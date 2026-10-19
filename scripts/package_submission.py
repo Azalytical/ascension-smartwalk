@@ -6,7 +6,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'deliverables' / 'ascension-smartwalk-submission.zip'
-files = [ROOT / name for name in ['README.md', 'LICENSE', 'package.json', 'package-lock.json', '.env.example']]
+files = [ROOT / name for name in ['README.md', 'LICENSE', 'package.json', 'package-lock.json', '.env.example', '.gitattributes']]
 for folder in ['public', 'src', 'data', 'tests', 'scripts', 'drizzle']:
     files += [p for p in (ROOT / folder).rglob('*') if p.is_file() and '__pycache__' not in p.parts]
 for name in ['ascension-smartwalk-presentation.pptx', 'ascension-smartwalk-presentation.pdf',
