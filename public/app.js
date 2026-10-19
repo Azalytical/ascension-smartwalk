@@ -13,8 +13,6 @@
     water: { start: 'embankment', minutes: 45, maxWalk: 15, child: false, query: 'Хочу выдохнуть у воды, спокойно пройтись и полюбоваться видом.' }
   };
   const categoryNames = { cafe: 'Кофе и еда', coffee: 'Кофе', restaurant: 'Кофе и еда', park: 'Зелёное место', garden: 'Зелёное место', nature: 'На природе', waterfront: 'У воды', water: 'У воды', attraction: 'Достопримечательность', museum: 'Музей', culture: 'Культура', playground: 'С ребёнком', leisure: 'Отдых', viewpoint: 'Красивый вид', monument: 'Городская история', square: 'Городское пространство', tourism: 'Открыть город', art: 'Искусство', mall: 'В помещении' };
-  const categoryIcons = { cafe: 'coffee', coffee: 'coffee', restaurant: 'food', park: 'park', garden: 'park', nature: 'park', waterfront: 'waterfront', water: 'waterfront', attraction: 'landmark', museum: 'museum', culture: 'museum', playground: 'family', leisure: 'park', viewpoint: 'landmark', monument: 'landmark', square: 'landmark', tourism: 'landmark', art: 'museum', mall: 'indoor' };
-  const utilityIcons = new Set(['search', 'location', 'pin', 'clock', 'walk', 'return', 'family', 'lock', 'expand', 'download', 'external', 'info', 'warning', 'close', 'nearby', 'route', 'saved', 'layers']);
   const state = { start: { ...starts.mega }, map: null, startMarker: null, placesLayer: null, routeLayer: null, markers: [], mapPick: false, result: null, request: null, loading: false, status: null, tileErrors: 0, hasTiles: false, selected: null };
 
   function element(tag, className, text) {
@@ -22,37 +20,6 @@
     if (className) node.className = className;
     if (text !== undefined && text !== null) node.textContent = String(text);
     return node;
-  }
-
-  function icon(name, className = '') {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('class', `ui-icon${className ? ` ${className}` : ''}`);
-    svg.setAttribute('aria-hidden', 'true');
-    svg.setAttribute('focusable', 'false');
-    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-    use.setAttribute('href', `/assets/icons/ui.svg#sw-${utilityIcons.has(name) ? name : 'pin'}`);
-    svg.append(use);
-    return svg;
-  }
-
-  function categoryIcon(category, className = 'category-icon') {
-    const asset = Object.hasOwn(categoryIcons, category) ? categoryIcons[category] : null;
-    if (!asset) return icon('pin', className);
-    const image = element('img', className);
-    image.src = `/assets/icons/categories/${asset}-64.webp`;
-    image.srcset = `/assets/icons/categories/${asset}-32.webp 1x, /assets/icons/categories/${asset}-64.webp 2x, /assets/icons/categories/${asset}-128.webp 4x`;
-    image.alt = '';
-    image.width = 32;
-    image.height = 32;
-    image.decoding = 'async';
-    return image;
-  }
-
-  function warningLine(message) {
-    const line = element('p', 'warning-line');
-    line.append(icon('warning'), element('span', '', message));
-    return line;
   }
 
   function cleanText(value, fallback = '') {
@@ -80,7 +47,6 @@
     link.href = href;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    link.append(icon('external'));
     return link;
   }
 
@@ -136,11 +102,8 @@
     }
   }
 
-  function markerIcon(kind, number, category) {
-    const marker = element('div', kind === 'start' ? 'map-start-marker' : 'map-poi-marker');
-    marker.setAttribute('aria-hidden', 'true');
-    if (kind !== 'start') marker.append(categoryIcon(category, 'marker-category-icon'), element('span', 'marker-number', number));
-    return window.L.divIcon({ className: 'custom-marker', html: marker, iconSize: kind === 'start' ? [22, 22] : [42, 42], iconAnchor: kind === 'start' ? [11, 11] : [21, 38], popupAnchor: [0, -30] });
+  function markerIcon(kind, number) {
+    return window.L.divIcon({ className: 'custom-marker', html: kind === 'start' ? '<div class="map-start-marker"></div>' : `<div class="map-poi-marker"><span>${number}</span></div>`, iconSize: kind === 'start' ? [22, 22] : [34, 34], iconAnchor: kind === 'start' ? [11, 11] : [17, 33], popupAnchor: [0, -25] });
   }
 
   function updateStartMarker() {
@@ -281,8 +244,7 @@
     } catch (error) {
       const message = error.name === 'AbortError' ? 'Подбор занял больше минуты. Проверьте соединение и попробуйте ещё раз.' : error instanceof TypeError ? 'Сервис сейчас недоступен. Проверьте соединение и попробуйте ещё раз — параметры прогулки уже заполнены.' : error.message;
       const copy = feedback('error', 'Прогулка подождёт минутку.', message);
-      const retry = element('button', 'secondary-button', 'Попробовать снова');
-      retry.append(icon('external'));
+      const retry = element('button', 'secondary-button', 'Попробовать снова ↗');
       retry.type = 'button';
       retry.addEventListener('click', recommend);
       copy.append(retry);
@@ -295,8 +257,7 @@
   function renderEmpty(result) {
     const copy = feedback('empty', 'Под этот ритм пока нет вариантов.', 'В нашей базе не нашлось места, куда получится сходить и вернуться за выбранное время. Попробуйте увеличить время, выбрать другую точку или уточнить пожелания.');
     const actions = element('div', 'empty-actions');
-    const addTime = element('button', 'secondary-button', 'Добавить 15 минут');
-    addTime.append(icon('external'));
+    const addTime = element('button', 'secondary-button', 'Добавить 15 минут ↗');
     addTime.type = 'button';
     addTime.disabled = Number($('minutes').value) >= 120;
     addTime.addEventListener('click', () => {
@@ -330,7 +291,7 @@
       : summary ? `${model} написала это описание только по данным карточек ниже. Время, расстояние и часы работы считает сервер, а не модель.` : '';
     $('generation-note').hidden = !$('generation-note').textContent;
     const warnings = [...new Set([...(Array.isArray(result.warnings) ? result.warnings : []).filter((item) => typeof item === 'string'), ...shared])];
-    $('result-notices').replaceChildren(...warnings.map(warningLine));
+    $('result-notices').replaceChildren(...warnings.map((warning) => element('p', '', warning)));
     $('result-notices').hidden = !warnings.length;
     $('results').hidden = false;
     $('map-bottom-description').textContent = `${count === 1 ? 'Один вариант' : count === 2 ? 'Два варианта' : 'Три варианта'} — каждый с возвращением к началу.`;
@@ -343,9 +304,7 @@
     card.id = `place-${index}`;
     const top = element('div', 'card-topline');
     const labels = element('span', 'card-labels');
-    const category = element('span', 'category-label');
-    category.append(categoryIcon(place.category), element('span', '', Object.hasOwn(categoryNames, place.category) ? categoryNames[place.category] : 'Место в городе'));
-    labels.append(element('span', 'source-badge', 'Данные OSM'), category);
+    labels.append(element('span', 'source-badge', 'Данные OSM'), element('span', 'category-label', categoryNames[place.category] || 'Место в городе'));
     top.append(element('span', 'place-number', `ВАРИАНТ 0${index + 1}`), labels);
     const name = cleanText(place.name, 'Место в Астане');
     card.append(top, element('h3', '', name), element('p', 'place-why', cleanText(place.why, 'Подходит по расстоянию и времени на прогулку.')));
@@ -363,11 +322,9 @@
       track.append(part);
     });
     const breakdown = element('div', 'time-breakdown');
-    [[walk, 'Туда', 'walk'], [visit, 'На месте', 'clock'], [back, 'Обратно', 'return']].forEach(([minutes, label, iconName]) => {
+    [[walk, 'Туда'], [visit, 'На месте'], [back, 'Обратно']].forEach(([minutes, label]) => {
       const column = element('div');
-      const caption = element('span', 'time-caption');
-      caption.append(icon(iconName), document.createTextNode(label));
-      column.append(element('strong', '', `~${minutes} мин`), caption);
+      column.append(element('strong', '', `~${minutes} мин`), document.createTextNode(label));
       breakdown.append(column);
     });
     card.append(totalLine, track, breakdown);
@@ -382,14 +339,13 @@
     const warnings = (Array.isArray(place.warnings) ? place.warnings : []).filter((item) => typeof item === 'string' && !shared.has(item));
     if (warnings.length) {
       const notice = element('div', 'place-warnings');
-      notice.append(...warnings.map(warningLine));
+      notice.append(...warnings.map((warning) => element('p', '', warning)));
       card.append(notice);
     }
     card.append(element('div', 'card-spacer'));
     card.append(createEvidence(place));
     const actions = element('div', 'card-actions');
-    const mapButton = element('button', 'show-on-map', state.map ? 'Посмотреть на карте' : 'Координаты места');
-    mapButton.append(icon('external'));
+    const mapButton = element('button', 'show-on-map', state.map ? 'Посмотреть на карте ↗' : 'Координаты места ↗');
     mapButton.type = 'button';
     mapButton.addEventListener('click', () => selectPlace(index, place));
     const distance = numeric(place.distanceMeters);
@@ -400,9 +356,7 @@
 
   function createEvidence(place) {
     const details = element('details', 'source-details');
-    const summary = element('summary');
-    summary.append(icon('info'), document.createTextNode('Источники и сведения о месте'));
-    details.append(summary);
+    details.append(element('summary', '', 'Источники и сведения о месте'));
     const facts = element('div', 'source-facts');
     const evidence = Array.isArray(place.evidence) ? place.evidence : [];
     let date = place.retrievedAt || place.updatedAt || state.status?.updatedAt;
@@ -422,7 +376,7 @@
     });
     if (!facts.childElementCount) facts.append(element('p', '', 'Место найдено в базе городских объектов. Полнота сведений может различаться.'));
     if (sourceUrl) {
-      const sourceName = /openstreetmap\.org/.test(new URL(sourceUrl).hostname) ? 'Открыть источник: OpenStreetMap' : 'Открыть источник';
+      const sourceName = /openstreetmap\.org/.test(new URL(sourceUrl).hostname) ? 'Открыть источник: OpenStreetMap ↗' : 'Открыть источник ↗';
       facts.append(externalLink(sourceName, sourceUrl));
     }
     const dateLabel = formatDate(date);
@@ -441,7 +395,7 @@
       const lat = numeric(place.lat, NaN);
       const lon = numeric(place.lon, NaN);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-      const marker = window.L.marker([lat, lon], { icon: markerIcon('place', index + 1, place.category), title: `${index + 1}. ${cleanText(place.name, 'Место в Астане')}`, alt: `Вариант ${index + 1}: ${cleanText(place.name, 'Место в Астане')}` }).addTo(state.placesLayer);
+      const marker = window.L.marker([lat, lon], { icon: markerIcon('place', index + 1) }).addTo(state.placesLayer);
       const popup = element('div');
       popup.append(element('strong', '', cleanText(place.name, 'Место в Астане')), element('span', '', `~${Math.ceil(numeric(place.totalMinutes))} мин с возвращением`));
       marker.bindPopup(popup);
@@ -472,7 +426,7 @@
       if (window.innerWidth < 621) $('map').scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else {
       const url = `https://www.openstreetmap.org/?mlat=${encodeURIComponent(place.lat)}&mlon=${encodeURIComponent(place.lon)}#map=16/${encodeURIComponent(place.lat)}/${encodeURIComponent(place.lon)}`;
-      const link = externalLink('Открыть координаты на OpenStreetMap', url);
+      const link = externalLink('Открыть координаты на OpenStreetMap ↗', url);
       if (link) {
         const details = $(`place-${index}`).querySelector('details');
         details.open = true;
@@ -528,7 +482,7 @@
     content.replaceChildren();
     if (kind === 'privacy') {
       content.append(element('h2', '', 'Вы выбираете, чем поделиться.'), element('p', '', 'Геолокация запрашивается только после нажатия «Я здесь». Можно обойтись без неё: выбрать известную точку или нажать на карту.'), element('p', '', 'Координаты старта и пожелания отправляются сервису для подбора этой прогулки. Точная локация не записывается в историю приложения. Запрос может обрабатываться внешним сервисом генерации текста; не указывайте персональные данные.'), element('p', '', 'Карта загружается с серверов OpenStreetMap, а шрифт — с Google Fonts. При загрузке эти сервисы получают обычные сетевые данные, включая IP-адрес.'), element('p', '', 'При сохранении плана координаты старта попадут в скачанный JSON-файл. Файл остаётся у вас — учитывайте это, если делитесь им.'), element('p', 'dialog-footnote', 'База собрана из открытых источников. Часы работы, доступность, наличие розеток и другие условия могут быть неполными или устаревшими. Отсутствие сведений не считается подтверждением.'));
-      const source = externalLink('Данные OpenStreetMap и условия использования', 'https://www.openstreetmap.org/copyright');
+      const source = externalLink('Данные OpenStreetMap и условия использования ↗', 'https://www.openstreetmap.org/copyright');
       if (source) content.append(source);
     } else {
       content.append(element('h2', '', 'Хорошему дню достаточно небольшой прогулки.'), element('p', '', 'SmartWalk помогает выбрать место в Астане, когда свободного времени немного. У каждого варианта есть оценка дороги туда, времени на месте и возвращения к началу.'), element('p', '', 'Подбор опирается на базу настоящих городских объектов и ваши ограничения. Мы показываем источники и отмечаем неподтверждённые сведения.'), element('p', '', 'Пунктир на карте связывает точки по прямой. Это ориентир для выбора, а не готовая пешеходная навигация. Для прогулки проверьте реальные переходы и маршрут.'), element('p', 'dialog-footnote', 'Ascension · Build with AI Hackathon 2026 · Smart City · Астана'));
