@@ -11,7 +11,8 @@ https://youtu.be/EKrwOn43a5w
 Репозиторий:
 https://github.com/Azalytical/ascension-smartwalk
 
-Презентация: ascension-smartwalk-presentation.pptx / .pdf
+Презентация (11 слайдов): ascension-smartwalk-presentation.pdf, исходник в deck/index.html (открыть в браузере).
+Прежняя редактируемая версия: ascension-smartwalk-presentation.pptx
 Сценарии и ограничения: ascension-smartwalk-tests-and-limitations.pdf
 Речь и демонстрация: ascension-smartwalk-defense-and-screencast.pdf
 Локальное видео: ascension-smartwalk-demo.mp4
