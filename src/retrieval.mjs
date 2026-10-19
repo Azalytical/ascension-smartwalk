@@ -1,11 +1,14 @@
 /** Deterministic, source-grounded POI retrieval. No network, LLM or embeddings. */
 import { checkVisit } from './hours.mjs';
+import { placeMetadata, requestedConditions, conditionEvidence, budgetAssessment, sourceTags } from './place-data.mjs';
 
 const BOUNDS = Object.freeze({ minLat: 51, maxLat: 51.35, minLon: 71.25, maxLon: 71.65 });
 const DETOUR = 1.35;
 const SPEED_KMH = 4.2;
 const RESERVE = 5;
 const VISIT = { park: 15, cafe: 20, museum: 35, playground: 20, attraction: 15, restaurant: 45, mall: 40, culture: 60 };
+// These are explicitly short visits, never promises of completing a meal, exhibition or performance.
+const MIN_VISIT = { park: 5, cafe: 10, museum: 20, playground: 10, attraction: 5, restaurant: 25, mall: 15, culture: 60 };
 const LABELS = { park: 'парк', cafe: 'кафе', museum: 'музей', playground: 'площадка', attraction: 'достопримечательность',
   restaurant: 'место, где поесть', mall: 'торговый центр', culture: 'место для культурного досуга' };
 // Categories that keep a visitor under a roof. Used for rain, cold and "indoor" requests.
@@ -86,12 +89,21 @@ function constraintsFor(input) {
   const lat = numeric(input.lat, NaN, 'Широта', BOUNDS.minLat, BOUNDS.maxLat);
   const lon = numeric(input.lon, NaN, 'Долгота', BOUNDS.minLon, BOUNDS.maxLon);
   const minutes = numeric(input.minutes, 60, 'Время прогулки', 10, 180);
-  const maxWalkMinutes = numeric(input.maxWalkMinutes, 20, 'Путь в одну сторону', 1, 180);
   if (input.withChild !== undefined && typeof input.withChild !== 'boolean') invalid('withChild должен быть логическим значением.');
   if (input.returnToStart !== undefined && typeof input.returnToStart !== 'boolean') invalid('returnToStart должен быть логическим значением.');
   if (input.query !== undefined && typeof input.query !== 'string') invalid('Запрос должен быть текстом.');
   const query = (input.query ?? '').trim();
   if (query.length > 500) invalid('Запрос должен быть не длиннее 500 символов.');
+  if (input.preferences !== undefined && typeof input.preferences !== 'string') invalid('Особые предпочтения должны быть текстом.');
+  const preferences = (input.preferences ?? '').trim();
+  if (preferences.length > 500) invalid('Особые предпочтения должны быть не длиннее 500 символов.');
+  if (input.indoor !== undefined && typeof input.indoor !== 'boolean') invalid('indoor должен быть логическим значением.');
+  const budget = input.budget === undefined || input.budget === null || input.budget === '' ? null
+    : numeric(input.budget, null, 'Бюджет в тенге', 0, 1000000);
+  const preferenceText = `${query}. ${preferences}`;
+  const explicitWalk = preferenceText.match(/(?:не (?:больше|более)|максимум|до|at most|no more than)\s*(\d{1,3})\s*(?:минут[уы]?|мин|min(?:utes?)?)\s*(?:пешком|ходьбы|walk)/iu);
+  const derivedWalk = explicitWalk ? Number(explicitWalk[1]) : Math.max(1, Math.floor((minutes - RESERVE) / (input.returnToStart === false ? 1 : 2)));
+  const maxWalkMinutes = numeric(input.maxWalkMinutes, derivedWalk, 'Путь в одну сторону', 1, 180);
   const suppliedCategory = normalize(input.category).trim();
   const category = ['', 'all', 'any', 'все'].includes(suppliedCategory) ? null
     : Object.hasOwn(VISIT, suppliedCategory) ? suppliedCategory
@@ -103,7 +115,8 @@ function constraintsFor(input) {
       || Number.isNaN(Date.parse(input.visitDate))) invalid('Некорректная дата посещения.');
     visitDate = input.visitDate;
   }
-  return { lat, lon, minutes, maxWalkMinutes, query, category, withChild: input.withChild ?? false,
+  return { lat, lon, minutes, maxWalkMinutes, query, preferences, budget, budgetCurrency: 'KZT', indoor: input.indoor ?? false,
+    specialConditions: requestedConditions(preferenceText, preferences), category, withChild: input.withChild ?? false,
     returnToStart: input.returnToStart ?? true, visitDate, timezone: 'Asia/Qyzylorda',
     safetyReserveMinutes: RESERVE, detourFactor: DETOUR, walkingSpeedKmh: SPEED_KMH,
     distanceMethod: 'haversine', walkTimeIsEstimate: true, alternativesAreSeparate: true };
@@ -121,6 +134,13 @@ function queryCategories(query) {
   // Category intent is lexical. Negated categories must never become positive requirements.
   const positive = normalize(query).replace(/(?:^|[^\p{L}\p{N}])(?:не|без|not|no|without)\s+[\p{L}]+/gu, '');
   const categories = Object.entries(SYNONYMS).filter(([, words]) => words.some(word => positive.includes(word))).map(([category]) => category);
+  if (/поесть|пообед|поужин|перекус|покуш|еда|food|\beat\b|lunch|dinner|тамақ/iu.test(positive)) {
+    if (!categories.includes('restaurant')) categories.push('restaurant');
+    if (!categories.includes('cafe')) categories.push('cafe');
+  }
+  if (/необыч|интересн|unusual|something new|ерекше/iu.test(positive)) {
+    for (const category of ['museum', 'attraction', 'culture']) if (!categories.includes(category)) categories.push(category);
+  }
   if (INDOOR_INTENT.test(positive)) {
     // Weather overrides outdoor wishes: keep only roofed categories, add all of them when none was named.
     const roofed = categories.filter(category => INDOOR.includes(category));
@@ -139,6 +159,14 @@ function safeSourceUrl(value) {
   if (typeof value !== 'string') return null;
   try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) ? url.href : null; }
   catch { return null; }
+}
+
+function evidenceSource(poi, field) {
+  const source = poi.fieldSources?.[field];
+  return source && typeof source === 'object' ? {
+    sourceUrl: safeSourceUrl(source.sourceUrl), retrievedAt: source.retrievedAt ?? null,
+    ...(source.source ? { source: source.source } : {}),
+  } : { sourceUrl: poi.sourceUrl, retrievedAt: poi.retrievedAt ?? null, source: poi.source };
 }
 
 function normalName(poi) {
@@ -171,7 +199,7 @@ function placeIndex() {
 function activitiesFor(category) {
   return ({
     park: ['Выделить время на короткую прогулку; доступ на территорию и условия на месте уточнить заранее.'],
-    cafe: ['Сделать перерыв на кофе; меню, наличие мест и удобств уточнить у заведения.'],
+    cafe: ['Перекусить или сделать перерыв; меню, наличие мест и удобств уточнить у заведения.'],
     museum: ['Осмотреть экспозицию после проверки режима работы, билетов и доступности входа.'],
     playground: ['Осмотреть площадку и самостоятельно оценить, подходят ли оборудование и условия ребёнку.'],
     attraction: ['Осмотреть место и сделать фотографии там, где это разрешено; доступ уточнить заранее.'],
@@ -199,9 +227,14 @@ function warningsFor(poi, constraints, hours) {
   if (!access) warnings.push('Условия входа и доступ на территорию неизвестны; уточните перед выходом.');
   else warnings.push(`Условия доступа в источнике: ${access}. Актуальные ограничения на вход не проверены.`);
   if (constraints.withChild) warnings.push('Категория подходит для поиска прогулки с ребёнком; безопасность, возрастные ограничения и доступность не проверены.');
-  if (/розет|socket|outlet|қуат|заряд/i.test(constraints.query)) warnings.push('Наличие доступных посетителю розеток не подтверждено.');
-  if (/тих|quiet|тыныш|спокой/i.test(constraints.query)) warnings.push('Тишина и текущий уровень шума не подтверждены.');
-  if (/коляск|wheelchair|доступн|арбамен|арба/i.test(constraints.query)) warnings.push('Безбарьерность входа и всего пути не подтверждена.');
+  for (const condition of constraints.specialConditions) {
+    warnings.push(conditionEvidence(poi, condition.key)
+      ? `${condition.label}: отмечено в источнике; актуальное состояние${condition.key === 'wheelchair' ? ' и доступность всего пути' : ''} не проверены.`
+      : condition.unknown);
+  }
+  if (!poi.averageCheck && ['cafe', 'restaurant'].includes(poi.category)) warnings.push('Средний чек неизвестен; уточните цены у заведения.');
+  if (poi.budgetStatus === 'unknown') warnings.push('Соответствие бюджету не подтверждено: стоимость в тенге неизвестна.');
+  if (poi.budgetStatus === 'confirmed') warnings.push('Средний чек из источника укладывается в бюджет; итоговая сумма зависит от заказа.');
   return warnings;
 }
 
@@ -222,12 +255,13 @@ function prepare(pois) {
       counters.invalidRecords++; continue;
     }
     if (!category) { counters.unsupportedCategory++; continue; }
-    const poi = { ...row, category, sourceUrl };
+    const poi = { ...row, id: String(row.id), category, sourceUrl, ...placeMetadata({ ...row, sourceUrl }) };
     const access = normalize(poi.access ?? (poi.tags && !Array.isArray(poi.tags) ? poi.tags.access : null));
     if (['private', 'no', 'military'].includes(access)) { counters.restrictedAccess++; continue; }
     if (seen.has(poi)) { counters.duplicates++; continue; }
     seen.add(poi);
-    unique.push({ poi, text: normalize(`${poi.name} ${poi.description ?? ''} ${tagText(poi.tags)}`) });
+    const names = [poi.name, poi.nameRu, poi.nameKk, poi.nameEn, ...(Array.isArray(poi.aliases) ? poi.aliases : [])].filter(value => typeof value === 'string');
+    unique.push({ poi, nameText: normalize(names.join(' ')), text: normalize(`${names.join(' ')} ${poi.description ?? ''} ${tagText(poi.tags)}`) });
   }
   const result = { unique, counters };
   preparedDatasets.set(pois, result);
@@ -243,6 +277,29 @@ export function prepareDataset(dataset) {
   prepare(poisOf(dataset));
 }
 
+/** Search the same validated, public, deduplicated source records used by retrieval. */
+export function searchLocations(dataset, options = {}) {
+  if (typeof options.q !== 'undefined' && typeof options.q !== 'string') invalid('Поиск локации должен быть текстом.');
+  const q = (options.q ?? '').trim();
+  if (q.length > 100) invalid('Поиск локации должен быть не длиннее 100 символов.');
+  const limit = numeric(options.limit, 30, 'Количество локаций', 1, 50);
+  if (!Number.isInteger(limit)) invalid('Количество локаций должно быть целым числом.');
+  const terms = normalize(q).split(/\s+/u).filter(Boolean);
+  const matches = prepare(poisOf(dataset)).unique.filter(record => terms.every(term => record.nameText.includes(term)));
+  const initialRank = poi => /экспо|expo|байтерек|baiterek|национальн.{0,20}музей|national museum/iu.test(poi.name) ? 3
+    : ['park', 'museum', 'attraction', 'culture', 'mall'].includes(poi.category) ? 1 : 0;
+  matches.sort((a, b) => (q ? Number(b.nameText.startsWith(normalize(q))) - Number(a.nameText.startsWith(normalize(q))) : initialRank(b.poi) - initialRank(a.poi))
+    || a.poi.name.localeCompare(b.poi.name, 'ru') || String(a.poi.id).localeCompare(String(b.poi.id), 'en'));
+  const locations = matches.slice(0, limit).map(({ poi }) => {
+    const tags = sourceTags(poi);
+    const address = typeof poi.address === 'string' ? poi.address : tags['addr:full']
+      ?? [tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join(', ');
+    return { id: poi.id, name: poi.name, lat: poi.lat, lon: poi.lon, category: poi.category,
+      ...(address ? { address } : {}) };
+  });
+  return { locations, total: matches.length, returned: locations.length, query: q };
+}
+
 /**
  * Return up to three independent alternatives backed by existing POI records.
  * Accepts an array, or a dataset wrapper { pois: [...] }. Does not mutate inputs.
@@ -250,10 +307,13 @@ export function prepareDataset(dataset) {
 export function recommend(dataset, input) {
   const constraints = constraintsFor(input);
   const pois = poisOf(dataset);
+  const preferenceText = `${constraints.query}. ${constraints.preferences}`;
   const requested = queryCategories(constraints.query);
-  const excluded = excludedCategories(constraints.query);
-  const terms = tokens(constraints.query);
-  const counters = { invalidRecords: 0, unsupportedCategory: 0, restrictedAccess: 0, duplicates: 0, category: 0, walkBudget: 0, totalBudget: 0, closedByHours: 0 };
+  const excluded = excludedCategories(preferenceText);
+  const terms = tokens(preferenceText);
+  const wantsFree = /бесплат|\bfree\b|тегін/iu.test(preferenceText);
+  const needsIndoor = constraints.indoor || INDOOR_INTENT.test(normalize(preferenceText));
+  const counters = { invalidRecords: 0, unsupportedCategory: 0, restrictedAccess: 0, duplicates: 0, category: 0, walkBudget: 0, totalBudget: 0, closedByHours: 0, budget: 0, specialConditions: 0, indoor: 0 };
   // Hours are checked against the requested visit time, or against now when no time was given.
   // A date without a time cannot be checked; minutes are dropped so equal requests give equal answers.
   const reference = constraints.visitDate
@@ -269,14 +329,19 @@ export function recommend(dataset, input) {
       || (!constraints.category && requested.length > 0 && !requested.includes(category))
       || excluded.includes(category)
       || (constraints.withChild && !['park', 'playground'].includes(category))) { counters.category++; continue; }
+    if (needsIndoor && (!INDOOR.includes(category) || normalize(sourceTags(poi).indoor) === 'no')) { counters.indoor++; continue; }
+    if (constraints.specialConditions.some(condition => condition.required && !conditionEvidence(poi, condition.key))) { counters.specialConditions++; continue; }
+    const cost = budgetAssessment(poi, constraints.budget, wantsFree);
+    if (!cost.allowed) { counters.budget++; continue; }
 
     const directDistance = haversineMeters(constraints.lat, constraints.lon, poi.lat, poi.lon);
     const walkMinutes = Math.ceil(directDistance * DETOUR / (SPEED_KMH * 1000 / 60));
     const returnMinutes = constraints.returnToStart ? walkMinutes : 0;
-    const visitMinutes = VISIT[category];
+    const availableVisit = Math.floor(constraints.minutes - walkMinutes - returnMinutes - RESERVE);
+    const visitMinutes = Math.min(VISIT[category], availableVisit);
     const totalMinutes = walkMinutes + visitMinutes + returnMinutes + RESERVE;
     if (walkMinutes > constraints.maxWalkMinutes) { counters.walkBudget++; continue; }
-    if (totalMinutes > constraints.minutes) { counters.totalBudget++; continue; }
+    if (visitMinutes < MIN_VISIT[category]) { counters.totalBudget++; continue; }
     const hours = reference && poi.openingHours
       ? { ...checkVisit(poi.openingHours, new Date(reference.getTime() + walkMinutes * 60000), visitMinutes),
         arrivalAt: new Date(reference.getTime() + walkMinutes * 60000).toISOString() }
@@ -292,6 +357,8 @@ export function recommend(dataset, input) {
       timeFit: Math.round(15 * (1 - totalMinutes / constraints.minutes)),
       childCategory: constraints.withChild ? 5 : 0,
       hoursConfirmed: hours?.status === 'open' ? 5 : 0,
+      preferences: constraints.specialConditions.filter(condition => conditionEvidence(poi, condition.key)).length * 10,
+      knownBudget: constraints.budget !== null && ['confirmed', 'free'].includes(cost.status) ? 10 : 0,
     };
     const score = Object.values(scoreBreakdown).reduce((a, b) => a + b, 0);
     const reason = `${LABELS[category]}${categoryIntent ? ' соответствует выбранной категории' : ' рядом с выбранной точкой'}; `
@@ -302,12 +369,24 @@ export function recommend(dataset, input) {
       { field: 'category', label: 'Категория из данных POI', value: category, sourceUrl, retrievedAt: poi.retrievedAt ?? null },
       { field: 'coordinates', label: 'Координаты из источника', value: `${poi.lat}, ${poi.lon}`, sourceUrl, retrievedAt: poi.retrievedAt ?? null },
     ];
-    if (poi.description) evidence.push({ field: 'description', label: 'Описание из данных POI', value: String(poi.description), sourceUrl, retrievedAt: poi.retrievedAt ?? null });
-    if (poi.openingHours) evidence.push({ field: 'openingHours', label: 'Режим работы из источника, без проверки открытия', value: String(poi.openingHours), sourceUrl, retrievedAt: poi.retrievedAt ?? null });
-    candidates.push({ ...poi, distanceMeters: Math.ceil(directDistance), estimatedWalkDistanceMeters: Math.ceil(directDistance * DETOUR),
+    if (poi.description) evidence.push({ field: 'description', label: 'Описание из данных POI', value: String(poi.description), ...evidenceSource(poi, 'description') });
+    if (poi.openingHours) evidence.push({ field: 'openingHours', label: 'Режим работы из источника, без проверки открытия', value: String(poi.openingHours), ...evidenceSource(poi, 'openingHours') });
+    for (const field of ['averageCheck', 'rating', 'reviewCount', 'popularity', 'contacts']) {
+      const value = poi[field];
+      if (value !== null && (field !== 'contacts' || Object.values(value).some(Boolean))) evidence.push({ field, label: 'Сведения из источника', value, ...evidenceSource(poi, field) });
+    }
+    for (const condition of constraints.specialConditions.filter(condition => conditionEvidence(poi, condition.key))) {
+      evidence.push({ field: condition.key, label: `${condition.label}: отмечено в источнике`, value: true, ...evidenceSource(poi, condition.key) });
+    }
+    const assessedPoi = { ...poi, budgetStatus: cost.status };
+    candidates.push({ ...assessedPoi, distanceMeters: Math.ceil(directDistance), estimatedWalkDistanceMeters: Math.ceil(directDistance * DETOUR),
       walkMinutes, visitMinutes, returnMinutes, safetyReserveMinutes: RESERVE, totalMinutes,
-      why: reason, activities: activitiesFor(category), activitiesAreSuggestions: true,
-      warnings: warningsFor(poi, constraints, hours), evidence, score, scoreBreakdown, matchedTerms,
+      visitIsShortened: visitMinutes < VISIT[category],
+      why: reason, activities: visitMinutes < VISIT[category]
+        ? [`Короткий визит: около ${visitMinutes} мин. ${activitiesFor(category)[0]}`] : activitiesFor(category), activitiesAreSuggestions: true,
+      specialConditions: constraints.specialConditions.map(condition => ({ key: condition.key, label: condition.label, required: condition.required, evidenced: conditionEvidence(poi, condition.key) })),
+      warnings: [...warningsFor(assessedPoi, constraints, hours), ...(visitMinutes < VISIT[category]
+        ? ['Запланирован сокращённый визит; полноценный осмотр или обслуживание за это время не подтверждены.'] : [])], evidence, score, scoreBreakdown, matchedTerms,
       hoursCheck: hours ?? { status: poi.openingHours ? 'not_checked' : 'no_data' } });
   }
 
@@ -328,10 +407,13 @@ export function recommend(dataset, input) {
   ];
   if (constraints.visitDate && !reference) warnings.push('Указана дата без времени: режим работы на эту дату автоматически не проверяется.');
   if (counters.closedByHours) warnings.push(`Исключено мест, закрытых к моменту визита по режиму работы из источника: ${counters.closedByHours}.`);
+  if (counters.specialConditions) warnings.push(`Исключено мест без подтверждения обязательных условий из запроса: ${counters.specialConditions}.`);
+  if (counters.budget) warnings.push(`Исключено мест, не соответствующих бюджету или запросу о бесплатном посещении: ${counters.budget}.`);
   if (!recommendations.length) warnings.unshift('В текущем наборе данных нет подтверждённых вариантов под все ограничения. Увеличьте время или измените категорию и точку старта.');
-  return { recommendations, constraints, warnings,
+  if (!recommendations.length && constraints.specialConditions.some(condition => condition.required)) warnings.push(`Нужны данные, подтверждающие условия: ${constraints.specialConditions.filter(condition => condition.required).map(condition => condition.label).join(', ')}.`);
+  return { recommendations, preferredId: recommendations[0]?.id ?? null, constraints, warnings,
     retrieval: { method: 'deterministic_geo_keyword_retrieval', usesEmbeddings: false, usesLanguageModel: false,
-      summary: 'Фильтры по географии, категории, времени и режиму работы из OSM; поиск по словам и словарю ru/kk/en; объяснение по данным POI.',
+      summary: 'Фильтры по географии, категории, времени, бюджету и подтверждённым условиям; поиск по словам и словарю ru/kk/en; объяснение по данным источников POI.',
       inputRecords: pois.length, validUniqueRecords: prepared.unique.length, feasibleCandidates: candidates.length, returned: recommendations.length,
       requestedCategories: requested, excludedCategories: excluded, queryTerms: terms, rejected: counters,
       scoring: { category: 35, keywordsPerMatch: 5, keywordsCap: 20, proximityMax: 25, timeFitMax: 15, childCategory: 5, hoursConfirmed: 5, repeatCategoryPenalty: 8 },

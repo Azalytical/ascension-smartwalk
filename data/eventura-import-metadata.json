@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "importedAt": "2026-10-19T14:33:53.297761Z",
+  "sources": [
+    {
+      "file": "places-2gis.json",
+      "sha256": "f007cc15cf5ff3c0261b6d8ac3fffa5b57e602ceab21d0edcd6e4e7f1f720086",
+      "bytes": 417929,
+      "records": 944,
+      "importedRecords": 944,
+      "skippedInvalidRecords": 0
+    },
+    {
+      "file": "places.json",
+      "sha256": "2ad67b081a7d069301a19e2a1f145e9ec4a6954f6c953199ad860772d2367bcc",
+      "bytes": 28472,
+      "records": 51,
+      "importedRecords": 50,
+      "skippedInvalidRecords": 1
+    }
+  ],
+  "directoryRecords": 994,
+  "cityCounts": {
+    "Астана": 973,
+    "Косшы": 20,
+    "Караганда": 1
+  },
+  "categoryCounts": {
+    "unsupported": 243,
+    "restaurant": 529,
+    "cafe": 222
+  },
+  "recordsWithSourceCoordinates": 0,
+  "recordsWithKnownAverageCheck": 0,
+  "recordsWithKnownOpeningHours": 0,
+  "enrichmentRecords": 15,
+  "enrichedOsmPoints": 15,
+  "notes": [
+    "Eventura was read only; only places-2gis.json and places.json were read.",
+    "Mock venue constants, user data, credentials, bookings, reviews by individual authors and photos are excluded.",
+    "Coordinates, prices, opening hours and original retrieval dates are absent in the source exports and remain null.",
+    "reviewCount is a count of directory reviews, not popularity or a real-time signal.",
+    "No coordinate-free directory record can enter geographic retrieval until its location is verified.",
+    "Provider records remain separate: matching names do not prove matching branches.",
+    "Enrichment is allowed only for an exact normalized name plus street and house number; both records must describe a cafe or restaurant and the OSM match must be unique at that address. The OSM category is preserved.",
+    "The local snapshots contain no license grant; provider terms may apply. Their metadata is separate from OSM's ODbL provenance."
+  ]
+}

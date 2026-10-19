@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">SmartWalk</title>
+  <desc id="desc">A walking route loops from an orange starting point to a mint destination.</desc>
+  <rect width="64" height="64" rx="18" fill="#152b34"/>
+  <path d="M18 43c6-2 10-11 16-11h4c6 0 10-4 10-10s-4-10-10-10-10 4-10 10" fill="none" stroke="#7bd8bd" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m23 18 5 4 5-4" fill="none" stroke="#7bd8bd" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="18" cy="43" r="4" fill="#ee986d"/>
+  <circle cx="48" cy="22" r="2.5" fill="#7bd8bd"/>
+</svg>

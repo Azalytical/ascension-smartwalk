@@ -1,14 +1,16 @@
 import { readFile, mkdir, copyFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
+import { combineCatalog } from '../src/catalog.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const assets = {};
-for (const [name, type] of [['index.html', 'text/html; charset=utf-8'], ['app.js', 'text/javascript; charset=utf-8'], ['styles.css', 'text/css; charset=utf-8']]) {
+for (const [name, type] of [['index.html', 'text/html; charset=utf-8'], ['app.js', 'text/javascript; charset=utf-8'], ['styles.css', 'text/css; charset=utf-8'], ['icons.js', 'text/javascript; charset=utf-8'], ['smartwalk-mark.svg', 'image/svg+xml']]) {
   assets['/' + name] = { body: await readFile(resolve(root, 'public', name), 'utf8'), type };
 }
 assets['/'] = assets['/index.html'];
-const data = JSON.parse(await readFile(resolve(root, 'data/pois.json'), 'utf8'));
+const data = combineCatalog(JSON.parse(await readFile(resolve(root, 'data/pois.json'), 'utf8')),
+  JSON.parse(await readFile(resolve(root, 'data/eventura-enrichment.json'), 'utf8')));
 const code = `import {handleApi} from './src/api.mjs';
 import {prepareDataset} from './src/retrieval.mjs';
 const assets=${JSON.stringify(assets)};

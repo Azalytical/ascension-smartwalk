@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
 import { handleApi } from '../src/api.mjs';
+import { combineCatalog } from '../src/catalog.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 // SMARTWALK_PRODUCTION=1 (set in the Dockerfile for Cloud Run) listens on all interfaces and enforces the request budget.
@@ -11,7 +12,8 @@ const env = { GEMINI_API_KEY: process.env.GEMINI_API_KEY, GEMINI_MODEL: process.
   ...(production ? { MEMORY_BUDGET: true } : { LOCAL_DEVELOPMENT: true }) };
 const port = Number(process.env.PORT || 8789);
 const host = process.env.HOST || '127.0.0.1';
-const dataset = JSON.parse(await readFile(resolve(root, 'data/pois.json'), 'utf8'));
+const dataset = combineCatalog(JSON.parse(await readFile(resolve(root, 'data/pois.json'), 'utf8')),
+  JSON.parse(await readFile(resolve(root, 'data/eventura-enrichment.json'), 'utf8')));
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8' };
 createServer(async (req, res) => {
   try {
