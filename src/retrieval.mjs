@@ -1,17 +1,27 @@
 /** Deterministic, source-grounded POI retrieval. No network, LLM or embeddings. */
+import { checkVisit } from './hours.mjs';
+
 const BOUNDS = Object.freeze({ minLat: 51, maxLat: 51.35, minLon: 71.25, maxLon: 71.65 });
 const DETOUR = 1.35;
 const SPEED_KMH = 4.2;
 const RESERVE = 5;
-const VISIT = { park: 15, cafe: 20, museum: 35, playground: 20, attraction: 15 };
-const LABELS = { park: 'парк', cafe: 'кафе', museum: 'музей', playground: 'площадка', attraction: 'достопримечательность' };
+const VISIT = { park: 15, cafe: 20, museum: 35, playground: 20, attraction: 15, restaurant: 45, mall: 40, culture: 60 };
+const LABELS = { park: 'парк', cafe: 'кафе', museum: 'музей', playground: 'площадка', attraction: 'достопримечательность',
+  restaurant: 'место, где поесть', mall: 'торговый центр', culture: 'место для культурного досуга' };
+// Categories that keep a visitor under a roof. Used for rain, cold and "indoor" requests.
+const INDOOR = ['mall', 'museum', 'cafe', 'restaurant', 'culture'];
 const SYNONYMS = {
   park: ['park', 'парк', 'сквер', 'сад', 'саябақ', 'garden'],
   cafe: ['cafe', 'café', 'coffee', 'кофе', 'кафе', 'кофейн', 'кофехана', 'кафехана', 'кофеіш'],
   museum: ['museum', 'музей', 'мұражай', 'выставк', 'exhibition'],
   playground: ['playground', 'площадк', 'ойыналаң', 'ойын алаң', 'children play'],
   attraction: ['attraction', 'достопримечатель', 'көрікті', 'monument', 'памятник', 'ескерткіш', 'memorial', 'viewpoint', 'смотров'],
+  restaurant: ['restaurant', 'ресторан', 'поесть', 'пообед', 'поужин', 'обед', 'ужин', 'покуш', 'еда', 'food', 'eat', 'lunch', 'dinner',
+    'тамақ', 'мейрамхана', 'фастфуд', 'бургер', 'пицц'],
+  mall: ['mall', 'трц', 'торгов', 'молл', 'shopping', 'сауда орталы'],
+  culture: ['theatre', 'theater', 'театр', 'кино', 'cinema', 'movie', 'фильм', 'библиотек', 'library', 'кітапхана', 'концерт', 'спектакл'],
 };
+const INDOOR_INTENT = /дожд|ливень|rain|под крыш|в помещен|indoor|жаңбыр|мороз|холодн|cold|снег|snow|қар/;
 const STOP_WORDS = new Set(['хочу', 'нужен', 'нужна', 'нужно', 'рядом', 'меня', 'есть', 'сейчас', 'что', 'как', 'для', 'куда', 'можно', 'минут', 'час', 'часа', 'with', 'the', 'near', 'want', 'and', 'мен', 'үшін']);
 
 function normalize(value) {
@@ -35,13 +45,14 @@ function categoryOf(poi) {
   const direct = normalize(poi.category).trim();
   if (Object.hasOwn(VISIT, direct)) return direct;
   const aliases = { garden: 'park', monument: 'attraction', memorial: 'attraction', viewpoint: 'attraction',
-    artwork: 'attraction', gallery: 'attraction', theme_park: 'attraction' };
+    artwork: 'attraction', gallery: 'attraction', theme_park: 'attraction', fast_food: 'restaurant', ice_cream: 'cafe',
+    theatre: 'culture', cinema: 'culture', arts_centre: 'culture', library: 'culture', exhibition_centre: 'culture' };
   if (aliases[direct]) return aliases[direct];
   // Never inspect a name, brand, or description for structural classification.
   // For example, the cinema name "Кинопарк" does not make it a park.
   const tags = poi.tags;
   const values = Array.isArray(tags) ? tags.map(tag => normalize(tag).split('=')).filter(parts => parts.length <= 2).map(parts => parts.at(-1))
-    : tags && typeof tags === 'object' ? ['amenity', 'leisure', 'tourism', 'historic'].map(key => normalize(tags[key]))
+    : tags && typeof tags === 'object' ? ['amenity', 'leisure', 'tourism', 'historic', 'shop'].map(key => normalize(tags[key]))
       : typeof tags === 'string' ? normalize(tags).split(/[;,\s]+/).map(tag => tag.split('=').at(-1)) : [];
   for (const value of values) {
     if (Object.hasOwn(VISIT, value)) return value;
@@ -110,6 +121,11 @@ function queryCategories(query) {
   // Category intent is lexical. Negated categories must never become positive requirements.
   const positive = normalize(query).replace(/(?:^|[^\p{L}\p{N}])(?:не|без|not|no|without)\s+[\p{L}]+/gu, '');
   const categories = Object.entries(SYNONYMS).filter(([, words]) => words.some(word => positive.includes(word))).map(([category]) => category);
+  if (INDOOR_INTENT.test(positive)) {
+    // Weather overrides outdoor wishes: keep only roofed categories, add all of them when none was named.
+    const roofed = categories.filter(category => INDOOR.includes(category));
+    return roofed.length ? roofed : [...INDOOR];
+  }
   if (!categories.length && /погуля|прогул|серуен|\bwalk\b/.test(positive)) return ['park', 'attraction'];
   return categories;
 }
@@ -141,13 +157,24 @@ function activitiesFor(category) {
     museum: ['Осмотреть экспозицию после проверки режима работы, билетов и доступности входа.'],
     playground: ['Осмотреть площадку и самостоятельно оценить, подходят ли оборудование и условия ребёнку.'],
     attraction: ['Осмотреть место и сделать фотографии там, где это разрешено; доступ уточнить заранее.'],
+    restaurant: ['Пообедать или перекусить; меню, цены и наличие мест уточнить у заведения.'],
+    mall: ['Переждать погоду под крышей и пройтись по галереям; режим входа уточнить заранее.'],
+    culture: ['Проверить афишу или расписание сеансов и выбрать то, что помещается в ваше время.'],
   })[category];
 }
 
-function warningsFor(poi, constraints) {
-  const warnings = [poi.openingHours
-    ? 'Указан режим работы из источника; открытие в момент визита и исключения не проверены.'
-    : 'Режим работы неизвестен; открытие в момент визита не подтверждено.',
+function hoursWarning(poi, hours) {
+  if (!poi.openingHours) return 'Режим работы неизвестен; открытие в момент визита не подтверждено.';
+  if (hours?.status === 'open') {
+    return `По режиму работы из источника место открыто на всё время визита${hours.closesAt ? ` (до ${hours.closesAt})` : ', круглосуточно'}; `
+      + 'открытие в момент визита, праздники и исключения не проверены.';
+  }
+  if (hours?.status === 'unknown') return 'Указан режим работы из источника, но его формат не разобран автоматически; открытие в момент визита и исключения не проверены.';
+  return 'Указан режим работы из источника; открытие в момент визита и исключения не проверены.';
+}
+
+function warningsFor(poi, constraints, hours) {
+  const warnings = [hoursWarning(poi, hours),
   'Время посещения — плановая оценка, без очередей, билетов и текущей загрузки.'];
   if (!poi.retrievedAt) warnings.push('Дата получения сведений об этом месте неизвестна.');
   const access = normalize(poi.access ?? (poi.tags && !Array.isArray(poi.tags) ? poi.tags.access : null));
@@ -170,7 +197,12 @@ export function recommend(dataset, input) {
   const requested = queryCategories(constraints.query);
   const excluded = excludedCategories(constraints.query);
   const terms = tokens(constraints.query);
-  const counters = { invalidRecords: 0, unsupportedCategory: 0, restrictedAccess: 0, duplicates: 0, category: 0, walkBudget: 0, totalBudget: 0 };
+  const counters = { invalidRecords: 0, unsupportedCategory: 0, restrictedAccess: 0, duplicates: 0, category: 0, walkBudget: 0, totalBudget: 0, closedByHours: 0 };
+  // Hours are checked against the requested visit time, or against now when no time was given.
+  // A date without a time cannot be checked; minutes are dropped so equal requests give equal answers.
+  const reference = constraints.visitDate
+    ? (constraints.visitDate.includes('T') ? new Date(constraints.visitDate) : null)
+    : new Date(Math.floor(Date.now() / 60000) * 60000);
   const seen = [];
   const candidates = [];
 
@@ -199,6 +231,11 @@ export function recommend(dataset, input) {
     const totalMinutes = walkMinutes + visitMinutes + returnMinutes + RESERVE;
     if (walkMinutes > constraints.maxWalkMinutes) { counters.walkBudget++; continue; }
     if (totalMinutes > constraints.minutes) { counters.totalBudget++; continue; }
+    const hours = reference && poi.openingHours
+      ? { ...checkVisit(poi.openingHours, new Date(reference.getTime() + walkMinutes * 60000), visitMinutes),
+        arrivalAt: new Date(reference.getTime() + walkMinutes * 60000).toISOString() }
+      : null;
+    if (hours && ['closed', 'closes_early'].includes(hours.status)) { counters.closedByHours++; continue; }
 
     const text = normalize(`${poi.name} ${poi.description ?? ''} ${tagText(poi.tags)}`);
     const matchedTerms = terms.filter(term => text.includes(term));
@@ -209,10 +246,12 @@ export function recommend(dataset, input) {
       proximity: Math.round(25 * (1 - Math.min(1, walkMinutes / constraints.maxWalkMinutes))),
       timeFit: Math.round(15 * (1 - totalMinutes / constraints.minutes)),
       childCategory: constraints.withChild ? 5 : 0,
+      hoursConfirmed: hours?.status === 'open' ? 5 : 0,
     };
     const score = Object.values(scoreBreakdown).reduce((a, b) => a + b, 0);
     const reason = `${LABELS[category]}${categoryIntent ? ' соответствует выбранной категории' : ' рядом с выбранной точкой'}; `
-      + `примерно ${walkMinutes} мин в одну сторону, ${totalMinutes} мин ${constraints.returnToStart ? 'с возвращением' : 'без возвращения'} и резервом ${RESERVE} мин.`;
+      + `примерно ${walkMinutes} мин в одну сторону, ${totalMinutes} мин ${constraints.returnToStart ? 'с возвращением' : 'без возвращения'} и резервом ${RESERVE} мин`
+      + (hours?.status === 'open' ? `; по режиму работы из источника открыто ${hours.closesAt ? `до ${hours.closesAt}` : 'круглосуточно'}.` : '.');
     const evidence = [
       { field: 'name', label: 'Название из источника', value: poi.name, sourceUrl, retrievedAt: poi.retrievedAt ?? null },
       { field: 'category', label: 'Категория из данных POI', value: category, sourceUrl, retrievedAt: poi.retrievedAt ?? null },
@@ -223,7 +262,8 @@ export function recommend(dataset, input) {
     candidates.push({ ...poi, distanceMeters: Math.ceil(directDistance), estimatedWalkDistanceMeters: Math.ceil(directDistance * DETOUR),
       walkMinutes, visitMinutes, returnMinutes, safetyReserveMinutes: RESERVE, totalMinutes,
       why: reason, activities: activitiesFor(category), activitiesAreSuggestions: true,
-      warnings: warningsFor(poi, constraints), evidence, score, scoreBreakdown, matchedTerms });
+      warnings: warningsFor(poi, constraints, hours), evidence, score, scoreBreakdown, matchedTerms,
+      hoursCheck: hours ?? { status: poi.openingHours ? 'not_checked' : 'no_data' } });
   }
 
   candidates.sort((a, b) => b.score - a.score || a.walkMinutes - b.walkMinutes || String(a.id).localeCompare(String(b.id), 'en'));
@@ -241,13 +281,15 @@ export function recommend(dataset, input) {
     'Каждая карточка — отдельный вариант прогулки. В суммарное время входят путь, посещение, выбранный возврат и резерв 5 минут.',
     'Актуальное открытие мест, цены и наличие свободных мест не проверены.',
   ];
-  if (constraints.visitDate) warnings.push('Дата учтена как контекст запроса; часы и специальные закрытия на эту дату автоматически не проверяются.');
+  if (constraints.visitDate && !reference) warnings.push('Указана дата без времени: режим работы на эту дату автоматически не проверяется.');
+  if (counters.closedByHours) warnings.push(`Исключено мест, закрытых к моменту визита по режиму работы из источника: ${counters.closedByHours}.`);
   if (!recommendations.length) warnings.unshift('В текущем наборе данных нет подтверждённых вариантов под все ограничения. Увеличьте время или измените категорию и точку старта.');
   return { recommendations, constraints, warnings,
     retrieval: { method: 'deterministic_geo_keyword_retrieval', usesEmbeddings: false, usesLanguageModel: false,
-      summary: 'Фильтры по географии, категории и времени; поиск по словам и словарю ru/kk/en; объяснение по данным POI.',
+      summary: 'Фильтры по географии, категории, времени и режиму работы из OSM; поиск по словам и словарю ru/kk/en; объяснение по данным POI.',
       inputRecords: pois.length, validUniqueRecords: seen.length, feasibleCandidates: candidates.length, returned: recommendations.length,
       requestedCategories: requested, excludedCategories: excluded, queryTerms: terms, rejected: counters,
-      scoring: { category: 35, keywordsPerMatch: 5, keywordsCap: 20, proximityMax: 25, timeFitMax: 15, childCategory: 5, repeatCategoryPenalty: 8 },
+      scoring: { category: 35, keywordsPerMatch: 5, keywordsCap: 20, proximityMax: 25, timeFitMax: 15, childCategory: 5, hoursConfirmed: 5, repeatCategoryPenalty: 8 },
+      hoursReferenceTime: reference ? reference.toISOString() : null, hoursTimezone: 'UTC+05:00',
       scoreIsConfidence: false } };
 }

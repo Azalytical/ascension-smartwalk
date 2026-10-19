@@ -106,7 +106,8 @@ test('a cinema named Кинопарк is never inferred to be a park from name t
     tags: { amenity: 'cinema', name: 'IMAX Кинопарк7', operator: 'Coffee park' } });
   const result = recommend([cinema], { ...start, withChild: true });
   assert.equal(result.recommendations.length, 0);
-  assert.equal(result.retrieval.rejected.unsupportedCategory, 1);
+  assert.equal(result.retrieval.rejected.category, 1);
+  assert.equal(recommend([cinema], { ...start, minutes: 90 }).recommendations[0].category, 'culture');
   assert.equal(recommend([poi({ category: 'unknown', tags: { leisure: 'park' } })], start).recommendations[0].category, 'park');
 });
 
@@ -142,4 +143,37 @@ test('distance is haversine and walking estimate follows documented factors', ()
   assert.equal(rec.walkMinutes, Math.ceil(haversineMeters(start.lat, start.lon, 51.124, start.lon) * 1.35 / 70));
   assert.ok(rec.estimatedWalkDistanceMeters >= rec.distanceMeters);
   assert.equal(recommend([], start).constraints.walkTimeIsEstimate, true);
+});
+
+test('recorded hours exclude places closed or closing during the visit', () => {
+  const at = time => ({ ...start, minutes: 90, visitDate: `2026-10-19T${time}:00+05:00` });
+  const cafe = hours => poi({ id: hours, category: 'cafe', openingHours: hours, sourceUrl: `https://www.openstreetmap.org/node/${hours.length}` });
+  const closed = recommend([cafe('Mo-Su 10:00-22:00')], at('02:30'));
+  assert.equal(closed.recommendations.length, 0);
+  assert.equal(closed.retrieval.rejected.closedByHours, 1);
+  assert.ok(closed.warnings.some(w => w.includes('закрытых к моменту визита')));
+  assert.equal(recommend([cafe('Mo-Su 10:00-22:00')], at('21:50')).recommendations.length, 0);
+  const open = recommend([cafe('Mo-Su 10:00-22:00')], at('12:00')).recommendations[0];
+  assert.equal(open.hoursCheck.status, 'open');
+  assert.equal(open.hoursCheck.closesAt, '22:00');
+  assert.ok(open.why.includes('открыто до 22:00'));
+  assert.ok(open.warnings.some(w => w.includes('праздники и исключения не проверены')));
+  const odd = recommend([cafe('Mo-Su,PH 08:00+')], at('12:00')).recommendations[0];
+  assert.equal(odd.hoursCheck.status, 'unknown');
+  assert.equal(recommend([poi()], at('02:30')).recommendations[0].hoursCheck.status, 'no_data');
+  const dateOnly = recommend([cafe('Mo-Su 10:00-22:00')], { ...start, minutes: 90, visitDate: '2026-10-19' });
+  assert.equal(dateOnly.recommendations[0].hoursCheck.status, 'not_checked');
+  assert.equal(dateOnly.retrieval.hoursReferenceTime, null);
+});
+
+test('food, indoor and culture requests use the wider category set', () => {
+  const records = [poi(), poi({ id: 'r', name: 'Ресторан', category: 'restaurant', sourceUrl: 'https://www.openstreetmap.org/node/r' }),
+    poi({ id: 'm', name: 'ТРЦ', category: 'mall', sourceUrl: 'https://www.openstreetmap.org/node/m' }),
+    poi({ id: 'f', name: 'Бургерная', category: 'unknown', tags: { amenity: 'fast_food' }, sourceUrl: 'https://www.openstreetmap.org/node/f' })];
+  const food = recommend(records, { ...start, minutes: 120, query: 'Хочу поесть' });
+  assert.deepEqual(new Set(food.recommendations.map(r => r.category)), new Set(['restaurant']));
+  const rain = recommend(records, { ...start, minutes: 120, query: 'идёт дождь, хочу погулять' });
+  assert.ok(rain.recommendations.length > 0);
+  assert.ok(rain.recommendations.every(r => r.category !== 'park'));
+  assert.deepEqual(recommend(records, { ...start, minutes: 120, query: 'rain, any museum?' }).retrieval.requestedCategories, ['museum']);
 });

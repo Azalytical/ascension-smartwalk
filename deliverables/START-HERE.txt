@@ -3,7 +3,7 @@ ASCENSION · SMARTWALK · BUILD WITH AI 2026
 Проект: «Успею вернуться», секция AI for Smart City.
 
 Работающий прототип:
-https://ascension-smartwalk-astana.azamatbreach.chatgpt.site
+https://ascension-smartwalk.azamatbreach.workers.dev
 
 Видеообзор на YouTube (доступ по ссылке):
 https://youtu.be/EKrwOn43a5w
@@ -17,7 +17,8 @@ https://github.com/Azalytical/ascension-smartwalk
 Локальное видео: ascension-smartwalk-demo.mp4
 
 930 канонических POI из 933 исходных записей OpenStreetMap.
-23 автоматизированных теста пройдены. Три сценария проверены в опубликованном интерфейсе.
+35 автоматизированных тестов пройдены. Генерация: Gemini (gemini-3.8-flash), запасной ответ без модели.
+Три сценария ранее проверены в опубликованном интерфейсе.
 Каждая карточка — отдельная альтернатива, а не часть общего маршрута.
 Пешее время является оценкой по расстоянию. Открытие и условия посещения не гарантируются.
 

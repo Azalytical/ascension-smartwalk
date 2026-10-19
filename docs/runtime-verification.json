@@ -27,5 +27,39 @@
       "evidence": "deliverables/screenshots/unknown.png"
     }
   ],
-  "scope": "Three scenarios observed on deployed UI; the additional scenarios document is a test plan, not a claim all scenarios were executed."
+  "scope": "Three scenarios observed on deployed UI; the additional scenarios document is a test plan, not a claim all scenarios were executed.",
+  "geminiDeploy": {
+    "checkedAt": "2026-10-19T12:45:00+00:00",
+    "site": "https://ascension-smartwalk.azamatbreach.workers.dev",
+    "host": "Cloudflare Workers",
+    "status": {
+      "poiCount": 930,
+      "generationAvailable": true,
+      "generationProvider": "gemini",
+      "version": "1.1.0"
+    },
+    "recommendRequest": {
+      "lat": 51.1283,
+      "lon": 71.4304,
+      "minutes": 90,
+      "query": "идёт дождь, хочу поесть"
+    },
+    "recommendResponse": {
+      "http": 200,
+      "mode": "llm",
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "references": [
+        "osm:node:10598438988",
+        "osm:node:12909752901",
+        "osm:node:7670738828"
+      ]
+    },
+    "automatedTests": {
+      "passed": 35,
+      "failed": 0,
+      "command": "npm test"
+    },
+    "note": "The browserChecks above were made on the earlier chatgpt.site deployment with OpenAI."
+  }
 }
