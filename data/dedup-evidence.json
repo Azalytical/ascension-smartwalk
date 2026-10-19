@@ -2,11 +2,11 @@
   "sourceMetadata": {
     "source": "OpenStreetMap via Overpass API",
     "endpoint": "https://overpass-api.de/api/interpreter",
-    "retrievedAt": "2026-10-19T11:33:40+00:00",
-    "rawSha256": "c8373198b59e8bd575999957b16020924db45ed2d66c2a53cad30c12f91bc678",
+    "retrievedAt": "2026-10-19T11:37:55+00:00",
+    "rawSha256": "bffe4a4c120d303b73e771e7910e6f225c487069d7062f1021251c1daacbaf50",
     "queryFile": "dedup-evidence.ql",
     "rawFile": "dedup-evidence.raw.json",
-    "osmBaseTimestamp": "2026-10-19T11:32:36Z",
+    "osmBaseTimestamp": "2026-10-19T11:36:36Z",
     "license": "ODbL-1.0",
     "attribution": "© OpenStreetMap contributors",
     "attributionUrl": "https://www.openstreetmap.org/copyright"

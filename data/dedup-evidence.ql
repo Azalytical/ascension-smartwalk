@@ -6,5 +6,7 @@
   way(around:100,51.17933,71.37823)[building];
   way(around:80,51.16924,71.41841)[building];
   node(around:500,51.08909,71.40733)[entrance];
+  way(around:100,51.161,71.423)[highway~"^(footway|pedestrian|path)$"];
+  nwr(around:100,51.161,71.423)[natural=water];
 );
 out meta center geom;
