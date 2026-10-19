@@ -4,7 +4,7 @@ import { resolve, extname } from 'node:path';
 import { handleApi } from '../src/api.mjs';
 
 const root = resolve(import.meta.dirname, '..');
-const env = { OPENAI_API_KEY: process.env.OPENAI_API_KEY, OPENAI_MODEL: process.env.OPENAI_MODEL };
+const env = { OPENAI_API_KEY: process.env.OPENAI_API_KEY, OPENAI_MODEL: process.env.OPENAI_MODEL, LOCAL_DEVELOPMENT: true };
 const port = Number(process.env.PORT || 8789);
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8' };
 createServer(async (req, res) => {

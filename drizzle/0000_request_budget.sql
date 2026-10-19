@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS request_budget (
+  bucket TEXT PRIMARY KEY NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);

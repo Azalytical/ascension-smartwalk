@@ -75,23 +75,27 @@ async function generate(result, query, env) {
 async function rateLimit(request, env) {
   if (env.RATE_LIMITER) {
     const outcome = await env.RATE_LIMITER.limit({ key: request.headers.get('CF-Connecting-IP') || 'anonymous' });
-    return outcome.success;
+    return { allowed: outcome.success, generationAllowed: outcome.success };
   }
-  // Hosted demo: best-effort short-lived counters. No location or query is retained.
-  if (typeof caches === 'undefined') return true;
+  if (env.LOCAL_DEVELOPMENT) return { allowed: true, generationAllowed: true };
+  if (!env.DB) return { allowed: true, generationAllowed: false };
+  // Atomic request budgets. Only salted IP hashes and aggregate counters are stored.
   const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('oai-authenticated-user-id') || 'anonymous';
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ip));
-  const hash = [...new Uint8Array(digest)].map(n => n.toString(16).padStart(2, '0')).join('');
-  const minute = Math.floor(Date.now() / 60000);
-  const cache = caches.default;
-  for (const [key, limit] of [[hash, 8], ['global', 120]]) {
-    const url = new URL(`/__limits/${minute}/${key}`, request.url).href;
-    const prior = await cache.match(url);
-    const count = prior ? Number(await prior.text()) : 0;
-    if (count >= limit) return false;
-    await cache.put(url, new Response(String(count + 1), { headers: { 'Cache-Control': 'max-age=65' } }));
+  try {
+    const day = Math.floor(Date.now() / 86400000);
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${env.OPENAI_API_KEY || 'demo'}:${day}:${ip}`));
+    const hash = [...new Uint8Array(digest)].map(n => n.toString(16).padStart(2, '0')).join('');
+    const now = Math.floor(Date.now() / 1000);
+    for (const [bucket, limit] of [[`minute:${Math.floor(now / 60)}:${hash}`, 8], [`day:${day}:global`, 500]]) {
+      const result = await env.DB.prepare('INSERT INTO request_budget (bucket, used, created_at) VALUES (?, 1, ?) ON CONFLICT(bucket) DO UPDATE SET used = used + 1 WHERE used < ? RETURNING used').bind(bucket, now, limit).first();
+      if (!result) return { allowed: false, generationAllowed: false };
+    }
+    await env.DB.prepare('DELETE FROM request_budget WHERE created_at < ?').bind(now - 86400).run();
+    return { allowed: true, generationAllowed: true };
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'request_budget_unavailable', message: String(error?.message || 'Unknown').slice(0, 200) }));
+    return { allowed: true, generationAllowed: false };
   }
-  return true;
 }
 
 export async function handleApi(request, env = {}, dataset = []) {
@@ -112,13 +116,17 @@ export async function handleApi(request, env = {}, dataset = []) {
     const body = await limitedJson(request, 8192);
     if (typeof body.query !== 'undefined' && (typeof body.query !== 'string' || body.query.length > 800)) return json({ error: 'Запрос должен быть текстом до 800 символов' }, 400);
     const result = recommend(pois, body);
-    if (!await rateLimit(request, env)) return json({ error: 'Слишком много запросов. Попробуйте через минуту.' }, 429, { 'Retry-After': '60' });
-    const generation = await generate(result, body.query, env);
+    const budget = await rateLimit(request, env);
+    if (!budget.allowed) return json({ error: 'Лимит запросов демо исчерпан. Попробуйте позднее.' }, 429, { 'Retry-After': '60' });
+    const generation = budget.generationAllowed
+      ? await generate(result, body.query, env)
+      : { mode: 'fallback', summary: safeSummary(result), references: [], reason: 'request_budget_unavailable' };
     return json({ ...result, generation, dataset: { source: 'OpenStreetMap', poiCount: pois.length,
       updatedAt: dataset.retrievedAt || pois[0]?.retrievedAt || null, license: 'ODbL-1.0' } });
   } catch (error) {
     if (error?.code === 'INVALID_INPUT' || error instanceof SyntaxError) return json({ error: error?.code === 'INVALID_INPUT' ? error.message : 'Некорректный JSON' }, 400);
     if (error?.message === 'RESPONSE_TOO_LARGE') return json({ error: 'Запрос слишком большой' }, 413);
+    console.error(JSON.stringify({ event: 'smartwalk_request_error', name: error?.name, message: String(error?.message || 'Unknown').slice(0, 300) }));
     return json({ error: 'Не удалось подобрать прогулку. Попробуйте ещё раз.' }, 500);
   }
 }

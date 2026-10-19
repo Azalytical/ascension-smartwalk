@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-10-19T11:36:09Z",
+  "policy": "Reviewed dataset entity grouping only; do not edit or delete original OSM objects. Fingerprint changes require re-review; proximity or shared chain contacts alone do not merge.",
+  "pairs": [
+    {
+      "reviewId": "mega-silk-way",
+      "ids": [
+        "osm:node:4965336822",
+        "osm:way:499328514"
+      ],
+      "decision": "merge",
+      "primaryId": "osm:way:499328514",
+      "confidence": "high",
+      "rationale": "The named mall node lies inside the same-named mall building polygon; multilingual names agree, centres are 16.51 m apart, and mapped categories agree. Use the richer building record as the primary mall destination.",
+      "evidence": [
+        {
+          "file": "dedup-evidence.json",
+          "facts": [
+            "node4965336822 is inside way499328514",
+            "both shop=mall",
+            "secondary name:en Mega SilkWay Astana matches primary Mega Silk Way"
+          ]
+        },
+        {
+          "url": "https://www.openstreetmap.org/way/499328514"
+        },
+        {
+          "url": "https://www.openstreetmap.org/node/4965336822"
+        }
+      ],
+      "sourceFingerprints": {
+        "osm:node:4965336822": "3a1071b6a1c80047051c7b20269030a66d3f48ac9f142cbbdcbaae6741c354bf",
+        "osm:way:499328514": "48fc38da7d35f2c09cd2509b562e07da13f5bd10ac08c487294b604879a62155"
+      }
+    },
+    {
+      "reviewId": "coffee-like-distinct",
+      "ids": [
+        "osm:node:6494912583",
+        "osm:node:7569174946"
+      ],
+      "decision": "retain_distinct",
+      "confidence": "high",
+      "rationale": "The mapper explicitly recorded that these are two nearby outlets, not a duplicate, in changeset85941414 while creating one and updating the other. Shared brand contacts and the same building do not override this direct mapping evidence. Their opening hours differ.",
+      "evidence": [
+        {
+          "file": "dedup-coffee-like-changeset-85941414.xml",
+          "url": "https://www.openstreetmap.org/changeset/85941414",
+          "mapperComment": "не дубль, у них две точки рядом",
+          "changesCount": 2
+        },
+        {
+          "file": "dedup-evidence.json",
+          "facts": [
+            "both in building way240369033 at Imanov36; building containment alone is insufficient"
+          ]
+        }
+      ],
+      "sourceFingerprints": {
+        "osm:node:6494912583": "b896796bf1b21adf440eac0fd66290e42d4d1159e6bec825c3930022695b5986",
+        "osm:node:7569174946": "28afbabe7bbde8bbb63634d372cdbc171780f179d64660b74e1f3c4b935b2211"
+      }
+    },
+    {
+      "reviewId": "shashlychok-unconfirmed",
+      "ids": [
+        "osm:node:12049030099",
+        "osm:node:12049030108"
+      ],
+      "decision": "retain_unconfirmed",
+      "confidence": "insufficient_to_merge",
+      "rationale": "Despite a 22.21 m distance and matching chain contacts/hours, the two points lie in different mapped building footprints (way1105503951 versus way923756720). Shared contacts occur at many branches and are not branch identity evidence. Do not merge without same-premises confirmation.",
+      "evidence": [
+        {
+          "file": "dedup-evidence.json",
+          "facts": [
+            "node12049030099 inside building way1105503951",
+            "node12049030108 inside building way923756720, Seidalina15e"
+          ]
+        },
+        {
+          "url": "https://shashlychok.kz/",
+          "role": "official chain website; common contacts do not identify a branch"
+        }
+      ],
+      "sourceFingerprints": {
+        "osm:node:12049030099": "1684f64727f4439c76931f823793a04b8893568dfffaaf23c5632bcea3d549c8",
+        "osm:node:12049030108": "2e6d3a7cd590022f34a444cc55c5bb70489a0e9a7f3f137b4f2e0309f1af33fa"
+      }
+    },
+    {
+      "reviewId": "coffee-stories",
+      "ids": [
+        "osm:node:12973394495",
+        "osm:node:12990081601"
+      ],
+      "decision": "merge",
+      "primaryId": "osm:node:12973394495",
+      "confidence": "supported_by_mapping_evidence",
+      "rationale": "The identically named cafe points are 7.09 m apart inside the same building way30012527 at Omarov53; amenity and cuisine agree, tags are complementary, and no unit/level/address conflict is mapped. Treat as one dataset destination, retaining the richer accessibility/seating record as primary and the second source address. This is a source-based entity decision, not a new field survey.",
+      "evidence": [
+        {
+          "file": "dedup-evidence.json",
+          "facts": [
+            "both nodes inside way30012527",
+            "mapped building address Omarov53 matches node12990081601"
+          ]
+        },
+        {
+          "url": "https://www.openstreetmap.org/node/12973394495"
+        },
+        {
+          "url": "https://www.openstreetmap.org/node/12990081601"
+        }
+      ],
+      "sourceFingerprints": {
+        "osm:node:12973394495": "afe3b0605c7ae58e9f51162bead4dec3e3a8e913bdc07794742983e132511d48",
+        "osm:node:12990081601": "8d57d097fe5e9c944c72a8e58a0caf1e0a5928a2456fae0bdac02b667ed9e229"
+      }
+    },
+    {
+      "reviewId": "ataturk-park",
+      "ids": [
+        "osm:way:502046662",
+        "osm:way:1460702136"
+      ],
+      "decision": "merge",
+      "primaryId": "osm:way:1460702136",
+      "confidence": "high",
+      "rationale": "Both leisure=park polygons describe Ataturk Park with equivalent names; all16 vertices of the smaller footprint are inside the larger same-named footprint and centres differ by18.20 m. Group as one named park destination while retaining both original geometries in evidence and both source records. Use the larger park footprint as primary.",
+      "evidence": [
+        {
+          "file": "dedup-evidence.json",
+          "facts": [
+            "16/16 vertices of way502046662 inside way1460702136",
+            "0/56 vertices of larger footprint inside smaller"
+          ]
+        },
+        {
+          "url": "https://www.openstreetmap.org/way/502046662"
+        },
+        {
+          "url": "https://www.openstreetmap.org/way/1460702136"
+        }
+      ],
+      "sourceFingerprints": {
+        "osm:way:502046662": "00a99047cb4ce948f748ff40530696ae8d1c46980405d9fd735f0bfd121beffd",
+        "osm:way:1460702136": "20122cf966bc41a5de404b948c890258d87c5dbc81dffc0c6dcdffbc97a3067e"
+      }
+    }
+  ]
+}

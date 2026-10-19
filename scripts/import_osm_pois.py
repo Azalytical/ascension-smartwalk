@@ -8,6 +8,7 @@ All output stays in ../data. The raw response is retained byte-for-byte.
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 from collections import Counter
 from datetime import datetime, timezone
 import hashlib
@@ -228,7 +229,121 @@ def normalize(raw, meta):
     return sorted(pois, key=lambda p: p["id"]), excluded, duplicate_ids, candidates
 
 
-def quality(pois, raw, meta, excluded, duplicate_ids, candidates):
+def source_fingerprint(poi):
+    """Bind reviewed decisions to source content/version, not download time."""
+    fields = ("id", "lat", "lon", "category", "tags", "osmVersion", "osmUpdatedAt")
+    body = json.dumps({k: poi[k] for k in fields}, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
+def apply_reviewed_dedup(originals, candidates):
+    """Apply explicit, evidence-backed decisions; proximity alone never merges."""
+    path = DATA / "dedup-decisions.json"
+    decisions = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"pairs": []}
+    by_id = {p["id"]: p for p in originals}
+    consumed, results, reviewed, resolved = set(), [], [], set()
+    for decision in decisions["pairs"]:
+        ids = decision["ids"]
+        review = deepcopy(decision)
+        valid = all(i in by_id and source_fingerprint(by_id[i]) == decision["sourceFingerprints"].get(i) for i in ids)
+        if not valid:
+            review["appliedStatus"] = "stale_source_requires_review"
+            reviewed.append(review)
+            continue
+        if decision["decision"] != "merge":
+            review["appliedStatus"] = decision["decision"]
+            if decision["decision"] == "retain_distinct":
+                resolved.add(tuple(sorted(ids)))
+            reviewed.append(review)
+            continue
+        if any(i in consumed for i in ids):
+            raise ValueError("Overlapping dedup decisions: " + str(ids))
+        sources = [deepcopy(by_id[i]) for i in ids]
+        primary = decision["primaryId"]
+        if primary not in ids or len({s["category"] for s in sources}) != 1:
+            raise ValueError("Invalid primary/category in dedup decision")
+        merged = deepcopy(by_id[primary])
+        # Keep every original record intact. The top-level projection uses the
+        # chosen primary, supplemented only by non-conflicting mapped values.
+        tags = dict(merged["tags"])
+        tag_sources, tag_values = {}, {}
+        for s in sources:
+            for key, value in s["tags"].items():
+                tag_sources.setdefault(key, []).append(s["id"])
+                tag_values.setdefault(key, []).append({"sourceId": s["id"], "value": value})
+                tags.setdefault(key, value)
+        conflicts = {k: values for k, values in tag_values.items() if len({v["value"] for v in values}) > 1}
+        merged["tags"] = tags
+        field_sources = {k: [primary] for k in ("id", "name", "lat", "lon", "category", "sourceUrl", "coordinateSource")}
+        for field, keys in {
+            "nameRu": ("name:ru",), "nameKk": ("name:kk",), "nameEn": ("name:en",),
+            "openingHours": ("opening_hours",), "phone": ("contact:phone", "phone"),
+            "website": ("contact:website", "website"), "email": ("contact:email", "email"),
+            "access": ("access",), "fee": ("fee",), "wheelchair": ("wheelchair",),
+        }.items():
+            key = next((k for k in keys if tags.get(k)), None)
+            if key is not None:
+                merged[field] = tags[key]
+                field_sources[field] = [v["sourceId"] for v in tag_values[key] if v["value"] == tags[key]]
+                if field not in ("nameRu", "nameKk", "nameEn") and key in conflicts:
+                    merged[field] = None
+                    field_sources[field] = []
+        merged["contacts"] = {k: merged[k] for k in ("phone", "website", "email")}
+        merged["description"], description_provenance = describe(tags, merged["category"])
+        merged["provenance"]["description"] = description_provenance
+        merged["provenance"]["description"]["tagSources"] = {
+            k: [v["sourceId"] for v in tag_values[k] if v["value"] == tags[k]]
+            for k in description_provenance["tagKeys"]}
+        merged["sourceRecords"] = sources
+        merged["osmIds"] = ids
+        merged["aliases"] = sorted({v for s in sources for k, v in s["tags"].items()
+                                    if k == "name" or k.startswith("name:") or k in ("official_name", "short_name")})
+        merged["deduplication"] = {"decisionId": decision["reviewId"], "primarySourceId": primary,
+                                   "method": "reviewed_source_evidence", "reviewedAt": decisions["reviewedAt"],
+                                   "rationale": decision["rationale"], "evidence": decision["evidence"],
+                                   "tagConflicts": conflicts, "tagSources": tag_sources, "fieldSources": field_sources}
+        results.append(merged)
+        consumed.update(ids)
+        resolved.add(tuple(sorted(ids)))
+        review["appliedStatus"] = "merged"
+        reviewed.append(review)
+    for p in originals:
+        if p["id"] not in consumed:
+            item = deepcopy(p)
+            item["sourceRecords"] = [deepcopy(p)]
+            item["osmIds"] = [p["id"]]
+            item["aliases"] = sorted({v for k, v in p["tags"].items()
+                                      if k == "name" or k.startswith("name:") or k in ("official_name", "short_name")})
+            results.append(item)
+    active = []
+    for candidate in candidates:
+        pair_key = tuple(sorted(candidate["ids"]))
+        if pair_key not in resolved:
+            retained = deepcopy(candidate)
+            review = next((x for x in reviewed if tuple(sorted(x["ids"])) == pair_key), None)
+            if review:
+                retained["action"] = review["appliedStatus"]
+                retained["reviewId"] = review["reviewId"]
+                retained["rationale"] = review["rationale"]
+            active.append(retained)
+    actual = {s["id"]: s for p in results for s in p["sourceRecords"]}
+    source_count = sum(len(p["sourceRecords"]) for p in results)
+    preservation = set(actual) == set(by_id) and source_count == len(by_id) and all(actual[i] == by_id[i] for i in by_id)
+    return sorted(results, key=lambda p: p["id"]), active, {
+        "decisionsFile": path.name if path.exists() else None,
+        "sourceOsmObjectCount": len(originals), "canonicalPoiCount": len(results),
+        "mergedPairCount": sum(p["appliedStatus"] == "merged" for p in reviewed),
+        "retainedDistinctPairCount": sum(p["appliedStatus"] == "retain_distinct" for p in reviewed),
+        "retainedUnconfirmedPairCount": sum(p["appliedStatus"] == "retain_unconfirmed" for p in reviewed),
+        "staleDecisionCount": sum(p["appliedStatus"] == "stale_source_requires_review" for p in reviewed),
+        "allOriginalSourceRecordsPreserved": preservation, "sourceRecordCount": source_count,
+        "uniqueSourceIds": len(actual), "reviewedPairs": reviewed,
+        "projectionPolicy": "Canonical id/coordinates come from primaryId; top-level tags add missing source keys with conflicts recorded. sourceRecords retain every original normalized record exactly.",
+        "reviewScope": "Only the five flagged pairs were reviewed; this is not a city-wide duplicate audit or field survey.",
+    }
+
+
+def quality(pois, raw, meta, excluded, duplicate_ids, candidates, dedup):
     areas = {
         "expoMega": {"label": "EXPO / MEGA Silk Way", "bbox": [51.080, 71.395, 51.107, 71.435]},
         "leftBankCenter": {"label": "Baiterek / Nurzhol / left-bank centre", "bbox": [51.115, 71.400, 51.145, 71.460]},
@@ -264,12 +379,14 @@ def quality(pois, raw, meta, excluded, duplicate_ids, candidates):
         "bboxActual": {"south": min(p["lat"] for p in pois), "west": min(p["lon"] for p in pois),
                        "north": max(p["lat"] for p in pois), "east": max(p["lon"] for p in pois)},
         "coverage": coverage, "possibleDuplicatePairs": candidates,
+        "deduplication": dedup,
         "completeness": {"withOpeningHours": sum(p["openingHours"] is not None for p in pois),
                          "withPhone": sum(p["phone"] is not None for p in pois),
                          "withWebsite": sum(p["website"] is not None for p in pois),
                          "withEmail": sum(p["email"] is not None for p in pois),
                          "sourceDescriptions": sum(p["provenance"]["description"]["kind"] == "source_tag" for p in pois)},
         "checks": {"atLeast300NamedPois": len(pois) >= 300, "allIdsUnique": len({p["id"] for p in pois}) == len(pois),
+                   "allOriginalSourcesPreserved": dedup["allOriginalSourceRecordsPreserved"],
                    "contractValid": not errors, "allWithinBbox": all(BBOX[0] <= p["lat"] <= BBOX[2] and BBOX[1] <= p["lon"] <= BBOX[3] for p in pois),
                    "expoMegaCovered": coverage["expoMega"]["count"] > 0,
                    "leftBankCenterCovered": coverage["leftBankCenter"]["count"] > 0,
@@ -278,8 +395,8 @@ def quality(pois, raw, meta, excluded, duplicate_ids, candidates):
             "This is a bbox extract, not an administrative boundary or exhaustive catalogue.",
             "Unnamed source objects are excluded; their real tags remain in the raw response.",
             "Ways and relations use Overpass bounding-box centres, not verified entrances or routing access points.",
-            "Near-name duplicates are flagged, not merged across OSM objects; IDs are deduplicated exactly.",
-            "Normalized count is a count of distinct OSM objects, not independently verified distinct venues.",
+            "Only explicitly reviewed duplicates with unchanged source fingerprints are merged; unresolved candidates remain separate.",
+            "Normalized count is a count of canonical POI records after reviewed merges, not independently verified distinct venues.",
             "Mapped access=private/no objects are excluded; absence of an access tag is not proof of public entry.",
             "OSM data is community maintained; opening hours and contacts may be absent or outdated.",
             "Quietness, sockets, interactivity and events are unknown; no values are invented.",
@@ -311,7 +428,8 @@ def main():
     pois, excluded, duplicates, candidates = normalize(raw, meta)
     if not pois:
         raise ValueError("No eligible named POIs; previous normalized outputs were preserved")
-    report = quality(pois, raw, meta, excluded, duplicates, candidates)
+    pois, candidates, dedup = apply_reviewed_dedup(pois, candidates)
+    report = quality(pois, raw, meta, excluded, duplicates, candidates, dedup)
     if not all(report["checks"].values()):
         write_json(DATA / "import-failure-report.json", report)
         print("Quality checks failed; existing dataset was preserved.", file=sys.stderr)

@@ -3,7 +3,7 @@
 
   const $ = (id) => document.getElementById(id);
   const starts = {
-    mega: { lat: 51.088, lon: 71.409, name: 'Mega Silk Way' },
+    mega: { lat: 51.0880152, lon: 71.4097489, name: 'Mega Silk Way · вход D' },
     baiterek: { lat: 51.1283, lon: 71.4304, name: 'Байтерек' },
     embankment: { lat: 51.161, lon: 71.423, name: 'Набережная Есиля' }
   };

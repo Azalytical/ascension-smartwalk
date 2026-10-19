@@ -1,0 +1,158 @@
+{
+  "sourceMetadata": {
+    "source": "OpenStreetMap via Overpass API",
+    "endpoint": "https://overpass-api.de/api/interpreter",
+    "retrievedAt": "2026-10-19T11:33:40+00:00",
+    "rawSha256": "c8373198b59e8bd575999957b16020924db45ed2d66c2a53cad30c12f91bc678",
+    "queryFile": "dedup-evidence.ql",
+    "rawFile": "dedup-evidence.raw.json",
+    "osmBaseTimestamp": "2026-10-19T11:32:36Z",
+    "license": "ODbL-1.0",
+    "attribution": "© OpenStreetMap contributors",
+    "attributionUrl": "https://www.openstreetmap.org/copyright"
+  },
+  "reviewedObjectCount": 10,
+  "sourceVersionsMatch": true,
+  "nodeContainment": [
+    {
+      "id": "osm:node:4965336822",
+      "insideFootprints": [
+        {
+          "id": "osm:way:499328514",
+          "tags": {
+            "addr:city": "Астана",
+            "addr:country": "KZ",
+            "addr:housenumber": "62",
+            "addr:street": "Қабанбай Батыр даңғылы",
+            "air_conditioning": "yes",
+            "building": "yes",
+            "building:levels": "2",
+            "layer": "-1",
+            "name": "Mega Silk Way",
+            "opening_hours": "Mo-Su 10:00-22:00",
+            "payment:american_express": "yes",
+            "payment:cash": "yes",
+            "payment:coins": "yes",
+            "payment:credit_cards": "yes",
+            "payment:debit_cards": "yes",
+            "payment:mastercard": "yes",
+            "payment:notes": "yes",
+            "payment:visa": "yes",
+            "phone": "7010",
+            "shop": "mall",
+            "source": "sentinel-2,MapBox",
+            "stroller": "yes",
+            "toilets": "yes"
+          }
+        }
+      ]
+    },
+    {
+      "id": "osm:node:6494912583",
+      "insideFootprints": [
+        {
+          "id": "osm:way:240369033",
+          "tags": {
+            "addr:city": "Астана",
+            "addr:country": "KZ",
+            "addr:housenumber": "36",
+            "addr:street": "Амангелді Иманов көшесі",
+            "building": "yes"
+          }
+        }
+      ]
+    },
+    {
+      "id": "osm:node:7569174946",
+      "insideFootprints": [
+        {
+          "id": "osm:way:240369033",
+          "tags": {
+            "addr:city": "Астана",
+            "addr:country": "KZ",
+            "addr:housenumber": "36",
+            "addr:street": "Амангелді Иманов көшесі",
+            "building": "yes"
+          }
+        }
+      ]
+    },
+    {
+      "id": "osm:node:12049030099",
+      "insideFootprints": [
+        {
+          "id": "osm:way:1105503951",
+          "tags": {
+            "addr:city": "Астана",
+            "addr:country": "KZ",
+            "building": "yes"
+          }
+        }
+      ]
+    },
+    {
+      "id": "osm:node:12049030108",
+      "insideFootprints": [
+        {
+          "id": "osm:way:923756720",
+          "tags": {
+            "addr:city": "Астана",
+            "addr:country": "KZ",
+            "addr:housenumber": "15е",
+            "addr:street": "улица Жаханша Сейдалина",
+            "building": "yes"
+          }
+        }
+      ]
+    },
+    {
+      "id": "osm:node:12973394495",
+      "insideFootprints": [
+        {
+          "id": "osm:way:30012527",
+          "tags": {
+            "addr:city": "Астана",
+            "addr:country": "KZ",
+            "addr:housenumber": "53",
+            "addr:street": "Жақып Омаров көшесі",
+            "building": "apartments",
+            "building:levels": "5"
+          }
+        }
+      ]
+    },
+    {
+      "id": "osm:node:12990081601",
+      "insideFootprints": [
+        {
+          "id": "osm:way:30012527",
+          "tags": {
+            "addr:city": "Астана",
+            "addr:country": "KZ",
+            "addr:housenumber": "53",
+            "addr:street": "Жақып Омаров көшесі",
+            "building": "apartments",
+            "building:levels": "5"
+          }
+        }
+      ]
+    }
+  ],
+  "parkContainment": [
+    {
+      "polygon": "osm:way:502046662",
+      "insidePolygon": "osm:way:1460702136",
+      "vertices": 16,
+      "verticesInside": 16
+    },
+    {
+      "polygon": "osm:way:1460702136",
+      "insidePolygon": "osm:way:502046662",
+      "vertices": 56,
+      "verticesInside": 0
+    }
+  ],
+  "limitations": [
+    "Containment uses simple closed-way footprints; an indoor unit or branch identity is not inferred from containment alone."
+  ]
+}
