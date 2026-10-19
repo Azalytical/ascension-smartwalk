@@ -1,0 +1,393 @@
+{
+  "generatedAt": "2026-10-19T11:22:41Z",
+  "retrievedAt": "2026-10-19T11:22:05Z",
+  "rawElements": 1480,
+  "normalizedCount": 933,
+  "uniqueIds": 933,
+  "duplicateIdsRemoved": [],
+  "excludedCounts": {
+    "no_source_name": 545,
+    "non_public_access": 2
+  },
+  "byCategory": {
+    "arts_centre": 6,
+    "artwork": 14,
+    "attraction": 16,
+    "bar": 93,
+    "cafe": 319,
+    "cinema": 10,
+    "exhibition_centre": 1,
+    "fast_food": 123,
+    "gallery": 2,
+    "garden": 4,
+    "ice_cream": 4,
+    "library": 7,
+    "mall": 52,
+    "memorial": 24,
+    "monument": 15,
+    "museum": 8,
+    "park": 35,
+    "playground": 1,
+    "pub": 13,
+    "restaurant": 176,
+    "theatre": 9,
+    "theme_park": 1
+  },
+  "unnamedSourceObjectsByCategory": {
+    "artwork": 20,
+    "attraction": 4,
+    "bar": 2,
+    "cafe": 14,
+    "fast_food": 15,
+    "food_court": 2,
+    "garden": 47,
+    "ice_cream": 1,
+    "mall": 4,
+    "memorial": 7,
+    "monument": 7,
+    "museum": 1,
+    "park": 88,
+    "playground": 324,
+    "restaurant": 6,
+    "theatre": 2,
+    "viewpoint": 1
+  },
+  "byOsmType": {
+    "node": 772,
+    "relation": 7,
+    "way": 154
+  },
+  "contractErrors": [],
+  "bboxRequested": {
+    "south": 51.04,
+    "west": 71.28,
+    "north": 51.23,
+    "east": 71.62
+  },
+  "bboxActual": {
+    "south": 51.044109,
+    "west": 71.3321471,
+    "north": 51.2144581,
+    "east": 71.5999581
+  },
+  "coverage": {
+    "expoMega": {
+      "label": "EXPO / MEGA Silk Way",
+      "bbox": [
+        51.08,
+        71.395,
+        51.107,
+        71.435
+      ],
+      "count": 53,
+      "byCategory": {
+        "attraction": 2,
+        "bar": 6,
+        "cafe": 18,
+        "cinema": 1,
+        "exhibition_centre": 1,
+        "fast_food": 4,
+        "garden": 1,
+        "mall": 2,
+        "memorial": 1,
+        "park": 3,
+        "restaurant": 13,
+        "theatre": 1
+      },
+      "sample": [
+        {
+          "id": "osm:node:10211901020",
+          "name": "Тануки",
+          "lat": 51.0905282,
+          "lon": 71.4242112
+        },
+        {
+          "id": "osm:node:10248180510",
+          "name": "Delish",
+          "lat": 51.1010935,
+          "lon": 71.4227958
+        },
+        {
+          "id": "osm:node:10861996205",
+          "name": "Veggie House",
+          "lat": 51.0964416,
+          "lon": 71.4090062
+        },
+        {
+          "id": "osm:node:11290690869",
+          "name": "TLP Flowers & Coffee",
+          "lat": 51.1005554,
+          "lon": 71.412037
+        },
+        {
+          "id": "osm:node:11345949796",
+          "name": "Golpas",
+          "lat": 51.0911515,
+          "lon": 71.4276338
+        },
+        {
+          "id": "osm:node:11345949798",
+          "name": "Golpas",
+          "lat": 51.0974517,
+          "lon": 71.4077211
+        },
+        {
+          "id": "osm:node:11345949799",
+          "name": "Golpas",
+          "lat": 51.1052128,
+          "lon": 71.4293611
+        },
+        {
+          "id": "osm:node:11783576043",
+          "name": "Drinkit",
+          "lat": 51.1008453,
+          "lon": 71.4178111
+        }
+      ]
+    },
+    "leftBankCenter": {
+      "label": "Baiterek / Nurzhol / left-bank centre",
+      "bbox": [
+        51.115,
+        71.4,
+        51.145,
+        71.46
+      ],
+      "count": 226,
+      "byCategory": {
+        "artwork": 3,
+        "attraction": 9,
+        "bar": 20,
+        "cafe": 60,
+        "cinema": 5,
+        "fast_food": 30,
+        "gallery": 2,
+        "garden": 3,
+        "ice_cream": 3,
+        "library": 2,
+        "mall": 7,
+        "memorial": 4,
+        "monument": 3,
+        "park": 9,
+        "playground": 1,
+        "pub": 1,
+        "restaurant": 61,
+        "theatre": 2,
+        "theme_park": 1
+      },
+      "sample": [
+        {
+          "id": "osm:node:10064384673",
+          "name": "Del Papa",
+          "lat": 51.1304777,
+          "lon": 71.4154218
+        },
+        {
+          "id": "osm:node:10093885578",
+          "name": "Дракон",
+          "lat": 51.1325332,
+          "lon": 71.4510438
+        },
+        {
+          "id": "osm:node:10168258158",
+          "name": "Yakitoriya",
+          "lat": 51.1216511,
+          "lon": 71.4275073
+        },
+        {
+          "id": "osm:node:10170592263",
+          "name": "Bla Bla Bar",
+          "lat": 51.1224522,
+          "lon": 71.4286878
+        },
+        {
+          "id": "osm:node:10170946741",
+          "name": "Starbucks",
+          "lat": 51.1218424,
+          "lon": 71.4280501
+        },
+        {
+          "id": "osm:node:10170946742",
+          "name": "Coffee BOOM",
+          "lat": 51.1215924,
+          "lon": 71.4281745
+        },
+        {
+          "id": "osm:node:10170946745",
+          "name": "Chaleur",
+          "lat": 51.1215961,
+          "lon": 71.4279892
+        },
+        {
+          "id": "osm:node:10171021736",
+          "name": "Bambino",
+          "lat": 51.1218864,
+          "lon": 71.4276335
+        }
+      ]
+    },
+    "historicCenter": {
+      "label": "Ishim embankment / old centre",
+      "bbox": [
+        51.151,
+        71.405,
+        51.18,
+        71.45
+      ],
+      "count": 258,
+      "byCategory": {
+        "arts_centre": 4,
+        "artwork": 2,
+        "attraction": 4,
+        "bar": 19,
+        "cafe": 106,
+        "fast_food": 43,
+        "ice_cream": 1,
+        "library": 1,
+        "mall": 7,
+        "memorial": 9,
+        "monument": 5,
+        "museum": 4,
+        "park": 8,
+        "pub": 6,
+        "restaurant": 36,
+        "theatre": 3
+      },
+      "sample": [
+        {
+          "id": "osm:node:10064384671",
+          "name": "Del Papa",
+          "lat": 51.1603117,
+          "lon": 71.429522
+        },
+        {
+          "id": "osm:node:10064384681",
+          "name": "Дареджани",
+          "lat": 51.161681,
+          "lon": 71.427725
+        },
+        {
+          "id": "osm:node:10118208317",
+          "name": "Столовая",
+          "lat": 51.179338,
+          "lon": 71.4206771
+        },
+        {
+          "id": "osm:node:10148735979",
+          "name": "Олимпиада сақиналары",
+          "lat": 51.1540747,
+          "lon": 71.4196456
+        },
+        {
+          "id": "osm:node:10295608316",
+          "name": "Coffee BOOM",
+          "lat": 51.1733913,
+          "lon": 71.4123132
+        },
+        {
+          "id": "osm:node:10559341312",
+          "name": "CrepeCafe",
+          "lat": 51.1633918,
+          "lon": 71.4356111
+        },
+        {
+          "id": "osm:node:10860197906",
+          "name": "Beatles Statue",
+          "lat": 51.1623955,
+          "lon": 71.4237199
+        },
+        {
+          "id": "osm:node:11083699462",
+          "name": "Jimmy Karaoké-bar",
+          "lat": 51.1713704,
+          "lon": 71.4288441
+        }
+      ]
+    }
+  },
+  "possibleDuplicatePairs": [
+    {
+      "ids": [
+        "osm:node:4965336822",
+        "osm:way:499328514"
+      ],
+      "name": "Мега Силк Вей",
+      "distanceMeters": 16.51,
+      "action": "retained_for_review"
+    },
+    {
+      "ids": [
+        "osm:node:6494912583",
+        "osm:node:7569174946"
+      ],
+      "name": "Coffee Like",
+      "distanceMeters": 35.51,
+      "action": "retained_for_review"
+    },
+    {
+      "ids": [
+        "osm:node:12049030099",
+        "osm:node:12049030108"
+      ],
+      "name": "ШашлычОк",
+      "distanceMeters": 22.21,
+      "action": "retained_for_review"
+    },
+    {
+      "ids": [
+        "osm:node:12973394495",
+        "osm:node:12990081601"
+      ],
+      "name": "Coffee Stories",
+      "distanceMeters": 7.09,
+      "action": "retained_for_review"
+    },
+    {
+      "ids": [
+        "osm:way:502046662",
+        "osm:way:1460702136"
+      ],
+      "name": "«Ататүрік» саябағы",
+      "distanceMeters": 18.2,
+      "action": "retained_for_review"
+    }
+  ],
+  "completeness": {
+    "withOpeningHours": 334,
+    "withPhone": 186,
+    "withWebsite": 189,
+    "withEmail": 82,
+    "sourceDescriptions": 1
+  },
+  "checks": {
+    "atLeast300NamedPois": true,
+    "allIdsUnique": true,
+    "contractValid": true,
+    "allWithinBbox": true,
+    "expoMegaCovered": true,
+    "leftBankCenterCovered": true,
+    "historicCenterCovered": true
+  },
+  "limitations": [
+    "This is a bbox extract, not an administrative boundary or exhaustive catalogue.",
+    "Unnamed source objects are excluded; their real tags remain in the raw response.",
+    "Ways and relations use Overpass bounding-box centres, not verified entrances or routing access points.",
+    "Near-name duplicates are flagged, not merged across OSM objects; IDs are deduplicated exactly.",
+    "Normalized count is a count of distinct OSM objects, not independently verified distinct venues.",
+    "Mapped access=private/no objects are excluded; absence of an access tag is not proof of public entry.",
+    "OSM data is community maintained; opening hours and contacts may be absent or outdated.",
+    "Quietness, sockets, interactivity and events are unknown; no values are invented.",
+    "Opening hours are preserved as raw OSM expressions; open-now is not evaluated.",
+    "No field survey, live venue checks, routing-time validation or city-wide completeness claim is made."
+  ],
+  "provenance": {
+    "source": "OpenStreetMap via Overpass API",
+    "endpoint": "https://overpass-api.de/api/interpreter",
+    "rawSha256": "674f30902d3e8268f834bcc142fcf0e391d4b96ec83b6c3117b9632233a8db08",
+    "osmBaseTimestamp": "2026-10-19T11:20:20Z",
+    "license": "ODbL-1.0",
+    "licenseUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+    "attribution": "© OpenStreetMap contributors",
+    "attributionUrl": "https://www.openstreetmap.org/copyright"
+  }
+}
