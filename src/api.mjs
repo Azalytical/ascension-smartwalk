@@ -97,11 +97,8 @@ async function generate(result, query, env) {
     why: p.why, warnings: p.warnings, sourceUrl: p.sourceUrl
   }));
   const input = JSON.stringify({ query: String(query || '').slice(0, 800), alternatives: context });
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 18000);
   try {
-    const call = provider.name === 'gemini' ? callGemini : callOpenAI;
-    const reply = await call(input, provider, env, controller.signal);
+    const reply = await callWithRetry(provider, input, env);
     if (reply.error) return { ...fallback, reason: reply.error };
     const answer = JSON.parse(reply.text);
     const ids = new Set(context.map(p => p.id));
@@ -110,7 +107,28 @@ async function generate(result, query, env) {
     if (UNSUPPORTED.test(answer.summary)) return { ...fallback, reason: 'unsupported_claim' };
     return { mode: 'llm', provider: provider.name, model: provider.model, summary: answer.summary.trim(), references: answer.references };
   } catch { return { ...fallback, reason: 'provider_unavailable' }; }
-  finally { clearTimeout(timer); }
+}
+
+// Free-tier Gemini often answers 503 or stalls under load; a short retry usually succeeds.
+const RETRYABLE = /^provider_(429|500|502|503|504|unavailable)$/;
+const TOTAL_MS = 18000, ATTEMPT_MS = 8000, MAX_ATTEMPTS = 3;
+
+async function callWithRetry(provider, input, env) {
+  const call = provider.name === 'gemini' ? callGemini : callOpenAI;
+  const deadline = Date.now() + TOTAL_MS;
+  const pause = Number.isFinite(Number(env.RETRY_DELAY_MS)) ? Number(env.RETRY_DELAY_MS) : 600;
+  let reply = { error: 'provider_unavailable' };
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.min(ATTEMPT_MS, deadline - Date.now()));
+    try { reply = await call(input, provider, env, controller.signal); }
+    catch { reply = { error: 'provider_unavailable' }; }
+    finally { clearTimeout(timer); }
+    if (!reply.error || !RETRYABLE.test(reply.error) || attempt === MAX_ATTEMPTS) break;
+    if (deadline - Date.now() < pause * attempt + 2000) break;
+    await new Promise(resolve => setTimeout(resolve, pause * attempt));
+  }
+  return reply;
 }
 
 const memoryBuckets = new Map();
