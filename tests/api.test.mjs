@@ -142,3 +142,18 @@ test('a busy Gemini is retried, and client errors are not', async () => {
     assert.equal(calls, 1);
   } finally { globalThis.fetch = original; }
 });
+
+test('the model is told which language to answer in', async () => {
+  const { answerLanguage } = await import('../src/api.mjs');
+  assert.equal(answerLanguage('I want coffee'), 'en');
+  assert.equal(answerLanguage('кофе ішкім келеді'), 'kk');
+  assert.equal(answerLanguage('кофе и прогулка'), 'ru');
+  assert.equal(answerLanguage(''), 'ru');
+  const original = globalThis.fetch;
+  let body;
+  globalThis.fetch = async (_u, o) => { body = JSON.parse(o.body); return new Response('{}', { status: 400 }); };
+  try {
+    await handleApi(request({ ...valid, query: 'walk in the park' }), { GEMINI_API_KEY: 'g', LOCAL_DEVELOPMENT: true }, [poi]);
+    assert.equal(JSON.parse(body.contents[0].parts[0].text).answerLanguage, 'en');
+  } finally { globalThis.fetch = original; }
+});
