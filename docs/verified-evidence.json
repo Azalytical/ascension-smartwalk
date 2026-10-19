@@ -1,0 +1,19 @@
+{
+  "received_from_thread": "01a153d5-6b29-7980-b5af-a2f0b21ec6af",
+  "received_date": "2026-10-19",
+  "source": "Подтверждённые результаты основной команды, переданные в этот чат",
+  "snapshot_utc": "2026-10-19 11:22 UTC",
+  "named_osm_ids": 933,
+  "raw_records": 1480,
+  "possible_duplicate_pairs": 5,
+  "selected_categories": {"cafes":319,"restaurants":176,"parks":35,"museums":8},
+  "zone_counts": {"EXPO_MEGA":53,"left_bank_center":226,"historical_center":258},
+  "automated_checks": {"passed":20,"retrieval":13,"api":7,"mapped_to_T01_T12":false},
+  "browser_coffee45": {"observed":true,"places":["Лепим и варим","Gasteria","Starbucks"],"computed_minutes_each":31,"osm_sources":true,"unknowns_disclosed":true,"measured_walk":false},
+  "retrieval": "lexical, no embeddings",
+  "stack": "vanilla JS, Node API, Cloudflare Worker, OpenAI Responses, gpt-4.1-mini",
+  "remote_generation_verified": false,
+  "live_site_verified": false,
+  "site_url_in_deck": false,
+  "presentation_date": "2026-10-22"
+}
