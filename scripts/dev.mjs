@@ -12,7 +12,7 @@ const env = { GEMINI_API_KEY: process.env.GEMINI_API_KEY, GEMINI_MODEL: process.
 const port = Number(process.env.PORT || 8789);
 const host = process.env.HOST || '127.0.0.1';
 const dataset = JSON.parse(await readFile(resolve(root, 'data/pois.json'), 'utf8'));
-const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8' };
+const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.ico': 'image/x-icon', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg' };
 createServer(async (req, res) => {
   try {
     const chunks = []; let count = 0;
