@@ -11,3 +11,7 @@
 @media print{.header,.hero,.workspace,.footer,.how-it-works,.alternatives,.card-actions,.results-heading>.text-button{display:none!important}.page-width{width:100%}.place-card{break-inside:avoid}.results{padding:0}.source-details{display:block}.source-details>div{display:block}}
 
 @media(max-width:740px){.map-panel{height:280px}.map-bottom-card{bottom:55px}.map-estimate{bottom:22px;font-size:11px}}
+
+.summary-label{display:block;font-size:13px;font-weight:550;color:var(--teal);margin-bottom:5px}
+
+.source-caption{font-size:13px;font-weight:550}

@@ -155,6 +155,18 @@ function excludedCategories(query) {
   return Object.entries(SYNONYMS).filter(([, words]) => negativePhrases.some(phrase => words.some(word => phrase.includes(word)))).map(([category]) => category);
 }
 
+function requestedFreeVisit(text) {
+  return normalize(text).split(/[.;,\n]|\s+(?:но|but|бірақ)\s+/iu).some(clause => {
+    // A free amenity is not a request for a free visit or a free meal.
+    const visit = clause.replace(/(?:бесплат\p{L}*|free|тегін)\s+(?:wi[\s-]?fi|вай[\s-]?фай|интернет\p{L}*)/giu, '');
+    if (!/бесплат|\bfree\b|тегін/iu.test(visit)) return false;
+    if (/(?:без|не)\s+(?:(?:обязател\p{L}*|нуж\p{L}*|хочу)\s+)?бесплат|(?:желательно|по возможности).{0,30}бесплат|бесплат.{0,30}не\s+(?:обязател\p{L}*|нуж\p{L}*)/iu.test(visit)) return false;
+    if (/\b(?:not|without|no|prefer|ideally)\b.{0,30}\bfree\b|\bfree\b.{0,30}(?:if possible|not (?:required|necessary|needed))/iu.test(visit)) return false;
+    if (/тегін.{0,30}(?:қажет|керек|міндетті)\s+емес|мүмкін болса.{0,30}тегін/iu.test(visit)) return false;
+    return true;
+  });
+}
+
 function safeSourceUrl(value) {
   if (typeof value !== 'string') return null;
   try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) ? url.href : null; }
@@ -226,7 +238,7 @@ function warningsFor(poi, constraints, hours) {
   const access = normalize(poi.access ?? (poi.tags && !Array.isArray(poi.tags) ? poi.tags.access : null));
   if (!access) warnings.push('Условия входа и доступ на территорию неизвестны; уточните перед выходом.');
   else warnings.push(`Условия доступа в источнике: ${access}. Актуальные ограничения на вход не проверены.`);
-  if (constraints.withChild) warnings.push('Категория подходит для поиска прогулки с ребёнком; безопасность, возрастные ограничения и доступность не проверены.');
+  if (constraints.withChild) warnings.push('Условия посещения с ребёнком, безопасность, возрастные ограничения и доступность не проверены.');
   for (const condition of constraints.specialConditions) {
     warnings.push(conditionEvidence(poi, condition.key)
       ? `${condition.label}: отмечено в источнике; актуальное состояние${condition.key === 'wheelchair' ? ' и доступность всего пути' : ''} не проверены.`
@@ -311,7 +323,7 @@ export function recommend(dataset, input) {
   const requested = queryCategories(constraints.query);
   const excluded = excludedCategories(preferenceText);
   const terms = tokens(preferenceText);
-  const wantsFree = /бесплат|\bfree\b|тегін/iu.test(preferenceText);
+  const wantsFree = requestedFreeVisit(preferenceText);
   const needsIndoor = constraints.indoor || INDOOR_INTENT.test(normalize(preferenceText));
   const counters = { invalidRecords: 0, unsupportedCategory: 0, restrictedAccess: 0, duplicates: 0, category: 0, walkBudget: 0, totalBudget: 0, closedByHours: 0, budget: 0, specialConditions: 0, indoor: 0 };
   // Hours are checked against the requested visit time, or against now when no time was given.
@@ -327,8 +339,7 @@ export function recommend(dataset, input) {
     const { category, sourceUrl } = poi;
     if ((constraints.category && category !== constraints.category)
       || (!constraints.category && requested.length > 0 && !requested.includes(category))
-      || excluded.includes(category)
-      || (constraints.withChild && !['park', 'playground'].includes(category))) { counters.category++; continue; }
+      || excluded.includes(category)) { counters.category++; continue; }
     if (needsIndoor && (!INDOOR.includes(category) || normalize(sourceTags(poi).indoor) === 'no')) { counters.indoor++; continue; }
     if (constraints.specialConditions.some(condition => condition.required && !conditionEvidence(poi, condition.key))) { counters.specialConditions++; continue; }
     const cost = budgetAssessment(poi, constraints.budget, wantsFree);
@@ -355,7 +366,7 @@ export function recommend(dataset, input) {
       keywords: Math.min(20, matchedTerms.length * 5),
       proximity: Math.round(25 * (1 - Math.min(1, walkMinutes / constraints.maxWalkMinutes))),
       timeFit: Math.round(15 * (1 - totalMinutes / constraints.minutes)),
-      childCategory: constraints.withChild ? 5 : 0,
+      childCategory: constraints.withChild && ['park', 'playground'].includes(category) ? 5 : 0,
       hoursConfirmed: hours?.status === 'open' ? 5 : 0,
       preferences: constraints.specialConditions.filter(condition => conditionEvidence(poi, condition.key)).length * 10,
       knownBudget: constraints.budget !== null && ['confirmed', 'free'].includes(cost.status) ? 10 : 0,

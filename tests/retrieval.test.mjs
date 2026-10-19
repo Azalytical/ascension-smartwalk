@@ -72,13 +72,30 @@ test('recorded hours never claim actual opening', () => {
   assert.ok(!Object.hasOwn(rec, 'isOpen'));
 });
 
-test('withChild restricts to park and playground without asserting safety', () => {
+test('withChild prefers parks and playgrounds without blocking a requested venue category', () => {
   const records = [poi(), poi({ id: '2', name: 'Кафе', category: 'cafe', sourceUrl: 'https://www.openstreetmap.org/node/2' }),
     poi({ id: '3', name: 'Площадка', category: 'playground', sourceUrl: 'https://www.openstreetmap.org/node/3' })];
   const result = recommend(records, { ...start, withChild: true });
-  assert.deepEqual(new Set(result.recommendations.map(rec => rec.category)), new Set(['park', 'playground']));
+  assert.ok(['park', 'playground'].includes(result.recommendations[0].category));
   assert.ok(result.recommendations.every(rec => rec.warnings.some(w => w.includes('безопасность') && w.includes('не проверены'))));
-  assert.equal(recommend(records, { ...start, category: 'cafe', withChild: true }).recommendations.length, 0);
+  assert.equal(recommend(records, { ...start, category: 'cafe', withChild: true }).recommendations[0].category, 'cafe');
+  for (const [category, query] of [['museum', 'Хочу в музей'], ['cafe', 'Хочу кофе'], ['restaurant', 'Хочу поесть'], ['culture', 'Хочу в кино']]) {
+    const record = poi({ category });
+    const response = recommend([record], { ...start, minutes: 120, withChild: true, query });
+    assert.equal(response.recommendations[0].category, category);
+    assert.equal(response.recommendations[0].scoreBreakdown.childCategory, 0);
+  }
+});
+
+test('a child museum request requires source evidence for interactive exhibits', () => {
+  const unknown = poi({ category: 'museum' });
+  const interactive = poi({ id: 'interactive', name: 'Музей с данными', category: 'museum',
+    sourceUrl: 'https://www.openstreetmap.org/node/2', tags: { 'museum:interactive': 'yes' } });
+  const input = { ...start, minutes: 120, withChild: true, query: 'Хочу в музей с интерактивами для ребёнка' };
+  const result = recommend([unknown, interactive], input);
+  assert.deepEqual(result.recommendations.map(place => place.id), ['interactive']);
+  assert.equal(result.recommendations[0].evidence.find(item => item.field === 'interactive').value, true);
+  assert.equal(recommend([unknown], input).recommendations.length, 0);
 });
 
 test('category intent uses ru/kk/en synonyms and tags, no unrelated filler', () => {
@@ -113,9 +130,10 @@ test('no invented records and source-less, out-of-area, invalid rows rejected', 
 test('a cinema named Кинопарк is never inferred to be a park from name tags', () => {
   const cinema = poi({ id: 'cinema', name: 'IMAX Кинопарк7', category: 'cinema',
     tags: { amenity: 'cinema', name: 'IMAX Кинопарк7', operator: 'Coffee park' } });
-  const result = recommend([cinema], { ...start, withChild: true });
-  assert.equal(result.recommendations.length, 0);
-  assert.equal(result.retrieval.rejected.category, 1);
+  const result = recommend([cinema], { ...start, minutes: 90, withChild: true });
+  assert.equal(result.recommendations[0].category, 'culture');
+  assert.equal(result.recommendations[0].scoreBreakdown.childCategory, 0);
+  assert.equal(recommend([cinema], { ...start, minutes: 90, withChild: true, query: 'Хочу в парк' }).recommendations.length, 0);
   assert.equal(recommend([cinema], { ...start, minutes: 90 }).recommendations[0].category, 'culture');
   assert.equal(recommend([poi({ category: 'unknown', tags: { leisure: 'park' } })], start).recommendations[0].category, 'park');
 });
@@ -231,6 +249,17 @@ test('free requests require positive fee evidence and cafe entry does not imply 
   }
 });
 
+test('waived free entry and free Wi-Fi do not turn a paid meal into a free-only request', () => {
+  const cafe = poi({ category: 'cafe', averageCheck: { amount: 2500, currency: 'KZT' } });
+  for (const query of ['Хочу кофе, не обязательно бесплатно', 'Кофе, бесплатно не обязательно',
+    'Хочу кофе с бесплатным Wi-Fi', 'Coffee with free wifi', 'Coffee, free is not required', 'Кофе, тегін қажет емес']) {
+    const result = recommend([cafe], { ...start, query, budget: 3000 });
+    assert.equal(result.recommendations[0]?.budgetStatus, 'confirmed', query);
+  }
+  assert.equal(recommend([cafe], { ...start, query: 'Хочу бесплатно кофе', budget: 3000 }).recommendations.length, 0);
+  assert.equal(recommend([cafe], { ...start, query: 'Хочу кофе с бесплатным Wi-Fi', budget: 0 }).recommendations.length, 0);
+});
+
 test('mandatory special conditions reject unknown evidence; optional desires retain a caveat', () => {
   const unknown = poi({ category: 'cafe' });
   const confirmed = poi({ id: 'confirmed', name: 'Подтверждённое кафе', category: 'cafe', sourceUrl: 'https://www.openstreetmap.org/node/2',
@@ -249,6 +278,32 @@ test('mandatory special conditions reject unknown evidence; optional desires ret
   assert.equal(recommend([poi({ wheelchair: 'limited' })], { ...start, preferences: 'Нужен вход для коляски' }).recommendations.length, 0);
   for (const preferences of [true, [], 'a'.repeat(501)]) assert.throws(() => recommend([], { ...start, preferences }), { code: 'INVALID_INPUT' });
   assert.throws(() => recommend([], { ...start, indoor: 'true' }), { code: 'INVALID_INPUT' });
+});
+
+test('negated or waived amenities never become positive requirements in ru, en or kk', () => {
+  for (const preferences of ['Розетка не нужна', 'Без розеток', 'Не нужно тихое место',
+    'No sockets required', 'Sockets not needed', 'Without sockets', "I don't need sockets", 'Розетка қажет емес', 'Тыныш жер қажет емес']) {
+    const result = recommend([poi()], { ...start, preferences });
+    assert.equal(result.recommendations.length, 1, preferences);
+    assert.ok(!result.constraints.specialConditions.some(condition => ['sockets', 'quiet'].includes(condition.key) && condition.required), preferences);
+    assert.ok(!result.recommendations[0].evidence.some(item => ['sockets', 'quiet'].includes(item.field)), preferences);
+  }
+});
+
+test('each explicit mandatory or optional modifier applies to its own condition', () => {
+  const sockets = poi({ category: 'cafe', tags: { 'socket:usb': '2' } });
+  for (const preferences of ['Обязательно розетка, желательно тихо', 'Желательно тихо, розетка обязательна',
+    'Розетка обязательна и желательно тихо', 'Sockets required and quiet if possible',
+    'Розетка міндетті, мүмкін болса тыныш жер']) {
+    const result = recommend([sockets], { ...start, preferences });
+    assert.equal(result.recommendations.length, 1, preferences);
+    assert.equal(result.constraints.specialConditions.find(condition => condition.key === 'sockets')?.required, true, preferences);
+    assert.equal(result.constraints.specialConditions.find(condition => condition.key === 'quiet')?.required, false, preferences);
+    assert.equal(recommend([poi()], { ...start, preferences }).recommendations.length, 0, preferences);
+  }
+  const shared = recommend([poi()], { ...start, preferences: 'Желательно тихо и с розеткой' });
+  assert.ok(shared.constraints.specialConditions.every(condition => !condition.required));
+  assert.equal(recommend([sockets], { ...start, preferences: 'Обязательно розетка, халяль' }).recommendations.length, 0);
 });
 
 test('indoor field applies independently of the request category', () => {
