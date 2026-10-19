@@ -277,7 +277,10 @@
   function renderResults(result) {
     const recommendations = result.recommendations.slice(0, 3);
     const count = recommendations.length;
-    $('result-grid').replaceChildren(...recommendations.map((place, index) => createPlaceCard(place, index)));
+    // Caveats repeated on every card are shown once above the cards; each card keeps only its own.
+    const cardWarnings = recommendations.map((place) => (Array.isArray(place.warnings) ? place.warnings : []).filter((item) => typeof item === 'string'));
+    const shared = new Set(count > 1 ? cardWarnings[0].filter((warning) => cardWarnings.every((list) => list.includes(warning))) : []);
+    $('result-grid').replaceChildren(...recommendations.map((place, index) => createPlaceCard(place, index, shared)));
     $('results-title').textContent = count === 1 ? 'Одно место. В самый раз.' : `${count === 2 ? 'Два' : 'Три'} места. Выберите своё.`;
     const summary = cleanText(result.generation?.summary).trim();
     $('result-summary').textContent = summary;
@@ -287,7 +290,7 @@
     $('generation-note').textContent = fallback ? 'Подбор составлен по данным мест и вашим ограничениям. Персональное описание сейчас недоступно.'
       : summary ? `${model} написала это описание только по данным карточек ниже. Время, расстояние и часы работы считает сервер, а не модель.` : '';
     $('generation-note').hidden = !$('generation-note').textContent;
-    const warnings = [...new Set((Array.isArray(result.warnings) ? result.warnings : []).filter((item) => typeof item === 'string'))];
+    const warnings = [...new Set([...(Array.isArray(result.warnings) ? result.warnings : []).filter((item) => typeof item === 'string'), ...shared])];
     $('result-notices').replaceChildren(...warnings.map((warning) => element('p', '', warning)));
     $('result-notices').hidden = !warnings.length;
     $('results').hidden = false;
@@ -296,11 +299,13 @@
     if (window.innerWidth < 621) $('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  function createPlaceCard(place, index) {
+  function createPlaceCard(place, index, shared = new Set()) {
     const card = element('article', 'place-card');
     card.id = `place-${index}`;
     const top = element('div', 'card-topline');
-    top.append(element('span', 'place-number', `ВАРИАНТ 0${index + 1}`), element('span', 'category-label', categoryNames[place.category] || 'Место в городе'));
+    const labels = element('span', 'card-labels');
+    labels.append(element('span', 'source-badge', 'Данные OSM'), element('span', 'category-label', categoryNames[place.category] || 'Место в городе'));
+    top.append(element('span', 'place-number', `ВАРИАНТ 0${index + 1}`), labels);
     const name = cleanText(place.name, 'Место в Астане');
     card.append(top, element('h3', '', name), element('p', 'place-why', cleanText(place.why, 'Подходит по расстоянию и времени на прогулку.')));
     const walk = Math.max(0, Math.ceil(numeric(place.walkMinutes)));
@@ -331,7 +336,7 @@
       list.append(...activities.slice(0, 4).map((activity) => element('li', '', activity)));
       card.append(element('p', 'activities-title', 'Чем заняться'), list);
     }
-    const warnings = (Array.isArray(place.warnings) ? place.warnings : []).filter((item) => typeof item === 'string');
+    const warnings = (Array.isArray(place.warnings) ? place.warnings : []).filter((item) => typeof item === 'string' && !shared.has(item));
     if (warnings.length) {
       const notice = element('div', 'place-warnings');
       notice.append(...warnings.map((warning) => element('p', '', warning)));
