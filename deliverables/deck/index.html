@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartWalk · Ascension · Build with AI 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&family=Caveat:wght@500&display=swap" rel="stylesheet">
+<style>
+/* ===========================================
+   THEME: цвета и шрифты продукта SmartWalk
+   Меняйте здесь, чтобы перекрасить всю презентацию
+   =========================================== */
+:root{
+  --paper:#f6f5ef; --paper-2:#ecebe2; --ink:#152b34; --muted:#5f6d71; --line:#d9dbd0;
+  --teal:#176958; --mint:#7bd8bd; --orange:#ee986d; --leaf:#689782; --sage:#b3c4b4;
+  --stage-bg:#0d1d24; --slide-bg:var(--paper);
+  --font:"Golos Text",system-ui,sans-serif; --hand:"Caveat",cursive;
+  --pad:120px;
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+
+/* === FIXED 16:9 STAGE (viewport-base.css из frontend-slides) === */
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--stage-bg,#000)}
+.deck-viewport{position:fixed;inset:0;overflow:hidden;background:var(--stage-bg,#000)}
+.deck-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:var(--slide-bg,#fff)}
+.slide{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;display:block;visibility:hidden;opacity:0;pointer-events:none;background:var(--slide-bg,#fff)}
+.slide.active,.slide.visible{visibility:visible;opacity:1;pointer-events:auto;z-index:1}
+img,video,canvas,svg{max-width:100%;max-height:100%}
+.deck-controls{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000}
+@media print{
+  html,body{width:1920px;height:auto;overflow:visible;background:#fff}
+  .deck-viewport{position:static;overflow:visible;background:#fff}
+  .deck-stage{position:static;width:auto;height:auto;transform:none!important;background:none}
+  .slide{position:relative;display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;width:1920px;height:1080px;break-after:page;page-break-after:always}
+  .slide:last-child{break-after:auto;page-break-after:auto}
+  .deck-controls{display:none!important}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.2s!important}}
+
+/* === BASE TYPE === */
+body{font-family:var(--font);color:var(--ink);-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1}
+.slide{padding:var(--pad);font-family:var(--font);color:var(--ink)}
+.kicker{font-size:22px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--teal);display:flex;gap:14px;align-items:center}
+.kicker b{color:var(--muted);font-weight:500}
+h1{font-size:150px;line-height:1;letter-spacing:-7px;font-weight:700}
+h2{font-size:96px;line-height:1.02;letter-spacing:-4px;font-weight:700}
+h2 em,h1 em{font-style:normal;color:var(--teal)}
+.lead{font-size:38px;line-height:1.4;color:var(--muted);max-width:1100px}
+.hand{font-family:var(--hand);font-size:46px;color:var(--teal);transform:rotate(-4deg);display:inline-block}
+
+/* Критерий жюри: маленькая плашка в правом верхнем углу */
+.crit{position:absolute;top:70px;right:var(--pad);display:flex;gap:10px;z-index:3}
+.crit span{font-size:20px;font-weight:600;padding:10px 18px;border-radius:999px;background:#fff;border:1.5px solid var(--line);color:var(--ink)}
+.crit span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--teal);margin-right:10px;vertical-align:2px}
+
+/* Нижняя линия: бюджет времени выступления — фирменный приём продукта */
+.talkbar{position:absolute;left:var(--pad);right:var(--pad);bottom:56px;display:flex;align-items:center;gap:24px;font-size:20px;color:var(--muted);z-index:3}
+.talkbar .track{flex:1;height:8px;border-radius:5px;background:var(--paper-2);overflow:hidden;display:flex;gap:4px}
+.talkbar .track i{display:block;height:100%;border-radius:3px;background:var(--leaf)}
+.talkbar .track i.now{background:var(--orange)}
+.talkbar .track i.left{background:var(--sage);opacity:.45}
+.dark .talkbar .track{background:#ffffff14}
+
+/* === ANIMATION: появление при показе слайда === */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.slide.visible .reveal{opacity:1;transform:none}
+.d1{transition-delay:.08s}.d2{transition-delay:.18s}.d3{transition-delay:.28s}.d4{transition-delay:.38s}.d5{transition-delay:.48s}.d6{transition-delay:.58s}
+.grow{transform-origin:left center;transform:scaleX(0);transition:transform 1.1s var(--ease)}
+.slide.visible .grow{transform:scaleX(1)}
+
+/* === BUDGET BAR: туда / визит / обратно / резерв === */
+.budget{display:flex;gap:8px;height:36px}
+.budget>div{border-radius:8px;position:relative}
+.b-there{background:var(--leaf)} .b-visit{background:var(--orange)} .b-back{background:var(--sage)} .b-res{background:repeating-linear-gradient(135deg,#d6d9cd 0 8px,#e9eae2 8px 16px)} .b-free{background:transparent;border:2px dashed var(--line)}
+.legend{display:flex;gap:8px;margin-top:18px}
+.legend>div{font-size:24px;color:var(--muted)}
+.legend strong{display:block;font-size:44px;color:var(--ink);letter-spacing:-1.5px;font-weight:650}
+
+/* === SCREENSHOT FRAME === */
+.shot{border-radius:22px;overflow:hidden;background:#fff;box-shadow:0 2px 0 var(--line),0 40px 90px -30px #152b3440;border:1.5px solid var(--line)}
+.shot img{display:block;width:100%;height:100%;object-fit:cover;max-width:none;max-height:none}
+
+/* ============ SLIDE 1: ТИТУЛ ============ */
+.s-title{background:var(--paper)}
+.s-title .brand{display:flex;align-items:center;gap:20px;font-size:38px;font-weight:750;letter-spacing:-1.4px}
+.s-title .mark{width:72px;height:72px;border-radius:20px;background:var(--ink);display:grid;place-items:center}
+.s-title .mark svg{width:52px;height:52px;fill:none;stroke:var(--mint);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.s-title h1{margin-top:90px;font-size:140px;letter-spacing:-6.5px}
+.s-title .lead{margin-top:50px;max-width:820px;font-size:36px}
+.s-title .meta{position:absolute;left:var(--pad);bottom:110px;font-size:26px;color:var(--muted);display:flex;flex-direction:column;gap:10px}
+.s-title .meta b{color:var(--ink);font-weight:600}
+.s-title .shot{position:absolute;left:1040px;top:600px;width:1000px;height:563px;border-radius:22px 0 0 0}
+.s-title .hand{position:absolute;left:1060px;top:500px}
+/* ============ SLIDE 2: ПРОБЛЕМА ============ */
+.s-problem{background:var(--ink);color:var(--paper)}
+.s-problem .kicker{color:var(--mint)}
+.s-problem .big{position:absolute;right:120px;top:150px;font-size:520px;line-height:.8;letter-spacing:-30px;font-weight:800;color:var(--mint)}
+.s-problem .big small{display:block;font-size:44px;letter-spacing:0;font-weight:500;color:#ffffffa0;text-align:right;margin-top:28px;margin-right:30px}
+.s-problem h2{margin-top:150px;max-width:1050px;color:#fff}
+.s-problem h2 em{color:var(--mint)}
+.s-problem .qs{position:absolute;left:var(--pad);bottom:170px;display:grid;grid-template-columns:repeat(3,420px);gap:30px}
+.s-problem .q{border-top:2px solid #ffffff30;padding-top:24px}
+.s-problem .q span{font-size:22px;color:#ffffff80;letter-spacing:2px;text-transform:uppercase}
+.s-problem .q p{font-size:38px;margin-top:10px;font-weight:550;letter-spacing:-.8px}
+.s-problem .note{position:absolute;left:var(--pad);bottom:110px;font-size:22px;color:#ffffff70}
+
+/* ============ SLIDE 3: РЕШЕНИЕ / ПРАВИЛО ============ */
+.s-rule h2{margin-top:40px;max-width:1500px}
+.s-rule .eq{margin-top:110px}
+.s-rule .eq .budget{height:64px}
+.s-rule .total{display:flex;flex-direction:column;gap:6px;margin-top:64px}
+.s-rule .total strong{font-size:120px;letter-spacing:-5px;font-weight:700}
+.s-rule .total span{font-size:36px;color:var(--muted)}
+.s-rule .out{position:absolute;right:var(--pad);bottom:170px;width:620px;font-size:30px;line-height:1.45;color:var(--muted);border-left:4px solid var(--orange);padding-left:30px}
+.s-rule .out b{color:var(--ink);font-weight:600}
+
+/* ============ DEMO SLIDES ============ */
+.s-demo{display:grid;grid-template-columns:560px 1fr;gap:80px;align-items:start}
+.s-demo .txt{padding-top:30px}
+.s-demo h2{font-size:70px;letter-spacing:-2.8px;margin-top:30px}
+.s-demo .ask{margin-top:34px;background:#fff;border:1.5px solid var(--line);border-radius:18px;padding:22px 28px;font-size:27px;line-height:1.4}
+.s-demo .ask small{display:block;font-size:20px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+.s-demo ul{list-style:none;margin-top:30px}
+.s-demo li{font-size:26px;line-height:1.35;padding:13px 0;border-top:1.5px solid var(--line);display:flex;gap:18px}
+.s-demo li b{color:var(--teal);font-weight:700;min-width:44px}
+.s-demo .shot{width:1060px;height:597px;margin-top:150px}
+.s-demo .zoom{position:absolute;right:var(--pad);bottom:150px;display:flex;gap:18px}
+
+/* ============ SLIDE: КАК РАБОТАЕТ ============ */
+.s-how h2{margin-top:36px}
+.pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:22px;margin-top:60px}
+.step{background:#fff;border:1.5px solid var(--line);border-radius:22px;padding:30px 26px;height:450px;position:relative;display:flex;flex-direction:column}
+.step .n{font-size:22px;color:var(--muted);letter-spacing:2px}
+.step h3{font-size:34px;letter-spacing:-1px;margin-top:18px;font-weight:650;line-height:1.1}
+.step p{font-size:22px;line-height:1.4;color:var(--muted);margin-top:14px}
+.step .fig{margin-top:auto;font-size:56px;font-weight:700;letter-spacing:-2.5px;color:var(--ink)}
+.step .fig small{font-size:22px;letter-spacing:0;color:var(--muted);font-weight:500;margin-left:8px}
+.step.ai{background:var(--ink);color:#fff;border-color:var(--ink)}
+.step.ai p,.step.ai .n{color:#ffffffa8}
+.step.ai .fig{color:var(--mint);font-size:38px;letter-spacing:-1px}
+.step:not(:last-child)::after{content:"→";position:absolute;right:-24px;top:50%;transform:translateY(-50%);font-size:30px;color:var(--teal);z-index:2;background:var(--paper);width:26px;text-align:center}
+.stack{display:flex;gap:16px;margin-top:30px;font-size:24px;color:var(--muted);align-items:center}
+.stack span{background:var(--paper-2);border-radius:10px;padding:10px 18px;color:var(--ink);font-weight:550}
+
+/* ============ SLIDE: ДОВЕРИЕ / ПРИВАТНОСТЬ ============ */
+.s-trust{display:grid;grid-template-columns:1fr 760px;gap:90px}
+.s-trust h2{margin-top:30px;font-size:80px}
+.rules{margin-top:36px;display:grid;gap:0}
+.rule{display:grid;grid-template-columns:70px 1fr;gap:20px;padding:18px 0;border-top:1.5px solid var(--line)}
+.rule .ic{width:54px;height:54px;border-radius:14px;background:#e4efe6;display:grid;place-items:center;font-size:28px;color:var(--teal);font-weight:700}
+.rule h4{font-size:30px;font-weight:650;letter-spacing:-.8px}
+.rule p{font-size:23px;color:var(--muted);margin-top:4px;line-height:1.35}
+.s-trust .shot{margin-top:150px;width:760px;height:600px}
+
+/* ============ SLIDE: ПРОВЕРКИ И ГРАНИЦЫ ============ */
+.s-tests{display:grid;grid-template-columns:720px 1fr;gap:110px}
+.s-tests .score{margin-top:130px;font-size:300px;font-weight:800;letter-spacing:-16px;line-height:.85;color:var(--teal)}
+.s-tests .score small{font-size:100px;color:var(--sage);letter-spacing:-4px}
+.s-tests .cap{font-size:34px;color:var(--muted);margin-top:30px;line-height:1.4}
+.s-tests .facts{margin-top:60px;display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.fact{background:#fff;border:1.5px solid var(--line);border-radius:20px;padding:30px}
+.fact strong{font-size:64px;letter-spacing:-2.5px;font-weight:700;display:block}
+.fact span{font-size:24px;color:var(--muted);line-height:1.4;display:block;margin-top:6px}
+.limits{margin-top:200px}
+.limits h3{font-size:30px;letter-spacing:2px;text-transform:uppercase;color:var(--orange);font-weight:650}
+.limits li{list-style:none;font-size:31px;line-height:1.4;padding:22px 0;border-top:1.5px solid var(--line)}
+.limits li b{font-weight:650}
+
+/* ============ SLIDE: ПЛАН РАЗВИТИЯ ============ */
+.s-next h2{margin-top:36px}
+.road{margin-top:110px;display:grid;grid-template-columns:repeat(3,1fr);gap:0;position:relative}
+.road::before{content:"";position:absolute;top:22px;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--teal),var(--orange))}
+.stop{padding-right:70px;position:relative}
+.stop .dot{width:48px;height:48px;border-radius:50%;background:var(--paper);border:5px solid var(--teal);position:relative;z-index:1}
+.stop:nth-child(2) .dot{border-color:#a68a62}.stop:nth-child(3) .dot{border-color:var(--orange)}
+.stop span{display:block;font-size:22px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-top:36px}
+.stop h3{font-size:46px;letter-spacing:-1.6px;font-weight:650;margin-top:12px;line-height:1.1}
+.stop p{font-size:27px;line-height:1.45;color:var(--muted);margin-top:18px}
+
+/* ============ SLIDE: ФИНАЛ ============ */
+.s-end{background:var(--ink);color:#fff}
+.s-end .kicker{color:var(--mint)}
+.s-end h1{margin-top:150px;font-size:170px;color:#fff}
+.s-end h1 em{color:var(--mint)}
+.links{position:absolute;left:var(--pad);right:var(--pad);bottom:170px;display:grid;grid-template-columns:1.6fr 1.45fr .75fr;gap:40px}
+.link{border-top:2px solid #ffffff30;padding-top:24px}
+.link span{font-size:22px;letter-spacing:2px;text-transform:uppercase;color:#ffffff80}
+.link p{font-size:29px;margin-top:10px;font-weight:550;letter-spacing:-.4px;color:var(--mint);white-space:nowrap}
+
+/* === Управление (вне слайда) === */
+.counter{position:fixed;right:22px;bottom:18px;font:500 13px var(--font);color:#ffffff70;z-index:1000}
+.notes{display:none}
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================= 1. ТИТУЛ ======================= -->
+<section class="slide s-title active" data-time="0:00">
+  <div class="brand reveal d1"><div class="mark"><svg viewBox="0 0 32 32"><path d="M8 8 L24 24 M24 13 V24 H13"/></svg></div>SmartWalk <span style="font-weight:500;color:var(--muted);font-size:26px;letter-spacing:0">by Ascension</span></div>
+  <h1 class="reveal d2">Хорошая прогулка.<br><em>Вовремя обратно.</em></h1>
+  <p class="lead reveal d3">ИИ-помощник для коротких прогулок по Астане: 1–3 реальных места, которые помещаются в ваше время вместе с дорогой назад.</p>
+  <div class="shot reveal d4"><img src="assets/hero.jpg" alt="Главный экран SmartWalk с картой Астаны"></div>
+  <div class="meta reveal d5"><span><b>Build with AI 2026</b> · GDG Astana</span><span>Задача НИЦ Smart City · команда Ascension</span></div>
+  <aside class="notes">0:00–0:25. Мы Ascension. SmartWalk отвечает на вопрос «куда сходить прямо сейчас, если времени мало», и всегда считает дорогу обратно.</aside>
+</section>
+
+<!-- ======================= 2. ПРОБЛЕМА ======================= -->
+<section class="slide s-problem dark" data-time="0:25">
+  <div class="kicker reveal d1">01 <b style="color:#ffffff70">/ Проблема</b></div>
+  <div class="big reveal d2">45<small>минут до следующего дела</small></div>
+  <h2 class="reveal d3">Сотни точек на карте. <em>Ни одного ответа</em> «куда мне сейчас».</h2>
+  <div class="qs">
+    <div class="q reveal d4"><span>Где я</span><p>У Mega Silk Way</p></div>
+    <div class="q reveal d5"><span>Чего хочу</span><p>Кофе и передышку</p></div>
+    <div class="q reveal d6"><span>Что ограничивает</span><p>Вернуться к входу D</p></div>
+  </div>
+  <div class="note reveal d6">Сценарий команды, не статистика пользователей</div>
+  <aside class="notes">0:25–0:55. Карты показывают всё подряд, но не отвечают, успею ли я сходить и вернуться. Это и есть контекст из критериев: расстояние, время, тип пользователя, часы работы.</aside>
+</section>
+
+<!-- ======================= 3. ПРАВИЛО ======================= -->
+<section class="slide s-rule" data-time="0:55">
+  <div class="crit"><span>Релевантность и полезность</span><span>Контекстуальность</span></div>
+  <div class="kicker reveal d1">02 <b>/ Решение</b></div>
+  <h2 class="reveal d2">Одно правило: прогулка <em>целиком</em> помещается в ваше время.</h2>
+  <div class="eq">
+    <div class="budget grow">
+      <div class="b-there" style="flex:10"></div><div class="b-visit" style="flex:15"></div><div class="b-back" style="flex:10"></div><div class="b-res" style="flex:5"></div><div class="b-free" style="flex:20"></div>
+    </div>
+    <div class="legend reveal d3">
+      <div style="flex:10"><strong>10</strong>туда</div><div style="flex:15"><strong>15</strong>на месте</div><div style="flex:10"><strong>10</strong>обратно</div><div style="flex:5"><strong>5</strong>резерв</div><div style="flex:20;text-align:right"><strong style="color:var(--muted)">60</strong>ваше окно</div>
+    </div>
+  </div>
+  <div class="total reveal d4"><strong>40 из 60 минут</strong><span>Сквер, прогулка с ребёнком</span></div>
+  <div class="out reveal d5"><b>На выходе 1–3 места:</b> почему оно подходит, сколько займёт, что там делать и откуда взяты данные.</div>
+  <aside class="notes">0:55–1:30. Главное правило продукта. Каждая карточка отдельный вариант, время включает дорогу туда, визит, возвращение и 5 минут запаса.</aside>
+</section>
+
+<!-- ======================= 4. ДЕМО: КОФЕ ======================= -->
+<section class="slide s-demo" data-time="1:30">
+  <div class="crit"><span>UX и понятность демо</span><span>Качество объяснений «почему»</span></div>
+  <div class="txt">
+    <div class="kicker reveal d1">03 <b>/ Демо · сценарий 1</b></div>
+    <h2 class="reveal d2">Кофе за 45 минут</h2>
+    <div class="ask reveal d3"><small>Запрос</small>«Хочу выпить кофе и немного отдохнуть. Нужно вернуться к началу»</div>
+    <ul>
+      <li class="reveal d4"><b>3</b>реальных кафе из OpenStreetMap</li>
+      <li class="reveal d5"><b>~31</b>минута вместе с возвращением</li>
+      <li class="reveal d6"><b>✓</b>часы работы проверены на всё время визита</li>
+    </ul>
+  </div>
+  <div class="shot reveal d3"><img src="assets/coffee.jpg" alt="Три карточки кафе с бюджетом времени"></div>
+  <aside class="notes">1:30–2:15. Живое демо на сайте. Показать, что на карточке есть «почему», время по частям и источник. Если интернет подведёт, этот слайд и есть запасной вариант.</aside>
+</section>
+
+<!-- ======================= 5. ДЕМО: РЕБЁНОК ======================= -->
+<section class="slide s-demo" data-time="2:15">
+  <div class="crit"><span>Контекстуальность</span><span>Релевантность и полезность</span></div>
+  <div class="txt">
+    <div class="kicker reveal d1">04 <b>/ Демо · сценарий 2</b></div>
+    <h2 class="reveal d2">С ребёнком, не дальше 10 минут</h2>
+    <div class="ask reveal d3"><small>Условия</small>Окно 60 минут · «Иду с ребёнком» · до места пешком ≤ 10 минут</div>
+    <ul>
+      <li class="reveal d4"><b>1</b>подходящее место, а не три ради количества</li>
+      <li class="reveal d5"><b>40</b>минут из 60: 10 + 15 + 10 + 5</li>
+      <li class="reveal d6"><b>?</b>безопасность и оснащённость не придумываем</li>
+    </ul>
+  </div>
+  <div class="shot reveal d3"><img src="assets/child.jpg" alt="Карточка Сквер для прогулки с ребёнком"></div>
+  <aside class="notes">2:15–2:55. Тип пользователя меняет категории. Если подходит одно место, система честно показывает одно.</aside>
+</section>
+
+<!-- ======================= 6. ДЕМО: НЕИЗВЕСТНО ======================= -->
+<section class="slide s-demo" data-time="2:55">
+  <div class="crit"><span>Этика и приватность</span><span>Креативность и фишки</span></div>
+  <div class="txt">
+    <div class="kicker reveal d1">05 <b>/ Демо · сценарий 3</b></div>
+    <h2 class="reveal d2">Поздно, нужна розетка</h2>
+    <div class="ask reveal d3"><small>Запрос</small>«Кафе с розеткой поздно вечером, рядом»</div>
+    <ul>
+      <li class="reveal d4"><b>≠</b>нет тега в данных, значит «неизвестно», а не «да»</li>
+      <li class="reveal d5"><b>≠</b>нет часов работы, значит не «открыто сейчас»</li>
+      <li class="reveal d6"><b>↗</b>у каждого места ссылка на запись OSM</li>
+    </ul>
+  </div>
+  <div class="shot reveal d3"><img src="assets/unknown.jpg" alt="Карточки с пометками о неизвестных данных"></div>
+  <aside class="notes">2:55–3:35. Обязательные правила кейса: не утверждать «открыто сейчас» без данных, показывать уверенность и источник. Это видно прямо в карточках.</aside>
+</section>
+
+<!-- ======================= 7. КАК РАБОТАЕТ (RAG) ======================= -->
+<section class="slide s-how" data-time="3:35">
+  <div class="crit"><span>Контекстуальность</span><span>Завершённость</span></div>
+  <div class="kicker reveal d1">06 <b>/ Как это работает</b></div>
+  <h2 class="reveal d2">Модель объясняет только то, <em>что нашёл поиск</em>.</h2>
+  <div class="pipe">
+    <div class="step reveal d2"><span class="n">01 · ДАННЫЕ</span><h3>Сбор из OSM</h3><p>Скрипт Overpass, дубли проверены, источник сохранён</p><div class="fig">930<small>мест</small></div></div>
+    <div class="step reveal d3"><span class="n">02 · ПОИСК</span><h3>Отбор кандидатов</h3><p>Категория, текст запроса на RU/KZ/EN, расстояние</p><div class="fig">3<small>языка</small></div></div>
+    <div class="step reveal d4"><span class="n">03 · ПРОВЕРКА</span><h3>Время и часы</h3><p>Бюджет прогулки и режим работы на весь визит</p><div class="fig">145/146<small>форматов</small></div></div>
+    <div class="step ai reveal d5"><span class="n">04 · GEMINI</span><h3>Объяснение «почему»</h3><p>Видит только найденные записи; ID источников сверяются</p><div class="fig">3.8 Flash</div></div>
+    <div class="step reveal d6"><span class="n">05 · ОТВЕТ</span><h3>Карточки</h3><p>Факты из данных отдельно от сгенерированного текста</p><div class="fig">1–3<small>места</small></div></div>
+  </div>
+  <div class="stack reveal d6">Стек: <span>Gemini API</span><span>OpenStreetMap</span><span>Cloudflare Workers</span><span>Dockerfile для Cloud Run</span><span>Telegram-бот</span></div>
+  <aside class="notes">3:35–4:20. Высокоуровневая схема RAG из требований кейса. Если Gemini недоступен, поиск и расчёт продолжают работать, интерфейс честно пишет, что текст без генерации.</aside>
+</section>
+
+<!-- ======================= 8. ДОВЕРИЕ ======================= -->
+<section class="slide s-trust" data-time="4:20">
+  <div class="crit"><span>Этика и приватность</span></div>
+  <div>
+    <div class="kicker reveal d1">07 <b>/ Чему можно верить</b></div>
+    <h2 class="reveal d2">Видно, откуда каждый факт.</h2>
+    <div class="rules">
+      <div class="rule reveal d3"><div class="ic">◎</div><div><h4>Точка старта не уходит в модель</h4><p>Gemini получает запрос и публичные места, без координат пользователя</p></div></div>
+      <div class="rule reveal d4"><div class="ic">∅</div><div><h4>Ничего не храним</h4><p>Нет истории запросов и маршрутов; бот помнит точку 30 минут</p></div></div>
+      <div class="rule reveal d5"><div class="ic">?</div><div><h4>Неизвестное так и называется</h4><p>Часы, розетки, доступность: «нужно проверить», а не догадка</p></div></div>
+      <div class="rule reveal d6"><div class="ic">≤</div><div><h4>Лимиты от злоупотреблений</h4><p>8 запросов в минуту с адреса, 500 в сутки; поиск работает и без ИИ</p></div></div>
+    </div>
+  </div>
+  <div class="shot reveal d3"><img src="assets/privacy.jpg" alt="Окно о данных и приватности"></div>
+  <aside class="notes">4:20–5:00. Этика и privacy из требований: приватность локации, недостоверная информация, безопасность.</aside>
+</section>
+
+<!-- ======================= 9. ПРОВЕРКИ И ОГРАНИЧЕНИЯ ======================= -->
+<section class="slide s-tests" data-time="5:00">
+  <div class="crit"><span>Завершённость</span><span>Этика и приватность</span></div>
+  <div>
+    <div class="kicker reveal d1">08 <b>/ Проверки</b></div>
+    <div class="score reveal d2">35<small>/35</small></div>
+    <p class="cap reveal d3">автотестов проходят: поиск, API, часы работы, Telegram-бот, приватность и лимиты</p>
+    <div class="facts">
+      <div class="fact reveal d4"><strong>930</strong><span>мест после проверки дублей</span></div>
+      <div class="fact reveal d5"><strong>3</strong><span>сценария проверены на опубликованном сайте</span></div>
+    </div>
+  </div>
+  <div class="limits">
+    <h3 class="reveal d2">Честные ограничения</h3>
+    <ul>
+      <li class="reveal d3"><b>Время пешком оценочное:</b> расстояние × 1,35 при 4,2 км/ч, без построения маршрута</li>
+      <li class="reveal d4"><b>OSM может быть неполным</b> или устаревшим: часы это запись источника, не факт «открыто»</li>
+      <li class="reveal d5"><b>Бесплатный ключ Gemini:</b> для реального запуска нужен проект с биллингом</li>
+    </ul>
+  </div>
+  <aside class="notes">5:00–5:40. Ограничения и риски, как просит кейс. Не заявлять пользователей или выручку.</aside>
+</section>
+
+<!-- ======================= 10. ПЛАН РАЗВИТИЯ ======================= -->
+<section class="slide s-next" data-time="5:40">
+  <div class="crit"><span>Креативность и фишки</span><span>План развития</span></div>
+  <div class="kicker reveal d1">09 <b>/ Что дальше</b></div>
+  <h2 class="reveal d2">Из прогулки в инструмент <em>для города</em>.</h2>
+  <div class="road">
+    <div class="stop reveal d3"><div class="dot"></div><span>Сейчас</span><h3>Точнее время</h3><p>Пешеходные маршруты вместо оценки по прямой, больше проверенных полей о местах</p></div>
+    <div class="stop reveal d4"><div class="dot"></div><span>Следом</span><h3>Мини-маршрут и события</h3><p>Цепочка из трёх мест, афиша города, голосовой запрос на казахском</p></div>
+    <div class="stop reveal d5"><div class="dot"></div><span>Пилот</span><h3>Карта спроса для НИЦ</h3><p>Обезличенные запросы показывают, каких мест городу не хватает. Пилот с кампусами и гостиницами</p></div>
+  </div>
+  <aside class="notes">5:40–6:20. Бизнес-идея: сервис для жителей и гостей с коротким окном; для НИЦ Smart City агрегированная карта спроса. Договорённостей с партнёрами не заявлять.</aside>
+</section>
+
+<!-- ======================= 11. ФИНАЛ ======================= -->
+<section class="slide s-end dark" data-time="6:20">
+  <div class="kicker reveal d1">Ascension · Build with AI 2026</div>
+  <h1 class="reveal d2">Попробуйте <em>прямо сейчас.</em></h1>
+  <div class="links">
+    <div class="link reveal d3"><span>Демо</span><p>ascension-smartwalk.azamatbreach.workers.dev</p></div>
+    <div class="link reveal d4"><span>Код</span><p>github.com/Azalytical/ascension-smartwalk</p></div>
+    <div class="link reveal d5"><span>Видео</span><p>youtu.be/EKrwOn43a5w</p></div>
+  </div>
+  <aside class="notes">6:20–6:40. Спасибо. Ссылки на экране, вопросы.</aside>
+</section>
+
+</main>
+</div>
+<div class="counter" id="counter"></div>
+
+<script>
+/* ===========================================
+   SLIDE CONTROLLER: масштаб сцены, клавиши, свайпы,
+   полоса «бюджета времени» выступления внизу каждого слайда
+   =========================================== */
+class SlidePresentation{
+  constructor(){
+    this.slides=[...document.querySelectorAll('.slide')];
+    this.i=0; this.stage=document.getElementById('deckStage');
+    this.counter=document.getElementById('counter');
+    this.buildTalkBars(); this.scale(); this.keys(); this.touch(); this.wheel();
+    const h=parseInt(location.hash.slice(1)); this.show(isNaN(h)?0:h-1);
+  }
+  /* Полоса внизу: каждый слайд как отрезок бюджета 7 минут */
+  buildTalkBars(){
+    const toSec=t=>{const[m,s]=t.split(':').map(Number);return m*60+s};
+    const times=this.slides.map(s=>toSec(s.dataset.time||'0:00')); const end=400;
+    this.slides.forEach((s,k)=>{
+      if(k===0) return;
+      const bar=document.createElement('div'); bar.className='talkbar';
+      const tr=document.createElement('div'); tr.className='track';
+      times.forEach((t,j)=>{const i=document.createElement('i');i.style.flex=((times[j+1]??end)-t);i.className=j<k?'':j===k?'now':'left';tr.appendChild(i)});
+      const lab=document.createElement('span'); lab.textContent=String(k+1).padStart(2,'0')+' / '+this.slides.length;
+      bar.append(tr,lab); s.appendChild(bar);
+    });
+  }
+  scale(){
+    const f=()=>{const k=Math.min(innerWidth/1920,innerHeight/1080);this.stage.style.transform=`translate(${(innerWidth-1920*k)/2}px,${(innerHeight-1080*k)/2}px) scale(${k})`};
+    f(); addEventListener('resize',f);
+  }
+  keys(){addEventListener('keydown',e=>{
+    if(['ArrowRight','ArrowDown','PageDown',' ','Enter'].includes(e.key)){e.preventDefault();this.show(this.i+1)}
+    if(['ArrowLeft','ArrowUp','PageUp','Backspace'].includes(e.key)){e.preventDefault();this.show(this.i-1)}
+    if(e.key==='Home')this.show(0); if(e.key==='End')this.show(this.slides.length-1);
+    if(e.key==='f'||e.key==='F')document.documentElement.requestFullscreen?.();
+  })}
+  touch(){let x=0;addEventListener('touchstart',e=>x=e.touches[0].clientX,{passive:true});
+    addEventListener('touchend',e=>{const d=e.changedTouches[0].clientX-x;if(Math.abs(d)>50)this.show(this.i+(d<0?1:-1))})}
+  wheel(){let lock=false;addEventListener('wheel',e=>{if(lock||Math.abs(e.deltaY)<30)return;lock=true;this.show(this.i+(e.deltaY>0?1:-1));setTimeout(()=>lock=false,700)},{passive:true})}
+  show(n){
+    this.i=Math.max(0,Math.min(n,this.slides.length-1));
+    this.slides.forEach((s,k)=>{s.classList.toggle('active',k===this.i);s.classList.toggle('visible',k===this.i)});
+    this.counter.textContent=(this.i+1)+' / '+this.slides.length; history.replaceState(null,'','#'+(this.i+1));
+  }
+}
+window.deck=new SlidePresentation();
+</script>
+</body>
+</html>
