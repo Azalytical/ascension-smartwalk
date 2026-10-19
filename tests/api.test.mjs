@@ -117,3 +117,28 @@ test('in-memory budget limits one address to 8 requests a minute', async () => {
   assert.deepEqual(statuses.slice(0, 8), Array(8).fill(200)); assert.equal(statuses[8], 429);
   assert.equal((await handleApi(request(valid, { 'X-Forwarded-For': '203.0.113.8' }), env, [poi])).status, 200);
 });
+
+test('a busy Gemini is retried, and client errors are not', async () => {
+  const original = globalThis.fetch;
+  const ok = { summary: 'Можно выбрать Парк: примерно 20 минут вместе с возвращением и запасом.', references: [poi.id] };
+  const env = { GEMINI_API_KEY: 'g', LOCAL_DEVELOPMENT: true, RETRY_DELAY_MS: 1 };
+  try {
+    let calls = 0;
+    globalThis.fetch = async () => (++calls === 1 ? new Response('{}', { status: 503 }) : geminiReply(ok));
+    let data = await (await handleApi(request(valid), env, [poi])).json();
+    assert.equal(data.generation.mode, 'llm');
+    assert.equal(calls, 2);
+
+    calls = 0;
+    globalThis.fetch = async () => { calls++; throw new TypeError('network'); };
+    data = await (await handleApi(request(valid), env, [poi])).json();
+    assert.equal(data.generation.mode, 'fallback');
+    assert.equal(calls, 3);
+
+    calls = 0;
+    globalThis.fetch = async () => { calls++; return new Response('{}', { status: 400 }); };
+    data = await (await handleApi(request(valid), env, [poi])).json();
+    assert.equal(data.generation.reason, 'provider_400');
+    assert.equal(calls, 1);
+  } finally { globalThis.fetch = original; }
+});
