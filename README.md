@@ -39,6 +39,16 @@ npm run build
 
 Сборка создаёт единый Cloudflare Worker в `dist/server/index.js` и манифест Sites. Секрет провайдера задаётся отдельно в среде размещения.
 
+## Cloudflare Workers (без биллинга Google Cloud)
+
+```sh
+npm run build
+npx wrangler secret put GEMINI_API_KEY
+npx wrangler deploy
+```
+
+Запросы к Gemini уходят с серверов Cloudflare, поэтому работают и там, где Gemini API недоступен из локальной сети. Генерацию ограничивает тот же учёт в памяти (`MEMORY_BUDGET` в `wrangler.jsonc`).
+
 ## Google Cloud Run
 
 `Dockerfile` собирает тот же сервер без npm-зависимостей. В контейнере включён учёт запросов в памяти: до 8 в минуту с одного адреса и до 500 в сутки, поэтому сервис разворачивается одним экземпляром.

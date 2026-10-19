@@ -133,7 +133,9 @@ async function rateLimit(request, env) {
     return { allowed: outcome.success, generationAllowed: outcome.success };
   }
   if (env.LOCAL_DEVELOPMENT) return { allowed: true, generationAllowed: true };
-  if (env.MEMORY_BUDGET) return memoryBudget(request.headers.get('X-Forwarded-For')?.split(',')[0].trim() || 'anonymous');
+  if (env.MEMORY_BUDGET) {
+    return memoryBudget(request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For')?.split(',')[0].trim() || 'anonymous');
+  }
   if (!env.DB) return { allowed: true, generationAllowed: false };
   // Atomic request budgets. Only salted IP hashes and aggregate counters are stored.
   const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('oai-authenticated-user-id') || 'anonymous';

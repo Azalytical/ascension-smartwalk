@@ -1,0 +1,10 @@
+// Cloudflare Workers deployment of the same bundle: npm run build && npx wrangler deploy
+// Secret: npx wrangler secret put GEMINI_API_KEY
+{
+  "name": "ascension-smartwalk",
+  "main": "dist/server/index.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  // Without D1 or a rate limiter binding, the in-isolate budget (8/min per address, 500/day) gates generation.
+  "vars": { "MEMORY_BUDGET": "1" }
+}
