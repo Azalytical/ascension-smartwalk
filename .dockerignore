@@ -1,0 +1,6 @@
+*
+!package.json
+!src/
+!public/
+!scripts/dev.mjs
+!data/pois.json

@@ -69,3 +69,51 @@ test('configured rate limit rejects requests before the provider is called', asy
   const response = await handleApi(request(valid), { RATE_LIMITER: { limit: async () => ({ success: false }) } }, [poi]);
   assert.equal(response.status, 429);
 });
+
+const geminiReply = payload => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(payload) }] } }] }), { headers: { 'Content-Type': 'application/json' } });
+
+test('Gemini is preferred, receives no coordinates, and keeps the key out of the URL', async () => {
+  const original = globalThis.fetch;
+  let url, options;
+  globalThis.fetch = async (u, o) => { url = String(u); options = o; return geminiReply({ summary: 'Можно выбрать Парк: примерно 20 минут вместе с возвращением и запасом.', references: [poi.id] }); };
+  try {
+    const response = await handleApi(request(valid), { GEMINI_API_KEY: 'g-secret', OPENAI_API_KEY: 'o-secret', LOCAL_DEVELOPMENT: true }, [poi]);
+    const data = await response.json();
+    assert.equal(data.generation.mode, 'llm'); assert.equal(data.generation.provider, 'gemini');
+    assert.equal(data.generation.model, 'gemini-3.8-flash');
+    assert.ok(url.startsWith('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent'));
+    assert.ok(!url.includes('g-secret')); assert.equal(options.headers['x-goog-api-key'], 'g-secret');
+    const sent = JSON.parse(options.body);
+    assert.equal(sent.generationConfig.responseMimeType, 'application/json');
+    const context = JSON.parse(sent.contents[0].parts[0].text);
+    assert.equal(context.lat, undefined); assert.equal(context.alternatives[0].lat, undefined); assert.equal(context.alternatives[0].lon, undefined);
+  } finally { globalThis.fetch = original; }
+});
+
+test('Gemini answers naming unknown places or unsupported claims fall back', async () => {
+  const original = globalThis.fetch;
+  try {
+    for (const [payload, reason] of [[{ summary: 'Try Park, it is open now.', references: [poi.id] }, 'unsupported_claim'],
+      [{ summary: 'Можно выбрать Кафе Икс.', references: ['node/999'] }, 'validation']]) {
+      globalThis.fetch = async () => geminiReply(payload);
+      const data = await (await handleApi(request(valid), { GEMINI_API_KEY: 'g', LOCAL_DEVELOPMENT: true }, [poi])).json();
+      assert.equal(data.generation.mode, 'fallback'); assert.equal(data.generation.reason, reason);
+    }
+    globalThis.fetch = async () => new Response('{}', { status: 503 });
+    const data = await (await handleApi(request(valid), { GEMINI_API_KEY: 'g', LOCAL_DEVELOPMENT: true }, [poi])).json();
+    assert.equal(data.generation.reason, 'provider_503'); assert.equal(data.recommendations.length, 1);
+  } finally { globalThis.fetch = original; }
+});
+
+test('status reports the generation provider without the key', async () => {
+  const text = await (await handleApi(new Request('https://demo.example/api/status'), { GEMINI_API_KEY: 'g-secret' }, [poi])).text();
+  assert.equal(JSON.parse(text).generationProvider, 'gemini'); assert.ok(!text.includes('g-secret'));
+});
+
+test('in-memory budget limits one address to 8 requests a minute', async () => {
+  const env = { MEMORY_BUDGET: true };
+  const statuses = [];
+  for (let i = 0; i < 9; i++) statuses.push((await handleApi(request(valid, { 'X-Forwarded-For': '203.0.113.7, 10.0.0.1' }), env, [poi])).status);
+  assert.deepEqual(statuses.slice(0, 8), Array(8).fill(200)); assert.equal(statuses[8], 429);
+  assert.equal((await handleApi(request(valid, { 'X-Forwarded-For': '203.0.113.8' }), env, [poi])).status, 200);
+});

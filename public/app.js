@@ -283,8 +283,10 @@
     $('result-summary').textContent = summary;
     $('result-summary').hidden = !summary;
     const fallback = result.generation?.mode === 'fallback';
-    $('generation-note').textContent = fallback ? 'Подбор составлен по данным мест и вашим ограничениям. Персональное описание сейчас недоступно.' : '';
-    $('generation-note').hidden = !fallback;
+    const model = result.generation?.provider === 'gemini' ? 'Gemini' : 'Языковая модель';
+    $('generation-note').textContent = fallback ? 'Подбор составлен по данным мест и вашим ограничениям. Персональное описание сейчас недоступно.'
+      : summary ? `${model} написала это описание только по данным карточек ниже. Время, расстояние и часы работы считает сервер, а не модель.` : '';
+    $('generation-note').hidden = !$('generation-note').textContent;
     const warnings = [...new Set((Array.isArray(result.warnings) ? result.warnings : []).filter((item) => typeof item === 'string'))];
     $('result-notices').replaceChildren(...warnings.map((warning) => element('p', '', warning)));
     $('result-notices').hidden = !warnings.length;
