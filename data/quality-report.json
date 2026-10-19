@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-19T11:36:09Z",
+  "generatedAt": "2026-10-19T11:38:36Z",
   "retrievedAt": "2026-10-19T11:22:05Z",
   "rawElements": 1480,
   "normalizedCount": 930,
@@ -523,5 +523,239 @@
     "licenseUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
     "attribution": "© OpenStreetMap contributors",
     "attributionUrl": "https://www.openstreetmap.org/copyright"
+  },
+  "locationQuality": {
+    "sourceMetadata": {
+      "source": "OpenStreetMap via Overpass API",
+      "endpoint": "https://overpass-api.de/api/interpreter",
+      "retrievedAt": "2026-10-19T11:37:55+00:00",
+      "rawSha256": "bffe4a4c120d303b73e771e7910e6f225c487069d7062f1021251c1daacbaf50",
+      "queryFile": "dedup-evidence.ql",
+      "rawFile": "dedup-evidence.raw.json",
+      "osmBaseTimestamp": "2026-10-19T11:36:36Z",
+      "license": "ODbL-1.0",
+      "attribution": "© OpenStreetMap contributors",
+      "attributionUrl": "https://www.openstreetmap.org/copyright"
+    },
+    "mega": {
+      "currentPreset": {
+        "lat": 51.088,
+        "lon": 71.409
+      },
+      "insideMallFootprint": false,
+      "mappedMainEntrances": [
+        {
+          "id": "osm:node:13404024646",
+          "osmType": "node",
+          "osmId": 13404024646,
+          "lat": 51.0880152,
+          "lon": 71.4097489,
+          "tags": {
+            "entrance": "main",
+            "ref": "D"
+          },
+          "distanceFromCurrentPresetMeters": 52.33,
+          "onMallBoundary": true,
+          "osmVersion": 1,
+          "osmUpdatedAt": "2025-12-25T09:31:43Z",
+          "provenance": {
+            "source": "OpenStreetMap via Overpass API",
+            "sourceUrl": "https://www.openstreetmap.org/node/13404024646",
+            "retrievedAt": "2026-10-19T11:37:55+00:00",
+            "license": "ODbL-1.0"
+          }
+        },
+        {
+          "id": "osm:node:5761275935",
+          "osmType": "node",
+          "osmId": 5761275935,
+          "lat": 51.0885318,
+          "lon": 71.407206,
+          "tags": {
+            "entrance": "main",
+            "ref": "C"
+          },
+          "distanceFromCurrentPresetMeters": 138.55,
+          "onMallBoundary": true,
+          "osmVersion": 3,
+          "osmUpdatedAt": "2025-12-25T09:31:43Z",
+          "provenance": {
+            "source": "OpenStreetMap via Overpass API",
+            "sourceUrl": "https://www.openstreetmap.org/node/5761275935",
+            "retrievedAt": "2026-10-19T11:37:55+00:00",
+            "license": "ODbL-1.0"
+          }
+        },
+        {
+          "id": "osm:node:13404024647",
+          "osmType": "node",
+          "osmId": 13404024647,
+          "lat": 51.0887669,
+          "lon": 71.4107868,
+          "tags": {
+            "entrance": "main",
+            "ref": "E"
+          },
+          "distanceFromCurrentPresetMeters": 151.15,
+          "onMallBoundary": true,
+          "osmVersion": 1,
+          "osmUpdatedAt": "2025-12-25T09:31:43Z",
+          "provenance": {
+            "source": "OpenStreetMap via Overpass API",
+            "sourceUrl": "https://www.openstreetmap.org/node/13404024647",
+            "retrievedAt": "2026-10-19T11:37:55+00:00",
+            "license": "ODbL-1.0"
+          }
+        },
+        {
+          "id": "osm:node:5761275928",
+          "osmType": "node",
+          "osmId": 5761275928,
+          "lat": 51.0896974,
+          "lon": 71.4084803,
+          "tags": {
+            "entrance": "main",
+            "ref": "F"
+          },
+          "distanceFromCurrentPresetMeters": 192.2,
+          "onMallBoundary": true,
+          "osmVersion": 5,
+          "osmUpdatedAt": "2025-12-25T09:31:43Z",
+          "provenance": {
+            "source": "OpenStreetMap via Overpass API",
+            "sourceUrl": "https://www.openstreetmap.org/node/5761275928",
+            "retrievedAt": "2026-10-19T11:37:55+00:00",
+            "license": "ODbL-1.0"
+          }
+        },
+        {
+          "id": "osm:node:13404024645",
+          "osmType": "node",
+          "osmId": 13404024645,
+          "lat": 51.0887972,
+          "lon": 71.4053102,
+          "tags": {
+            "entrance": "main",
+            "ref": "B"
+          },
+          "distanceFromCurrentPresetMeters": 272.53,
+          "onMallBoundary": true,
+          "osmVersion": 1,
+          "osmUpdatedAt": "2025-12-25T09:31:43Z",
+          "provenance": {
+            "source": "OpenStreetMap via Overpass API",
+            "sourceUrl": "https://www.openstreetmap.org/node/13404024645",
+            "retrievedAt": "2026-10-19T11:37:55+00:00",
+            "license": "ODbL-1.0"
+          }
+        },
+        {
+          "id": "osm:node:5761275930",
+          "osmType": "node",
+          "osmId": 5761275930,
+          "lat": 51.0899986,
+          "lon": 71.4059792,
+          "tags": {
+            "entrance": "main",
+            "ref": "G"
+          },
+          "distanceFromCurrentPresetMeters": 306.43,
+          "onMallBoundary": true,
+          "osmVersion": 3,
+          "osmUpdatedAt": "2025-12-25T09:31:43Z",
+          "provenance": {
+            "source": "OpenStreetMap via Overpass API",
+            "sourceUrl": "https://www.openstreetmap.org/node/5761275930",
+            "retrievedAt": "2026-10-19T11:37:55+00:00",
+            "license": "ODbL-1.0"
+          }
+        },
+        {
+          "id": "osm:node:10980119728",
+          "osmType": "node",
+          "osmId": 10980119728,
+          "lat": 51.0895622,
+          "lon": 71.4038391,
+          "tags": {
+            "entrance": "main",
+            "ref": "A"
+          },
+          "distanceFromCurrentPresetMeters": 400.13,
+          "onMallBoundary": true,
+          "osmVersion": 3,
+          "osmUpdatedAt": "2025-12-25T09:31:43Z",
+          "provenance": {
+            "source": "OpenStreetMap via Overpass API",
+            "sourceUrl": "https://www.openstreetmap.org/node/10980119728",
+            "retrievedAt": "2026-10-19T11:37:55+00:00",
+            "license": "ODbL-1.0"
+          }
+        }
+      ],
+      "recommendedPreset": {
+        "id": "osm:node:13404024646",
+        "osmType": "node",
+        "osmId": 13404024646,
+        "lat": 51.0880152,
+        "lon": 71.4097489,
+        "tags": {
+          "entrance": "main",
+          "ref": "D"
+        },
+        "distanceFromCurrentPresetMeters": 52.33,
+        "onMallBoundary": true,
+        "osmVersion": 1,
+        "osmUpdatedAt": "2025-12-25T09:31:43Z",
+        "provenance": {
+          "source": "OpenStreetMap via Overpass API",
+          "sourceUrl": "https://www.openstreetmap.org/node/13404024646",
+          "retrievedAt": "2026-10-19T11:37:55+00:00",
+          "license": "ODbL-1.0"
+        }
+      },
+      "recommendationBasis": "Closest mapped entrance=main node on the mall outline to the existing preset; no live access check."
+    },
+    "bayterek": {
+      "currentPreset": {
+        "lat": 51.1283,
+        "lon": 71.4304
+      },
+      "sourceId": "osm:way:230401645",
+      "osmRepresentativePoint": {
+        "lat": 51.1282882,
+        "lon": 71.4304546
+      },
+      "distanceMeters": 4.03,
+      "conclusion": "Preset matches the mapped monument area; its centre is not a verified entrance."
+    },
+    "embankment": {
+      "currentPreset": {
+        "lat": 51.161,
+        "lon": 71.423
+      },
+      "nearestMappedFootway": {
+        "lat": 51.16106080556258,
+        "lon": 71.42302543345896,
+        "distanceMeters": 6.99,
+        "osmId": "osm:way:112456436",
+        "tags": {
+          "highway": "footway",
+          "lit": "yes",
+          "surface": "paving_stones"
+        },
+        "sourceUrl": "https://www.openstreetmap.org/way/112456436"
+      },
+      "nearbyWaterContainment": [
+        {
+          "id": "osm:way:23970652",
+          "containsPreset": false
+        }
+      ],
+      "conclusion": "An approximate scenario location near mapped riverbank footways, not a named POI or verified entrance."
+    },
+    "limitations": [
+      "Distances are straight-line/local geometry checks, not walking routes or measured journey times.",
+      "Mapped entrances and footways are not proof of current opening, public access, clearance or step-free passage."
+    ]
   }
 }

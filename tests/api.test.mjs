@@ -39,3 +39,33 @@ test('malformed JSON is a client error', async () => {
   const response = await handleApi(new Request('https://demo.example/api/recommend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{broken' }), {}, [poi]);
   assert.equal(response.status, 400);
 });
+
+test('model context excludes start coordinates, uses no response storage, and rejects invented venue claims', async () => {
+  const original = globalThis.fetch;
+  let sent;
+  globalThis.fetch = async (_url, options) => {
+    sent = JSON.parse(options.body);
+    return new Response(JSON.stringify({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ summary: 'Парк предлагает классическое меню и стандартный ассортимент кофе.', references: [poi.id] }) }] }] }), { headers: { 'Content-Type': 'application/json' } });
+  };
+  try {
+    const response = await handleApi(request(valid), { OPENAI_API_KEY: 'test-secret', LOCAL_DEVELOPMENT: true }, [poi]);
+    const data = await response.json();
+    assert.equal(response.status, 200); assert.equal(data.generation.mode, 'fallback');
+    assert.equal(data.generation.reason, 'unsupported_claim'); assert.equal(sent.store, false);
+    const context = JSON.parse(sent.input);
+    assert.equal(context.lat, undefined); assert.equal(context.lon, undefined);
+    assert.equal(context.alternatives[0].lat, undefined); assert.equal(context.alternatives[0].lon, undefined);
+  } finally { globalThis.fetch = original; }
+});
+
+test('missing hosted request budget preserves retrieval without charging the model', async () => {
+  const response = await handleApi(request(valid), { OPENAI_API_KEY: 'test-secret' }, [poi]);
+  const data = await response.json();
+  assert.equal(response.status, 200); assert.equal(data.recommendations.length, 1);
+  assert.equal(data.generation.mode, 'fallback'); assert.equal(data.generation.reason, 'request_budget_unavailable');
+});
+
+test('configured rate limit rejects requests before the provider is called', async () => {
+  const response = await handleApi(request(valid), { RATE_LIMITER: { limit: async () => ({ success: false }) } }, [poi]);
+  assert.equal(response.status, 429);
+});
