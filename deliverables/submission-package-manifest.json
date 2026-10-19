@@ -1,9 +1,10 @@
 {
   "file": "ascension-smartwalk-submission.zip",
-  "bytes": 1094684,
-  "sha256": "bf623abde3761f957565f7c86978d62847d59123227dddbfe995c2bfb2a7f6e0",
+  "bytes": 1094849,
+  "sha256": "73f94eae9a20984e1be1d954ba95306b37a6757ba6c10a63408138ce91021704",
   "files": [
     ".env.example",
+    ".gitattributes",
     "data/dedup-coffee-like-changeset-85941414.xml",
     "data/dedup-coffee-like-changeset.metadata.json",
     "data/dedup-decisions.json",
