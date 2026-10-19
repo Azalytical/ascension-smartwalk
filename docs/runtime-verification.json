@@ -1,0 +1,31 @@
+{
+  "checkedAt": "2026-10-19T11:53:09.467038+00:00",
+  "site": "https://ascension-smartwalk-astana.azamatbreach.chatgpt.site",
+  "repository": "https://github.com/Azalytical/ascension-smartwalk",
+  "automatedTests": {
+    "passed": 23,
+    "failed": 0,
+    "command": "npm test"
+  },
+  "browserChecks": [
+    {
+      "scenario": "coffee45",
+      "observed": "Gasteria31;Starbucks31;Лепим и варим33;each includes return and5minute reserve",
+      "generation": "llm",
+      "evidence": "deliverables/screenshots/coffee-results.png"
+    },
+    {
+      "scenario": "child60_maxWalk10",
+      "observed": "Сквер,10+15+10+5=40minutes;unsupported safety/accessibility not asserted",
+      "generation": "llm",
+      "evidence": "deliverables/screenshots/child.png"
+    },
+    {
+      "scenario": "lateCoffeeSockets",
+      "observed": "Degirmen,CrepeCafe,Drinkit;socket/noise/open-now not confirmed",
+      "generation": "llm",
+      "evidence": "deliverables/screenshots/unknown.png"
+    }
+  ],
+  "scope": "Three scenarios observed on deployed UI; the additional scenarios document is a test plan, not a claim all scenarios were executed."
+}

@@ -1,0 +1,86 @@
+{
+  "title": "Ascension SmartWalk",
+  "format": "Видеообзор экранов прототипа",
+  "voice": "Microsoft Irina Desktop - Russian",
+  "voice_rate": 0,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "target_seconds": 87.5,
+  "application_context": {
+    "public_site": "https://ascension-smartwalk-astana.azamatbreach.chatgpt.site",
+    "capture_date": "2026-10-19",
+    "poi_count": 930,
+    "cloud_llm_cases_reported_confirmed": ["coffee", "child", "unknown"],
+    "application_tests_reported_passed": 23,
+    "scope": "Application checks were confirmed by the project operator before final media rendering. Media QA independently checks the encoded video and the exact captured screenshots."
+  },
+  "shots_dir": "C:/Users/Azalytical/AppData/Local/Temp/gdg-smartwalk-shots",
+  "ffmpeg": "C:/Users/Azalytical/OneDrive/Desktop/Projects/AzaUn/ja_kk_demo/.venv/Lib/site-packages/imageio_ffmpeg/binaries/ffmpeg-win-x86_64-v7.1.exe",
+  "scenes": [
+    {
+      "id": "01_intro",
+      "heading": "Город в вашем темпе",
+      "shot": "titlecard",
+      "secondary_shot": "hero.png",
+      "sentences": [
+        "Ассеншн Смарт Уок помогает выбрать короткую прогулку по Астане.",
+        "Видеообзор экранов прототипа."
+      ]
+    },
+    {
+      "id": "02_planner",
+      "heading": "Старт и 45 минут",
+      "shot": "planner.png",
+      "sentences": [
+        "Выбираем старт и сорок пять свободных минут.",
+        "Расчёт включает дорогу туда, время на месте, возвращение и пять минут резерва."
+      ]
+    },
+    {
+      "id": "03_alternatives",
+      "heading": "Три понятных альтернативы",
+      "shot": "coffee-results.png",
+      "sentences": [
+        "На запрос о кофе получаем три альтернативы.",
+        "В карточках — расчётное время и объяснение выбора. Варианты можно открыть на карте."
+      ]
+    },
+    {
+      "id": "04_child",
+      "heading": "Сценарий с ребёнком",
+      "shot": "child.png",
+      "sentences": [
+        "Меняем запрос: прогулка с ребёнком.",
+        "Удобства и доступ неизвестны, если их нет в источнике."
+      ]
+    },
+    {
+      "id": "05_sources",
+      "heading": "Источники можно проверить",
+      "shot": "evidence.png",
+      "sentences": [
+        "Данные — из Оупен стрит мэп.",
+        "Раскрываем сведения о месте: источники помогают проверить рекомендацию."
+      ]
+    },
+    {
+      "id": "06_unknown",
+      "heading": "Неизвестное отмечено честно",
+      "shot": "unknown.png",
+      "sentences": [
+        "Режим работы и условия входа могут требовать проверки.",
+        "Время в пути ориентировочное: пешеходный маршрут не построен. Перед выходом проверьте переходы и погоду."
+      ]
+    },
+    {
+      "id": "07_privacy",
+      "heading": "Локация — вне истории приложения",
+      "shot": "privacy.png",
+      "sentences": [
+        "Точная локация не хранится в истории приложения.",
+        "Но координаты старта остаются в скачанном плане. Ассеншн Смарт Уок."
+      ]
+    }
+  ]
+}

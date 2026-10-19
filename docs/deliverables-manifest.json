@@ -1,0 +1,18 @@
+{
+  "ascension-smartwalk-defense-and-screencast.pdf": {
+    "bytes": 62491,
+    "sha256": "0e17874d7c8275eb7aba7074fad2a39b04ab47c571faef987c097e6b5201ccaa"
+  },
+  "ascension-smartwalk-presentation.pdf": {
+    "bytes": 556143,
+    "sha256": "cb0665d5aba4e26e29423a67fa5070822b0c5b686980c976fbb0114e0473761c"
+  },
+  "ascension-smartwalk-presentation.pptx": {
+    "bytes": 136131,
+    "sha256": "ba0d71999896f89fe927aece3ca85cb9e4519e82f7e92e5b568b0957caf336a6"
+  },
+  "ascension-smartwalk-tests-and-limitations.pdf": {
+    "bytes": 76213,
+    "sha256": "7e634c603c94fa323fb77db584ee5e51fde8be72be7f55696b51984f4971d93d"
+  }
+}

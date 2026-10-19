@@ -1,0 +1,42 @@
+[
+  {
+    "scene": "00_title",
+    "time": 1.6,
+    "path": "build\\qa\\00_title.png"
+  },
+  {
+    "scene": "01_hero",
+    "time": 6.0,
+    "path": "build\\qa\\01_hero.png"
+  },
+  {
+    "scene": "02_planner",
+    "time": 16.953,
+    "path": "build\\qa\\02_planner.png"
+  },
+  {
+    "scene": "03_alternatives",
+    "time": 30.223,
+    "path": "build\\qa\\03_alternatives.png"
+  },
+  {
+    "scene": "04_child",
+    "time": 42.243,
+    "path": "build\\qa\\04_child.png"
+  },
+  {
+    "scene": "05_sources",
+    "time": 53.058,
+    "path": "build\\qa\\05_sources.png"
+  },
+  {
+    "scene": "06_unknown",
+    "time": 66.685,
+    "path": "build\\qa\\06_unknown.png"
+  },
+  {
+    "scene": "07_privacy",
+    "time": 81.099,
+    "path": "build\\qa\\07_privacy.png"
+  }
+]

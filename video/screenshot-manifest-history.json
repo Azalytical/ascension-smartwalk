@@ -1,0 +1,98 @@
+{
+  "versions": [
+    {
+      "version": 1,
+      "stage": "initial preparation before final capture",
+      "kind": "User-browser screenshots copied without image-content edits",
+      "screenshots": [
+        {
+          "name": "coffee-results.png",
+          "original_path": "C:\\Users\\Azalytical\\AppData\\Local\\Temp\\gdg-smartwalk-shots\\coffee-results.png",
+          "width": 1265,
+          "height": 712,
+          "bytes": 87895,
+          "sha256": "b1e4fb3dfb29e25e599251bd242209252a303ed25377d78b948f08b7f0b20eee"
+        },
+        {
+          "name": "hero.png",
+          "original_path": "C:\\Users\\Azalytical\\AppData\\Local\\Temp\\gdg-smartwalk-shots\\hero.png",
+          "width": 1265,
+          "height": 712,
+          "bytes": 89028,
+          "sha256": "c18e4786538b64c8e2eee263f286d5b70c89b624ae9c7f8c1417fde2926860f6"
+        }
+      ]
+    },
+    {
+      "kind": "User-browser screenshots copied without image-content edits",
+      "refreshed_utc": "2026-10-19T11:52:24.286544+00:00",
+      "source_policy": "Final rendering rereads all original files; old cached files never substitute for missing originals.",
+      "screenshots": [
+        {
+          "name": "hero.png",
+          "original_path": "C:\\Users\\Azalytical\\AppData\\Local\\Temp\\gdg-smartwalk-shots\\hero.png",
+          "source_modified_utc": "2026-10-19T11:45:28.292148+00:00",
+          "width": 1265,
+          "height": 712,
+          "bytes": 89028,
+          "sha256": "c18e4786538b64c8e2eee263f286d5b70c89b624ae9c7f8c1417fde2926860f6"
+        },
+        {
+          "name": "planner.png",
+          "original_path": "C:\\Users\\Azalytical\\AppData\\Local\\Temp\\gdg-smartwalk-shots\\planner.png",
+          "source_modified_utc": "2026-10-19T11:46:29.712507+00:00",
+          "width": 1265,
+          "height": 712,
+          "bytes": 124507,
+          "sha256": "8b687bbaedb07223acd5f903fed82e7a467806ff26a825c282b9c8106c85232a"
+        },
+        {
+          "name": "coffee-results.png",
+          "original_path": "C:\\Users\\Azalytical\\AppData\\Local\\Temp\\gdg-smartwalk-shots\\coffee-results.png",
+          "source_modified_utc": "2026-10-19T11:46:30.073102+00:00",
+          "width": 1265,
+          "height": 712,
+          "bytes": 87460,
+          "sha256": "3d965cd838ea5e28bbdad6d5fc140fe19cc90e54dddc115b1284caf4e1a78833"
+        },
+        {
+          "name": "child.png",
+          "original_path": "C:\\Users\\Azalytical\\AppData\\Local\\Temp\\gdg-smartwalk-shots\\child.png",
+          "source_modified_utc": "2026-10-19T11:50:37.185096+00:00",
+          "width": 1265,
+          "height": 712,
+          "bytes": 52896,
+          "sha256": "4d885e4a59a2b4c0fe4ec148987a90ed8d3e236425c0afd10ed9083153f2925a"
+        },
+        {
+          "name": "evidence.png",
+          "original_path": "C:\\Users\\Azalytical\\AppData\\Local\\Temp\\gdg-smartwalk-shots\\evidence.png",
+          "source_modified_utc": "2026-10-19T11:49:54.914673+00:00",
+          "width": 1265,
+          "height": 712,
+          "bytes": 61276,
+          "sha256": "981a394c9e466a16c298f2dbea645ed135ec3beac42e7960660ffa01f16f2800"
+        },
+        {
+          "name": "unknown.png",
+          "original_path": "C:\\Users\\Azalytical\\AppData\\Local\\Temp\\gdg-smartwalk-shots\\unknown.png",
+          "source_modified_utc": "2026-10-19T11:48:59.506536+00:00",
+          "width": 1265,
+          "height": 712,
+          "bytes": 92419,
+          "sha256": "1d15c61e3c2422018ab02ef3906f8797bdb349d50d7e8ce0a53008405d23149a"
+        },
+        {
+          "name": "privacy.png",
+          "original_path": "C:\\Users\\Azalytical\\AppData\\Local\\Temp\\gdg-smartwalk-shots\\privacy.png",
+          "source_modified_utc": "2026-10-19T11:50:39.342606+00:00",
+          "width": 1265,
+          "height": 712,
+          "bytes": 55861,
+          "sha256": "c3a198d29fe2f0551c78b6d81e998a7954df4e324e0b14d46d6b0c884e978532"
+        }
+      ],
+      "version": 2
+    }
+  ]
+}

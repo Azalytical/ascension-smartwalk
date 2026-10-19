@@ -1,0 +1,37 @@
+[
+  {
+    "file": "hero.png",
+    "original_matches_manifest": true,
+    "cache_matches_manifest": true
+  },
+  {
+    "file": "planner.png",
+    "original_matches_manifest": true,
+    "cache_matches_manifest": true
+  },
+  {
+    "file": "coffee-results.png",
+    "original_matches_manifest": true,
+    "cache_matches_manifest": true
+  },
+  {
+    "file": "child.png",
+    "original_matches_manifest": true,
+    "cache_matches_manifest": true
+  },
+  {
+    "file": "evidence.png",
+    "original_matches_manifest": true,
+    "cache_matches_manifest": true
+  },
+  {
+    "file": "unknown.png",
+    "original_matches_manifest": true,
+    "cache_matches_manifest": true
+  },
+  {
+    "file": "privacy.png",
+    "original_matches_manifest": true,
+    "cache_matches_manifest": true
+  }
+]

@@ -408,6 +408,9 @@ def quality(pois, raw, meta, excluded, duplicate_ids, candidates, dedup):
                        "license": LICENSE, "licenseUrl": LICENSE_URL,
                        "attribution": ATTRIBUTION, "attributionUrl": SOURCE_URL},
     }
+    location_path = DATA / "dedup-location-quality.json"
+    if location_path.exists():
+        report["locationQuality"] = json.loads(location_path.read_text(encoding="utf-8"))
     return report
 
 

@@ -8,6 +8,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 from pathlib import Path
 import sys
 from urllib.parse import urlencode
@@ -45,6 +46,68 @@ def inside(lat, lon, geometry):
             if lon < cross_lon:
                 contained = not contained
     return contained
+
+
+def distance_m(lat, lon, other_lat, other_lon):
+    radius = 6371008.8
+    p1, p2 = math.radians(lat), math.radians(other_lat)
+    h = math.sin((p2 - p1) / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(math.radians(other_lon - lon) / 2) ** 2
+    return radius * 2 * math.atan2(math.sqrt(h), math.sqrt(max(0, 1 - h)))
+
+
+def nearest_segment_point(lat, lon, a, b):
+    # Local equirectangular projection is sufficient for these sub-100 m checks.
+    xscale, yscale = 111195 * math.cos(math.radians(lat)), 111195
+    ax, ay = (a["lon"] - lon) * xscale, (a["lat"] - lat) * yscale
+    bx, by = (b["lon"] - lon) * xscale, (b["lat"] - lat) * yscale
+    dx, dy = bx - ax, by - ay
+    t = max(0, min(1, -(ax * dx + ay * dy) / (dx * dx + dy * dy))) if dx or dy else 0
+    x, y = ax + t * dx, ay + t * dy
+    return {"lat": lat + y / yscale, "lon": lon + x / xscale, "distanceMeters": math.hypot(x, y)}
+
+
+def locations(raw, meta, source):
+    by_id = {f"osm:{e['type']}:{e['id']}": e for e in raw["elements"]}
+    mall = by_id["osm:way:499328514"]
+    entrance_nodes = [e for e in raw["elements"] if e["type"] == "node" and e["id"] in mall["nodes"]
+                      and e.get("tags", {}).get("entrance") == "main"]
+    entrances = sorted([{
+        "id": f"osm:node:{e['id']}", "osmType": "node", "osmId": e["id"],
+        "lat": e["lat"], "lon": e["lon"], "tags": e["tags"],
+        "distanceFromCurrentPresetMeters": round(distance_m(51.088, 71.409, e["lat"], e["lon"]), 2),
+        "onMallBoundary": True, "osmVersion": e["version"], "osmUpdatedAt": e["timestamp"],
+        "provenance": {"source": "OpenStreetMap via Overpass API", "sourceUrl": f"https://www.openstreetmap.org/node/{e['id']}",
+                       "retrievedAt": meta["retrievedAt"], "license": "ODbL-1.0"},
+    } for e in entrance_nodes], key=lambda p: p["distanceFromCurrentPresetMeters"])
+    bayterek = source["osm:way:230401645"]
+    c = bayterek["center"]
+    paths = []
+    for e in raw["elements"]:
+        if e["type"] == "way" and e.get("tags", {}).get("highway") in ("footway", "pedestrian", "path"):
+            for a, b in zip(e["geometry"], e["geometry"][1:]):
+                candidate = nearest_segment_point(51.161, 71.423, a, b)
+                paths.append({**candidate, "osmId": f"osm:way:{e['id']}", "tags": e["tags"],
+                              "sourceUrl": f"https://www.openstreetmap.org/way/{e['id']}"})
+    nearest = min(paths, key=lambda p: p["distanceMeters"]) if paths else None
+    if nearest:
+        nearest["distanceMeters"] = round(nearest["distanceMeters"], 2)
+    water = [{"id": f"osm:way:{e['id']}", "containsPreset": inside(51.161, 71.423, e["geometry"])}
+             for e in raw["elements"] if e["type"] == "way" and e.get("tags", {}).get("natural") == "water"
+             and e.get("nodes") and e["nodes"][0] == e["nodes"][-1]]
+    return {
+        "sourceMetadata": meta,
+        "mega": {"currentPreset": {"lat": 51.088, "lon": 71.409},
+                 "insideMallFootprint": inside(51.088, 71.409, mall["geometry"]),
+                 "mappedMainEntrances": entrances, "recommendedPreset": entrances[0] if entrances else None,
+                 "recommendationBasis": "Closest mapped entrance=main node on the mall outline to the existing preset; no live access check."},
+        "bayterek": {"currentPreset": {"lat": 51.1283, "lon": 71.4304}, "sourceId": "osm:way:230401645",
+                     "osmRepresentativePoint": c, "distanceMeters": round(distance_m(51.1283, 71.4304, c["lat"], c["lon"]), 2),
+                     "conclusion": "Preset matches the mapped monument area; its centre is not a verified entrance."},
+        "embankment": {"currentPreset": {"lat": 51.161, "lon": 71.423}, "nearestMappedFootway": nearest,
+                       "nearbyWaterContainment": water,
+                       "conclusion": "An approximate scenario location near mapped riverbank footways, not a named POI or verified entrance."},
+        "limitations": ["Distances are straight-line/local geometry checks, not walking routes or measured journey times.",
+                        "Mapped entrances and footways are not proof of current opening, public access, clearance or step-free passage."]}
 
 
 def main():
@@ -109,6 +172,7 @@ def main():
         report["parkContainment"].append({"polygon": aid, "insidePolygon": bid, "vertices": len(points),
                                            "verticesInside": sum(inside(p["lat"], p["lon"], b["geometry"]) for p in points)})
     write_json(DATA / "dedup-evidence.json", report)
+    write_json(DATA / "dedup-location-quality.json", locations(raw, meta, source))
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 

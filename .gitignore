@@ -9,3 +9,10 @@ dist/
 tmp/
 src/assets.generated.mjs
 .openai/.local/
+docs/.build/
+video/build/
+video/tools/
+deliverables/slide-previews/
+deliverables/*-r*.pptx
+deliverables/*-demo.mp4
+deliverables/*-submission.zip
