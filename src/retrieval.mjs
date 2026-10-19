@@ -145,9 +145,27 @@ function normalName(poi) {
   return normalize(poi.name).replace(/[^\p{L}\p{N}]/gu, '');
 }
 
-function samePlace(a, b) {
-  return String(a.id) === String(b.id) || a.sourceUrl === b.sourceUrl
-    || (normalName(a) === normalName(b) && haversineMeters(a.lat, a.lon, b.lat, b.lon) < 40);
+// Two records are the same place when they share an id or source URL, or a normalized name within 40 m.
+// Indexed lookups keep deduplication linear: a pairwise scan exceeds the Workers CPU limit at ~900 records.
+function placeIndex() {
+  const ids = new Set();
+  const urls = new Set();
+  const names = new Map();
+  return {
+    size: 0,
+    has(poi) {
+      return ids.has(String(poi.id)) || urls.has(poi.sourceUrl)
+        || (names.get(normalName(poi)) ?? []).some(other => haversineMeters(poi.lat, poi.lon, other.lat, other.lon) < 40);
+    },
+    add(poi) {
+      ids.add(String(poi.id));
+      urls.add(poi.sourceUrl);
+      const name = normalName(poi);
+      if (!names.has(name)) names.set(name, []);
+      names.get(name).push(poi);
+      this.size++;
+    },
+  };
 }
 
 function activitiesFor(category) {
@@ -187,25 +205,15 @@ function warningsFor(poi, constraints, hours) {
   return warnings;
 }
 
-/**
- * Return up to three independent alternatives backed by existing POI records.
- * Accepts an array, or a dataset wrapper { pois: [...] }. Does not mutate inputs.
- */
-export function recommend(dataset, input) {
-  const constraints = constraintsFor(input);
-  const pois = Array.isArray(dataset) ? dataset : Array.isArray(dataset?.pois) ? dataset.pois : [];
-  const requested = queryCategories(constraints.query);
-  const excluded = excludedCategories(constraints.query);
-  const terms = tokens(constraints.query);
-  const counters = { invalidRecords: 0, unsupportedCategory: 0, restrictedAccess: 0, duplicates: 0, category: 0, walkBudget: 0, totalBudget: 0, closedByHours: 0 };
-  // Hours are checked against the requested visit time, or against now when no time was given.
-  // A date without a time cannot be checked; minutes are dropped so equal requests give equal answers.
-  const reference = constraints.visitDate
-    ? (constraints.visitDate.includes('T') ? new Date(constraints.visitDate) : null)
-    : new Date(Math.floor(Date.now() / 60000) * 60000);
-  const seen = [];
-  const candidates = [];
+// Validation, classification and deduplication do not depend on the request, so they run once per dataset.
+const preparedDatasets = new WeakMap();
 
+function prepare(pois) {
+  const cached = preparedDatasets.get(pois);
+  if (cached) return cached;
+  const counters = { invalidRecords: 0, unsupportedCategory: 0, restrictedAccess: 0, duplicates: 0 };
+  const seen = placeIndex();
+  const unique = [];
   for (const row of pois) {
     const category = row && typeof row === 'object' ? categoryOf(row) : null;
     const sourceUrl = safeSourceUrl(row?.sourceUrl);
@@ -217,8 +225,46 @@ export function recommend(dataset, input) {
     const poi = { ...row, category, sourceUrl };
     const access = normalize(poi.access ?? (poi.tags && !Array.isArray(poi.tags) ? poi.tags.access : null));
     if (['private', 'no', 'military'].includes(access)) { counters.restrictedAccess++; continue; }
-    if (seen.some(other => samePlace(poi, other))) { counters.duplicates++; continue; }
-    seen.push(poi);
+    if (seen.has(poi)) { counters.duplicates++; continue; }
+    seen.add(poi);
+    unique.push({ poi, text: normalize(`${poi.name} ${poi.description ?? ''} ${tagText(poi.tags)}`) });
+  }
+  const result = { unique, counters };
+  preparedDatasets.set(pois, result);
+  return result;
+}
+
+function poisOf(dataset) {
+  return Array.isArray(dataset) ? dataset : Array.isArray(dataset?.pois) ? dataset.pois : [];
+}
+
+/** Prepare a dataset ahead of the first request, e.g. at Worker startup, which has its own CPU budget. */
+export function prepareDataset(dataset) {
+  prepare(poisOf(dataset));
+}
+
+/**
+ * Return up to three independent alternatives backed by existing POI records.
+ * Accepts an array, or a dataset wrapper { pois: [...] }. Does not mutate inputs.
+ */
+export function recommend(dataset, input) {
+  const constraints = constraintsFor(input);
+  const pois = poisOf(dataset);
+  const requested = queryCategories(constraints.query);
+  const excluded = excludedCategories(constraints.query);
+  const terms = tokens(constraints.query);
+  const counters = { invalidRecords: 0, unsupportedCategory: 0, restrictedAccess: 0, duplicates: 0, category: 0, walkBudget: 0, totalBudget: 0, closedByHours: 0 };
+  // Hours are checked against the requested visit time, or against now when no time was given.
+  // A date without a time cannot be checked; minutes are dropped so equal requests give equal answers.
+  const reference = constraints.visitDate
+    ? (constraints.visitDate.includes('T') ? new Date(constraints.visitDate) : null)
+    : new Date(Math.floor(Date.now() / 60000) * 60000);
+  const prepared = prepare(pois);
+  Object.assign(counters, prepared.counters);
+  const candidates = [];
+
+  for (const { poi, text } of prepared.unique) {
+    const { category, sourceUrl } = poi;
     if ((constraints.category && category !== constraints.category)
       || (!constraints.category && requested.length > 0 && !requested.includes(category))
       || excluded.includes(category)
@@ -237,7 +283,6 @@ export function recommend(dataset, input) {
       : null;
     if (hours && ['closed', 'closes_early'].includes(hours.status)) { counters.closedByHours++; continue; }
 
-    const text = normalize(`${poi.name} ${poi.description ?? ''} ${tagText(poi.tags)}`);
     const matchedTerms = terms.filter(term => text.includes(term));
     const categoryIntent = constraints.category === category || requested.includes(category);
     const scoreBreakdown = {
@@ -287,7 +332,7 @@ export function recommend(dataset, input) {
   return { recommendations, constraints, warnings,
     retrieval: { method: 'deterministic_geo_keyword_retrieval', usesEmbeddings: false, usesLanguageModel: false,
       summary: 'Фильтры по географии, категории, времени и режиму работы из OSM; поиск по словам и словарю ru/kk/en; объяснение по данным POI.',
-      inputRecords: pois.length, validUniqueRecords: seen.length, feasibleCandidates: candidates.length, returned: recommendations.length,
+      inputRecords: pois.length, validUniqueRecords: prepared.unique.length, feasibleCandidates: candidates.length, returned: recommendations.length,
       requestedCategories: requested, excludedCategories: excluded, queryTerms: terms, rejected: counters,
       scoring: { category: 35, keywordsPerMatch: 5, keywordsCap: 20, proximityMax: 25, timeFitMax: 15, childCategory: 5, hoursConfirmed: 5, repeatCategoryPenalty: 8 },
       hoursReferenceTime: reference ? reference.toISOString() : null, hoursTimezone: 'UTC+05:00',

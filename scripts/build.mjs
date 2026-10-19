@@ -10,8 +10,10 @@ for (const [name, type] of [['index.html', 'text/html; charset=utf-8'], ['app.js
 assets['/'] = assets['/index.html'];
 const data = JSON.parse(await readFile(resolve(root, 'data/pois.json'), 'utf8'));
 const code = `import {handleApi} from './src/api.mjs';
+import {prepareDataset} from './src/retrieval.mjs';
 const assets=${JSON.stringify(assets)};
 const data=${JSON.stringify(data)};
+prepareDataset(data);
 export default {async fetch(request,env,ctx){
   const api=await handleApi(request,env,data);if(api)return api;
   const url=new URL(request.url);const asset=assets[url.pathname];
