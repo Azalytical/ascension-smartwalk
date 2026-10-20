@@ -141,11 +141,11 @@ async function run(scenario) {
 const results = [];
 for (const scenario of SCENARIOS) results.push(await run(scenario));
 const passed = results.filter(r => r.pass).length;
-const protocol = { product: 'Seruen', team: 'Ascension', date: new Date().toISOString(), commit, mode: live ? `живой сайт ${live}` : 'движок подбора', places: places.length,
+const protocol = { product: 'Seruen (SmartWalk)', team: 'Ascension', date: new Date().toISOString(), commit, mode: live ? `живой сайт ${live}` : 'движок подбора', places: places.length,
   visitDay: DAY, passed, total: results.length, results };
 writeFileSync(new URL('docs/test-protocol.json', root), JSON.stringify(protocol, null, 2) + '\n');
 
-const md = [`# Протокол тестовых сценариев Seruen`, '',
+const md = [`# Протокол тестовых сценариев Seruen (SmartWalk)`, '',
   `Команда Ascension, Build with AI Hackathon 2026, задача НИЦ Smart City «ИИ-помощник по прогулкам в городе Астана».`, '',
   `Прогон: ${protocol.mode}, коммит \`${commit}\`, база ${places.length} мест, день визита ${DAY} (Астана, UTC+5), ${protocol.date.slice(0, 16).replace('T', ' ')} UTC. Итог: **${passed} из ${results.length} сценариев Pass.**`, '',
   'Pass ставится, только если выполнены все проверки сценария и общие проверки формата ответа из задания: не больше трёх мест, время в бюджете, «почему», время и план у каждого места, источник и уровень уверенности, идея помечена как идея, нет «открыто сейчас», показано, что учтено. Повторить: `node scripts/scenario-protocol.mjs` (движок) или `node scripts/scenario-protocol.mjs --live <адрес сайта>`.', '',

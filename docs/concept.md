@@ -1,6 +1,6 @@
-# Seruen: концепция продукта
+# Seruen (SmartWalk): концепция продукта
 
-Команда Ascension, Build with AI Hackathon 2026, задача НИЦ Smart City «ИИ-помощник по прогулкам в городе Астана». Репозиторий `ascension-smartwalk` (рабочее имя до 20 октября: SmartWalk).
+Команда Ascension, Build with AI Hackathon 2026, задача НИЦ Smart City «ИИ-помощник по прогулкам в городе Астана». Репозиторий `ascension-smartwalk`. SmartWalk — имя продукта на сайте и в ролике, Seruen («серуен», по-казахски «прогулка») — его новое имя; это один продукт.
 
 ## Идея
 
