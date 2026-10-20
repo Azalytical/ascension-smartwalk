@@ -8,7 +8,7 @@ import { languageNote, languageProblem } from './language.mjs';
 // Latency budget: an answer within a few seconds, or an honest quick fallback. Usually two model calls: tools, then the answer.
 const MAX_TURNS = 3, MAX_TOOL_CALLS = 5, TOTAL_MS = 14000, ATTEMPT_MS = 7000;
 export const DEFAULT_AGENT_MODEL = 'gemini-3.5-flash-lite';
-// Free-tier quotas are per model. After a 429 the agent starts on the spare model for a few minutes.
+// Free-tier quotas and load are per model. After a 429 or 5xx the agent starts on the spare model for a few minutes.
 export const SPARE_AGENT_MODEL = 'gemini-3.1-flash-lite';
 let primaryRefusedAt = 0;
 
@@ -243,8 +243,8 @@ export async function runAgent(input, deps) {
       generationConfig: { temperature: 0.2, maxOutputTokens: 1024 } };
     let reply = await callWithRetry(body, model, env, deadline, limitedJson, attemptMs);
     modelCalls++;
-    // Out of quota before any model turn: the spare model takes the whole run (thought signatures don't cross models).
-    if (reply.error === 'provider_429' && turn === 1 && model === primary) {
+    // Out of quota or busy before any model turn: the spare model takes the whole run (thought signatures don't cross models).
+    if (/^provider_(429|5\d\d)$/.test(reply.error || '') && turn === 1 && model === primary && primary !== SPARE_AGENT_MODEL) {
       primaryRefusedAt = Date.now();
       model = SPARE_AGENT_MODEL;
       reply = await callWithRetry(body, model, env, deadline, limitedJson, attemptMs);

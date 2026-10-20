@@ -185,7 +185,7 @@ test('/api/recommend: the reserve reaches the card, the calendar link, and a bad
   assert.equal((await api('/api/recommend', { ...valid, excludeIds: hidden }, {}, [park])).status, 200);
 });
 
-test('/api/recommend: Gemini rewords the difference only from its facts, and a reworded line with a new number is dropped', async () => {
+test('/api/recommend: the model sees the computed differences for its summary; the card keeps the computed line', async () => {
   const original = globalThis.fetch;
   let sent;
   try {
@@ -195,17 +195,13 @@ test('/api/recommend: Gemini rewords the difference only from its facts, and a r
     const context = JSON.parse(sent.contents[0].parts[0].text);
     assert.deepEqual(context.alternatives[0].versus, ['единственный вариант, который помещается в ваше время и условия']);
     assert.equal(context.alternatives[0].reserveMinutes, 5);
-    assert.ok(sent.generationConfig.responseSchema.properties.places.items.required.includes('versus'));
-    assert.equal(data.recommendations[0].aiVersus, 'Других вариантов под ваше время нет.');
-    assert.equal(data.recommendations[0].provenance.aiVersus.origin, 'generated');
+    // The model writes only why and todo: rewording the difference too made the answer about a quarter longer.
+    assert.deepEqual(sent.generationConfig.responseSchema.properties.places.items.required, ['id', 'why', 'todo']);
+    assert.ok(!sent.systemInstruction.parts[0].text.includes('versus —'));
+    assert.equal(data.recommendations[0].aiVersus, undefined, 'a stray versus from a model is not shown');
+    assert.equal(data.recommendations[0].aiWhy, 'Подходит под прогулку.');
     assert.equal(data.recommendations[0].versus.reasons[0].key, 'only');
-
-    globalThis.fetch = async () => geminiReply({ summary: 'Можно выбрать Парк: прогулка с возвращением и запасом.', references: [park.id],
-      places: [{ id: park.id, why: 'Подходит под прогулку.', todo: 'Пройтись по парку.', versus: 'Ближе всех на 99 минут.' }] });
-    const invented = (await (await api('/api/recommend', valid, { GEMINI_API_KEY: 'g' }, [park])).json()).recommendations[0];
-    assert.equal(invented.aiVersus, undefined);
-    assert.equal(invented.aiWhy, 'Подходит под прогулку.', 'the other texts stay');
-    assert.ok(invented.versus.text);
+    assert.ok(data.recommendations[0].versus.text);
   } finally { globalThis.fetch = original; }
 });
 
