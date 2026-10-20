@@ -32,7 +32,7 @@ p,h1,h2{margin:0}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* One card per screen, scrolled with the crown or a swipe. */
-.view.view-results{padding:0}
+.view.view-results,.view.view-meet{padding:0}
 .results{width:100%}
 .card{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:var(--h);padding:calc(var(--k)*7) calc(var(--k)*5) calc(var(--k)*8);scroll-snap-align:start}
 .round .card{padding:calc(var(--k)*11) calc(var(--k)*13) calc(var(--k)*12)}
@@ -98,6 +98,57 @@ p,h1,h2{margin:0}
 .error-text{font-size:calc(var(--k)*7);margin-bottom:calc(var(--k)*5);line-height:1.25}
 .view-error .action+.action{margin-top:calc(var(--k)*3)}
 
+/* Meetups and friends, linked to the phone account with a 6-digit code. */
+.chip-meet b{color:var(--ink)}
+.count{display:inline-flex;align-items:center;justify-content:center;min-width:calc(var(--k)*8);height:calc(var(--k)*8);padding:0 calc(var(--k)*1.8);margin-left:calc(var(--k)*1);border-radius:999px;background:var(--sky);color:var(--ink-on-gold);font-size:calc(var(--k)*5);font-weight:800;font-variant-numeric:tabular-nums}
+.view-link,.view-pair{height:var(--h);justify-content:center;overflow:hidden}
+.round .view-link{padding:calc(var(--k)*12) calc(var(--k)*13)}
+.link-mark{font-size:calc(var(--k)*11);line-height:1}
+.link-title{font-size:calc(var(--k)*8.4);font-weight:750;letter-spacing:-.01em;margin:calc(var(--k)*2) 0 calc(var(--k)*1.5)}
+.link-text{font-size:calc(var(--k)*5.8);color:var(--muted);line-height:1.25;margin-bottom:calc(var(--k)*4)}
+.link-text.error{color:var(--amber)}
+.view-link .action+.action{margin-top:calc(var(--k)*2.5)}
+.round .view-link .action{width:86%}
+.view.view-pair{padding:calc(var(--k)*5);gap:calc(var(--k)*3)}
+.pair-code{display:flex;gap:calc(var(--k)*1.6)}
+.pair-code span{display:flex;align-items:center;justify-content:center;width:calc(var(--k)*8);height:calc(var(--k)*11);border-radius:calc(var(--k)*2.5);background:var(--surface);font-size:calc(var(--k)*7.4);font-weight:750;font-variant-numeric:tabular-nums}
+.pair-code span.filled{background:var(--surface-2);color:var(--gold)}
+.pair-code.busy span{animation:blink 1s ease-in-out infinite}
+@keyframes blink{50%{opacity:.4}}
+.keypad{display:grid;grid-template-columns:repeat(3,calc(var(--k)*17));gap:calc(var(--k)*2)}
+.keypad button{height:calc(var(--k)*12.5);border-radius:999px;background:var(--surface);font-size:calc(var(--k)*7.4);font-weight:700;font-variant-numeric:tabular-nums;transition:transform 120ms var(--ease-out)}
+.keypad button:active{background:var(--surface-2);transform:scale(.94)}
+.keypad .key-soft{background:none;color:var(--muted)}
+.square .keypad{grid-template-columns:repeat(3,calc(var(--k)*26))}
+.square .keypad button{height:calc(var(--k)*15.5)}
+.people{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:calc(var(--k)*1.4);margin-top:calc(var(--k)*2)}
+.person{display:inline-flex;align-items:center;justify-content:center;flex:none;width:calc(var(--k)*9);height:calc(var(--k)*9);border-radius:50%;background:var(--surface);box-shadow:inset 0 0 0 calc(var(--k)*.7) var(--surface-2);font-size:calc(var(--k)*5.2);line-height:1}
+.person.is-arrived{box-shadow:inset 0 0 0 calc(var(--k)*.9) var(--gold)}
+.person.is-on_way{box-shadow:inset 0 0 0 calc(var(--k)*.9) var(--sky)}
+.person.is-going{box-shadow:inset 0 0 0 calc(var(--k)*.9) var(--green)}
+.person.is-invited,.person.is-maybe{opacity:.5}
+.person.more{font-size:calc(var(--k)*4.2);font-weight:750;color:var(--muted)}
+.people-note{font-size:calc(var(--k)*4.8);font-weight:650;color:var(--gold);white-space:nowrap}
+.meet-card .card-name{font-size:calc(var(--k)*7.4)}
+.card-place{max-width:100%;white-space:nowrap}
+.place-name{display:inline-block;max-width:68%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+.meet-when{margin-top:calc(var(--k)*2)}
+.meet-when span{text-align:right}
+.meet-when b{font-size:calc(var(--k)*14);color:var(--gold)}
+.meet-when.now span{text-align:center;font-size:calc(var(--k)*7);font-weight:750;color:var(--amber);line-height:1.1}
+.card-here{margin-top:calc(var(--k)*3);font-size:calc(var(--k)*6.6);font-weight:750;color:var(--gold)}
+.card .action+.action{margin-top:calc(var(--k)*2)}
+.friend{display:flex;align-items:center;gap:calc(var(--k)*2.4);width:100%;min-height:calc(var(--k)*15);margin-top:calc(var(--k)*2);padding:0 calc(var(--k)*3.5) 0 calc(var(--k)*2.5);border-radius:999px;background:var(--surface);text-align:left;font-size:calc(var(--k)*6)}
+.friend:active{background:var(--surface-2)}
+.friend .person{width:calc(var(--k)*10);height:calc(var(--k)*10);background:var(--surface-2);box-shadow:none}
+.friend-name{flex:1;min-width:0;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.friend-far{flex:none;color:var(--gold);font-weight:700;font-size:calc(var(--k)*5.4);font-variant-numeric:tabular-nums}
+.round .friends-card{padding-left:calc(var(--k)*8);padding-right:calc(var(--k)*8)}
+.round .meet-when b{font-size:calc(var(--k)*12)}
+.round .meet-card .action{width:70%}
+.round .view-done .action{width:80%}
+.text-button{padding:calc(var(--k)*2);font-size:calc(var(--k)*5.2);color:var(--muted);text-decoration:underline;text-underline-offset:.2em}
+
 /* Bigger screens: the same app inside a watch, with a caption for demos. */
 .caption{display:none}
 .device .crown{display:none}
@@ -117,6 +168,7 @@ html.framed .caption{display:block;max-width:380px;color:var(--ink)}
 .caption .kicker .mark{width:26px;height:26px}
 .caption h2{margin:14px 0 12px;font-size:clamp(24px,3vw,34px);line-height:1.12;letter-spacing:-.02em}
 .caption p{color:var(--muted);font-size:15px;line-height:1.5}
+.caption p+p{margin-top:10px}
 .segmented{display:inline-flex;margin:20px 0 14px;padding:4px;border-radius:999px;background:var(--surface)}
 .segmented button{min-height:40px;padding:8px 16px;border-radius:999px;font-size:14px;font-weight:650;color:var(--muted)}
 .segmented button[aria-pressed="true"]{background:var(--gold);color:var(--ink-on-gold)}
