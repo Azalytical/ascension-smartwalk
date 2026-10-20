@@ -55,7 +55,7 @@ export function fairMeetingPoints(dataset, participants, { kind = 'any', at = ne
     if (hours.status === 'closed' || hours.status === 'closes_early') continue;
     options.push({
       place: { id: String(candidate.poi.id), name: candidate.poi.name, category: candidate.poi.category, lat: candidate.poi.lat, lon: candidate.poi.lon,
-        sourceUrl: candidate.poi.sourceUrl, openingHours: candidate.poi.openingHours ?? null },
+        sourceUrl: candidate.poi.sourceUrl, source: { label: candidate.poi.source?.label || 'OpenStreetMap' }, openingHours: candidate.poi.openingHours ?? null },
       walks, maxMinutes: longest, spreadMinutes: longest - shortest,
       hours: hours.status === 'open' ? { status: 'open', closesAt: hours.closesAt ?? null } : { status: 'unknown' },
       why: shortest === longest ? `Всем идти примерно ${longest} мин` : `Всем идти от ${shortest} до ${longest} мин`

@@ -54,15 +54,18 @@ function chip(label, pressed, onclick, attrs = {}) {
 }
 
 const pad = n => String(n).padStart(2, '0');
-function clock(ts) { const d = new Date(ts); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+// Meetups happen in Astana, so their times are Astana time (UTC+5 all year) on any device; shifting by hand
+// avoids browsers with outdated time zone data.
+const ASTANA = 5 * 3600000;
+const astana = ts => new Date(ts + ASTANA);
+const astanaDay = ts => Math.floor((ts + ASTANA) / 86400000);
+function clock(ts) { const d = astana(ts); return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`; }
 function dayLabel(ts) {
-  const d = new Date(ts), today = new Date();
-  const start = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const diff = Math.round((start(d) - start(today)) / 86400000);
+  const diff = astanaDay(ts) - astanaDay(Date.now());
   if (diff === 0) return t('sx.today');
   if (diff === 1) return t('sx.tomorrow');
   if (diff === -1) return t('sx.yesterday');
-  return d.toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short' });
+  return astana(ts).toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
 }
 const when = ts => t('sx.when', { day: dayLabel(ts), time: clock(ts) });
 function ago(ts) {
@@ -88,7 +91,11 @@ function km(meters) {
   if (meters < 1000) return t('sx.m', { n: Math.round(meters / 10) * 10 });
   return t('sx.km', { n: new Intl.NumberFormat(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(meters / 1000) });
 }
-function localInput(ts) { const d = new Date(ts); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+// The date-and-time field shows and reads Astana time too.
+const localInput = ts => astana(ts).toISOString().slice(0, 16);
+const fromInput = value => Date.parse(`${value.slice(0, 16)}Z`) - ASTANA;
+// The dataset of a meeting place: OpenStreetMap or Overture Maps.
+const sourceOf = option => option.place.source?.label || 'OpenStreetMap';
 const roundTo5 = ts => Math.ceil(ts / 300000) * 300000;
 const counted = (n, key) => `${n} ${plural(n, key)}`;
 
@@ -475,10 +482,10 @@ export function mountSocial(root, ctx = {}) {
             h('span', { class: 'sx-walk-bar' }, h('span', { style: { width: `${Math.round(walk.minutes / longest * 100)}%`, '--avatar': person.color } })),
             h('span', { class: 'sx-walk-min' }, t('sx.min', { n: walk.minutes })));
         })),
-        h('p', { class: `sx-hours${option.hours.status === 'open' ? ' is-open' : ''}` }, option.hours.status === 'open' ? (option.hours.closesAt ? t('sx.meet.openUntil', { time: option.hours.closesAt }) : t('sx.meet.open24')) : t('sx.meet.hoursUnknown')),
+        h('p', { class: `sx-hours${option.hours.status === 'open' ? ' is-open' : ''}` }, option.hours.status === 'open' ? (option.hours.closesAt ? t('sx.meet.openUntil', { time: option.hours.closesAt, source: sourceOf(option) }) : t('sx.meet.open24', { source: sourceOf(option) })) : t('sx.meet.hoursUnknown')),
         h('div', { class: 'sx-actions' },
           button(t('sx.meet.inviteHere'), event => { event.stopPropagation(); inviteHere(option); }, index === meeting.selected ? 'gold' : 'ghost'),
-          h('a', { class: 'sx-link', href: option.place.sourceUrl, target: '_blank', rel: 'noopener noreferrer', onclick: event => event.stopPropagation() }, t('sx.meet.source'))))),
+          h('a', { class: 'sx-link', href: option.place.sourceUrl, target: '_blank', rel: 'noopener noreferrer', onclick: event => event.stopPropagation() }, t('sx.meet.source', { source: sourceOf(option) }))))),
       result.options.length >= 2 ? h('div', { class: 'sx-vote-cta' },
         h('p', {}, t('sx.vote.cta')),
         button(t('sx.vote.offer', { n: result.options.length }), () => inviteToVote(), 'primary', { class: 'btn btn-primary sx-btn sx-wide' })) : null,
@@ -553,9 +560,9 @@ export function mountSocial(root, ctx = {}) {
 
   function timePicker(initial, onPick) {
     let value = initial;
-    const input = h('input', { type: 'datetime-local', class: 'sx-input', value: localInput(value), 'aria-label': t('sx.tp.label'), onchange: () => { const ts = new Date(input.value).getTime(); if (Number.isFinite(ts)) { value = ts; onPick(ts); draw(); } } });
-    const evening = (() => { const d = new Date(); d.setHours(19, 0, 0, 0); if (d.getTime() < Date.now() + 30 * 60000) d.setDate(d.getDate() + 1); return d.getTime(); })();
-    const tonight = new Date(evening).getDate() === new Date().getDate();
+    const input = h('input', { type: 'datetime-local', class: 'sx-input', value: localInput(value), 'aria-label': t('sx.tp.label'), onchange: () => { const ts = fromInput(input.value); if (Number.isFinite(ts)) { value = ts; onPick(ts); draw(); } } });
+    const evening = (() => { const today = astanaDay(Date.now()) * 86400000 + 19 * 3600000 - ASTANA; return today < Date.now() + 30 * 60000 ? today + 86400000 : today; })();
+    const tonight = astanaDay(evening) === astanaDay(Date.now());
     const presets = [[t('sx.tp.m15'), roundTo5(Date.now() + 15 * 60000)], [t('sx.tp.m30'), roundTo5(Date.now() + 30 * 60000)], [t('sx.tp.h1'), roundTo5(Date.now() + 60 * 60000)], [t(tonight ? 'sx.tp.tonight' : 'sx.tp.tomorrow'), evening]];
     const row = h('div', { class: 'sx-chips' });
     const draw = () => row.replaceChildren(...presets.map(([label, ts]) => chip(label, Math.abs(ts - value) < 60000, () => { value = ts; input.value = localInput(ts); onPick(ts); draw(); })));
@@ -695,9 +702,9 @@ export function mountSocial(root, ctx = {}) {
   function eventsView() {
     const all = social.getState().events;
     const filters = [['all', t('sx.ev.all')], ['today', t('sx.ev.today')], ['friends', t('sx.ev.friends')], ['mine', t('sx.ev.mine')]];
-    const today = new Date(); today.setHours(23, 59, 59, 999);
+    const endOfToday = (astanaDay(Date.now()) + 1) * 86400000 - ASTANA - 1;
     const list = all.filter(item => view.eventFilter === 'all' ? true
-      : view.eventFilter === 'today' ? item.startsAt <= today.getTime()
+      : view.eventFilter === 'today' ? item.startsAt <= endOfToday
         : view.eventFilter === 'friends' ? item.friendsGoing.length > 0
           : item.isHost || item.myStatus);
     return h('div', { class: 'sx-stack' },
