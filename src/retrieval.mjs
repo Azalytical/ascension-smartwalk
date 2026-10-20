@@ -1,4 +1,7 @@
-/** Deterministic, source-grounded POI retrieval. No network, LLM or embeddings. */
+/**
+ * Deterministic, source-grounded POI retrieval. No network or LLM here: when the dictionary finds no category in a request,
+ * the categories Gemini embeddings found (src/semantic.mjs) may arrive in context.semantic and are used in their place.
+ */
 import { checkVisit } from './hours.mjs';
 import { queryIntents, nightReference, localClock } from './intent.mjs';
 import { microRoute } from './route.mjs';
@@ -501,12 +504,13 @@ function pairingFor(pick, prepared, constraints, reference, taken) {
 }
 
 /** What the system used to answer: shown to the visitor, as the task requires. */
-function understoodFor(constraints, requested, excluded, intents, reference, nightShift, weather, weatherRoof) {
+function understoodFor(constraints, requested, excluded, intents, reference, nightShift, weather, weatherRoof, meant) {
   const items = [
     { key: 'location', label: 'Точка старта: используется только для расчёта, не сохраняется и не передаётся модели' },
     { key: 'time', label: `${constraints.minutes} мин всего, до ${constraints.maxWalkMinutes} мин пешком в одну сторону${constraints.returnToStart ? ', с возвращением' : ''}` },
   ];
   if (requested.length) items.push({ key: 'categories', label: `Категории: ${requested.map(category => CATEGORY_NAMES[category]).join(', ')}` });
+  if (meant.length) items.push({ key: 'semantic', label: `Смысл запроса по эмбеддингам Gemini: ${meant.map(category => CATEGORY_NAMES[category]).join(', ')}` });
   if (excluded.length) items.push({ key: 'excluded', label: `Без: ${excluded.map(category => CATEGORY_NAMES[category]).join(', ')}` });
   if (constraints.withChild) items.push({ key: 'child', label: constraints.withChildFromQuery ? 'С ребёнком (понято из запроса)' : 'С ребёнком' });
   if (intents.sightseeing) items.push({ key: 'sightseeing', label: 'Посмотреть город: достопримечательности, музеи, парки' });
@@ -518,6 +522,23 @@ function understoodFor(constraints, requested, excluded, intents, reference, nig
   if (weather) items.push({ key: 'weather', label: `Погода сейчас: ${weather.text} (Open-Meteo)${weatherRoof ? ', поэтому только места под крышей' : ''}` });
   if (reference && !nightShift) items.push({ key: 'hours', label: `Режим работы проверен на ${localClock(reference)}` });
   return items;
+}
+
+/**
+ * Categories from Gemini embeddings that this request may use: known ones only, and never one the visitor excluded
+ * or one the child and night rules would filter out anyway.
+ */
+function meaningFor(semantic, child, intents, excluded) {
+  const categories = Array.isArray(semantic?.categories) ? semantic.categories : [];
+  return [...new Set(categories)].filter(category => Object.hasOwn(VISIT, category) && !excluded.includes(category)
+    && (!child || CHILD_ALLOWED.includes(category)) && !(intents.night && !child && ['playground', 'family'].includes(category))).slice(0, 2);
+}
+
+/** True when the dictionary understood nothing in a request with words, so its meaning is worth asking Gemini embeddings. */
+export function meaningWanted(result) {
+  const { retrieval, constraints, intents } = result ?? {};
+  return Boolean(constraints?.query && constraints.query.length >= 3 && !constraints.category && !intents?.length
+    && !retrieval?.requestedCategories?.length && !retrieval?.requestedKinds?.length);
 }
 
 /**
@@ -533,7 +554,12 @@ export function recommend(dataset, input, context = {}) {
     night: intents.night, accessible: intents.accessible, group: intents.group, groupSize: intents.groupSize };
   const pois = poisOf(dataset);
   const excluded = excludedCategories(constraints.query);
-  const named = queryCategories(constraints.query);
+  const lexical = queryCategories(constraints.query);
+  const kinds = queryKinds(constraints.query);
+  // Gemini embeddings stand in only for a request the dictionary understood nothing of: no category, kind or intent.
+  const meant = !lexical.length && !kinds.length && !constraints.category && !Object.values(intents).includes(true)
+    ? meaningFor(context.semantic, child, intents, excluded) : [];
+  const named = lexical.length ? lexical : meant;
   // Live weather (server-side only, never from the request body) applies to walks that start now.
   const now = new Date(Math.floor(Date.now() / 60000) * 60000);
   const nightShift = intents.night && !constraints.visitDate ? nightReference(now) : null;
@@ -547,7 +573,6 @@ export function recommend(dataset, input, context = {}) {
     requested = (kept.length ? kept : roofed).filter(category => !excluded.includes(category));
   }
   const terms = tokens(constraints.query);
-  const kinds = queryKinds(constraints.query);
   const counters = { invalidRecords: 0, unsupportedCategory: 0, restrictedAccess: 0, duplicates: 0, gambling: 0, category: 0, walkBudget: 0, totalBudget: 0,
     closedByHours: 0, unknownHoursAtNight: 0, notAccessible: 0 };
   // The nearest place that matched the request but not the time limits, offered when nothing fits.
@@ -719,10 +744,13 @@ export function recommend(dataset, input, context = {}) {
   }
   return { recommendations, route, nearestBeyondLimits, nearestMissing, constraints, warnings,
     intents: Object.keys(intents).filter(key => intents[key] === true),
-    understood: understoodFor(constraints, requested, excluded, intents, reference, nightShift, weather, weatherRoof),
+    understood: understoodFor(constraints, requested, excluded, intents, reference, nightShift, weather, weatherRoof, meant),
     weather: weather ? { ...context.weather, condition: weather.label, text: weather.text, roofOnly: weatherRoof } : null,
-    retrieval: { method: 'deterministic_geo_keyword_retrieval', usesEmbeddings: false, usesLanguageModel: false,
-      summary: 'Фильтры по географии, категории, времени и режиму работы из OSM; поиск по словам, словарю ru/kk/en и намерениям запроса (ребёнок, ночь, турист, необычное, компания, коляска); объяснение по данным POI.',
+    retrieval: { method: meant.length ? 'geo_keyword_retrieval_with_gemini_embeddings' : 'deterministic_geo_keyword_retrieval',
+      usesEmbeddings: meant.length > 0, usesLanguageModel: false,
+      summary: 'Фильтры по географии, категории, времени и режиму работы из OSM; поиск по словам, словарю ru/kk/en и намерениям запроса (ребёнок, ночь, турист, необычное, компания, коляска); объяснение по данным POI.'
+        + (meant.length ? ' Слова запроса словарь не узнал, поэтому категорию определили эмбеддинги Gemini по примерам запросов.' : ''),
+      semantic: meant.length ? { model: context.semantic.model ?? null, categories: meant, ranking: context.semantic.ranking ?? [] } : null,
       inputRecords: pois.length, validUniqueRecords: prepared.unique.length, feasibleCandidates: candidates.length, returned: recommendations.length,
       requestedCategories: requested, requestedKinds: kinds, excludedCategories: excluded, queryTerms: terms, rejected: counters,
       scoring: { category: 35, keywordsPerMatch: 5, keywordsCap: 20, proximityMax: 25, timeFitMax: 15, childCategory: 5, hoursConfirmed: 5,

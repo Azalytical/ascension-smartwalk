@@ -106,6 +106,12 @@ const SCENARIOS = [
     expected: 'Только кафе с подтверждёнными часами на время визита; розетка не утверждается.',
     checks: r => [['Только заведения с подтверждёнными часами', r.recommendations.every(p => p.hoursCheck.status === 'open')],
       ['Розетка не утверждается', r.recommendations.every(p => p.warnings.some(w => w.includes('розеток не подтверждено')))]] },
+  { id: 'M1', source: 'свой (смысловой поиск Gemini)', title: 'Запрос без слов из словаря', start: 'baiterek', minutes: 60, maxWalkMinutes: 15, time: '15:00',
+    liveOnly: true, query: 'Хочу подышать свежим воздухом',
+    expected: 'Эмбеддинги Gemini понимают, что нужен парк или открытое место; в «Мы учли» есть строка о смысле запроса.',
+    checks: r => [['Подбор по смыслу через эмбеддинги Gemini', r.retrieval?.usesEmbeddings === true],
+      ['Предложены парки или открытые места', r.recommendations.length > 0 && r.recommendations.every(p => ['park', 'attraction'].includes(p.category))],
+      ['Смысл запроса назван в «Мы учли»', r.understood?.some(i => i.key === 'semantic')]] },
   { id: 'X1', source: 'свой (пустой ответ)', title: 'Слишком мало времени', start: 'baiterek', minutes: 10, maxWalkMinutes: 5, time: '15:00',
     query: 'музей',
     expected: 'Честный пустой ответ с причиной и подсказкой, что изменить.',
@@ -139,7 +145,8 @@ async function run(scenario) {
 }
 
 const results = [];
-for (const scenario of SCENARIOS) results.push(await run(scenario));
+// M1 needs Gemini embeddings, so it runs only against the live site.
+for (const scenario of SCENARIOS.filter(item => live || !item.liveOnly)) results.push(await run(scenario));
 const passed = results.filter(r => r.pass).length;
 const protocol = { product: 'Aidem (ранее SmartWalk)', team: 'Ascension', date: new Date().toISOString(), commit, mode: live ? `живой сайт ${live}` : 'движок подбора', places: places.length,
   visitDay: DAY, passed, total: results.length, results };
@@ -149,6 +156,7 @@ const md = [`# Протокол тестовых сценариев Aidem (ра�
   `Команда Ascension, Build with AI Hackathon 2026, задача НИЦ Smart City «ИИ-помощник по прогулкам в городе Астана».`, '',
   `Прогон: ${protocol.mode}, коммит \`${commit}\`, база ${places.length} мест, день визита ${DAY} (Астана, UTC+5), ${protocol.date.slice(0, 16).replace('T', ' ')} UTC. Итог: **${passed} из ${results.length} сценариев Pass.**`, '',
   'Pass ставится, только если выполнены все проверки сценария и общие проверки формата ответа из задания: не больше трёх мест, время в бюджете, «почему», время и план у каждого места, источник и уровень уверенности, идея помечена как идея, нет «открыто сейчас», показано, что учтено. Повторить: `node scripts/scenario-protocol.mjs` (движок) или `node scripts/scenario-protocol.mjs --live <адрес сайта>`.', '',
+  ...(live ? [] : ['Сценарий M1 (смысловой поиск на эмбеддингах Gemini) идёт только на живом сайте: движку без сети модель недоступна.', '']),
   '| Сценарий | Откуда | Итог |', '|---|---|---|',
   ...results.map(r => `| ${r.id}. ${r.title} | ${r.source} | ${r.pass ? 'Pass' : 'Fail'} |`), ''];
 for (const r of results) {
