@@ -58,9 +58,12 @@ function formatResult(result, generation) {
     lines.push(`<b>${index + 1}. ${escape(place.name)}</b>`,
       `~${place.walkMinutes} мин туда · ~${place.totalMinutes} мин всего с возвращением`,
       escape(place.why),
+      ...(place.plan?.text ? [`🧭 ${escape(place.plan.text)}`] : []),
+      ...(place.confidence ? [`${{ high: '🟢', medium: '🟡', low: '🟠' }[place.confidence.level] ?? '•'} ${escape(place.confidence.label)}: ${escape(place.confidence.reasons.join('; ') || 'по данным источника')}`] : []),
       `⚠️ ${escape(place.warnings[0])}`,
       `<a href="${escape(place.sourceUrl)}">Источник: ${escape(place.source?.label ?? 'OpenStreetMap')}</a>`, '');
   });
+  if (result.route) lines.push(`<b>🗺 ${escape(result.route.label)}</b>`, escape(result.route.summary), '');
   lines.push(generation?.mode === 'llm'
     ? 'Первую строку написал Gemini только по данным этих карточек. Время, расстояние и часы считает сервер.'
     : 'Подбор составлен по данным мест без языковой модели.');
