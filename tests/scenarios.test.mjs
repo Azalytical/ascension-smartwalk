@@ -6,6 +6,7 @@ import { recommend } from '../src/retrieval.mjs';
 import { queryIntents, nightReference } from '../src/intent.mjs';
 import { weatherCondition, currentWeather, resetWeatherCache } from '../src/weather.mjs';
 import { handleApi } from '../src/api.mjs';
+import { runTool } from '../src/tools.mjs';
 
 const places = JSON.parse(readFileSync(new URL('../data/places.json', import.meta.url), 'utf8'));
 const at = { mega: [51.0880152, 71.4097489], baiterek: [51.1283, 71.4304], embankment: [51.161, 71.423], expo: [51.0896, 71.416] };
@@ -247,4 +248,35 @@ test('jury v3: a tourist with few sights in walking range is told the nearest on
   assert.match(result.warnings[0], /^Пешком отсюда мест для осмотра мало\. Ближайшее за пределами вашего времени: «[^»]+», около [\d,]+ км по прямой, примерно \d+ мин пешком в одну сторону\. Дальше нужен транспорт/);
   const baiterek = ask('baiterek', { minutes: 120, maxWalkMinutes: 30, query: 'Я турист, у меня 2 часа перед вылетом: что можно посмотреть поблизости?', visitDate: '2026-10-22T14:00:00+05:00' });
   assert.ok(!baiterek.warnings.some(warning => warning.startsWith('Пешком отсюда мест для осмотра мало')));
+});
+
+test('jury v4: two nameless playgrounds by the same landmark never read as one place listed twice', () => {
+  const result = ask('mega', { minutes: 90, maxWalkMinutes: 15, withChild: true, query: 'С ребёнком: площадка или музей с интерактивами' });
+  const names = result.recommendations.map(place => place.name);
+  assert.equal(new Set(names).size, names.length, names.join(' | '));
+});
+
+test('jury v4: wishes no source confirms reach Gemini as «unconfirmed», and hours are cited as the source\'s', async () => {
+  const result = ask('baiterek', { minutes: 60, maxWalkMinutes: 15, query: 'Хочу тихое место с кофе и розеткой недалеко от меня.', visitDate: '2026-10-22T15:00:00+05:00' });
+  assert.deepEqual(result.unconfirmed, ['розетки', 'тишина']);
+  assert.deepEqual(ask('baiterek', { minutes: 60, maxWalkMinutes: 15, query: 'кофе' }).unconfirmed, []);
+
+  const original = globalThis.fetch;
+  let sent = null;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).includes(':generateContent')) sent = JSON.parse(JSON.parse(options.body).contents[0].parts[0].text);
+    return new Response('{}', { status: 503 });
+  };
+  try {
+    const request = new Request('https://demo.example/api/recommend', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://demo.example' },
+      body: JSON.stringify({ lat: at.baiterek[0], lon: at.baiterek[1], minutes: 60, maxWalkMinutes: 15, query: 'Хочу тихое место с кофе и розеткой', visitDate: '2026-10-22T15:00:00+05:00' }) });
+    await handleApi(request, { GEMINI_API_KEY: 'g', LOCAL_DEVELOPMENT: true }, places);
+    assert.deepEqual(sent.unconfirmed, ['розетки', 'тишина']);
+    assert.ok(sent.alternatives.filter(place => place.hours !== 'режим работы не подтверждён').every(place => place.hours.startsWith('по часам из источника')));
+  } finally { globalThis.fetch = original; }
+});
+
+test('jury v4: the agent\'s plan_walk passes unconfirmed wishes to Gemini', async () => {
+  const plan = await runTool('plan_walk', { minutes: 60, query: 'тихое кафе с розеткой', lat: at.baiterek[0], lon: at.baiterek[1] }, { dataset: places });
+  assert.deepEqual(plan.unconfirmed, ['розетки', 'тишина']);
 });
