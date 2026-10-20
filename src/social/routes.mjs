@@ -58,7 +58,7 @@ function searchPlaces(url, dataset) {
   }
   matches.sort((a, b) => a.rank - b.rank || a.distance - b.distance);
   return json({ places: matches.slice(0, 8).map(({ entry, distance }) => ({ id: String(entry.poi.id), name: entry.poi.name, category: entry.poi.category,
-    lat: entry.poi.lat, lon: entry.poi.lon, sourceUrl: entry.poi.sourceUrl, ...(hasCenter ? { distanceMeters: Math.round(distance) } : {}) })) });
+    lat: entry.poi.lat, lon: entry.poi.lon, sourceUrl: entry.poi.sourceUrl, source: { label: entry.poi.source?.label || 'OpenStreetMap' }, ...(hasCenter ? { distanceMeters: Math.round(distance) } : {}) })) });
 }
 
 async function meetingPoint(hub, token, body, meta, dataset) {

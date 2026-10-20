@@ -22,6 +22,20 @@ test('watch plan is compact and sourced', async () => {
   assert.match(data.query, /кофе/);
 });
 
+test('watch plan cites the dataset of each place and its confidence', async () => {
+  const overture = { ...pois[0], id: 'overture/1', sourceUrl: 'https://overturemaps.org/', source: { id: 'overture', label: 'Overture Maps · Meta', license: 'CDLA-Permissive-2.0', attribution: 'Overture Maps Foundation' } };
+  const response = await handleApi(new Request('https://demo.example/api/watch/plan?lat=51.1283&lon=71.4304&minutes=45&mood=coffee'), {}, [overture, pois[1]]);
+  const data = await response.json();
+  assert.equal(data.places[0].source.label, 'Overture Maps · Meta');
+  assert.equal(data.places[0].source.license, 'CDLA-Permissive-2.0');
+  assert.match(data.places[0].confidence.label, /уверенность/);
+  assert.ok(['high', 'medium', 'low'].includes(data.places[0].confidence.level));
+  assert.equal(data.attribution, '© OpenStreetMap contributors, Overture Maps Foundation');
+  assert.equal(data.license, undefined);
+  const html = readFileSync(new URL('../public/watch.html', import.meta.url), 'utf8');
+  assert.match(html, /© OpenStreetMap contributors, Overture Maps Foundation/);
+});
+
 test('voice format answers in plain Russian and accepts comma decimals', async () => {
   const response = await plan('lat=51,1283&lon=71,4304&mood=coffee&format=text');
   assert.equal(response.status, 200);
