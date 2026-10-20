@@ -46,7 +46,7 @@ npx wrangler deploy
 - **Durable Objects** `SocialHub` (друзья, встречи, оценки), `WatchPush` (напоминания «пора обратно» на часы) и `CityEventsStore` (афиша). Миграции `social-v1`, `watch-v1`, `events-v1` применяются при первом `deploy`.
 - **Cron** `50 0 * * *`: в 05:50 по Астане Worker сам собирает афишу sxodim.com. До первого сбора показывается копия из `data/events.json`.
 - **Размещение** `gcp:europe-west1`: Worker работает рядом с Google, потому что из точки Cloudflare в Астане Gemini API недоступен.
-- **Переменные** `GEMINI_MODEL=gemini-3.5-flash-lite` (500 бесплатных запросов в сутки), `WEATHER=1` (погода Open-Meteo), `MEMORY_BUDGET=1` (лимит: 8 ответов модели в минуту с адреса и 500 в сутки).
+- **Переменные** `GEMINI_MODEL=gemini-3.1-flash-lite` (запасная модель `gemini-3.5-flash-lite`, у каждой своя бесплатная квота), `WEATHER=1` (погода Open-Meteo), `MEMORY_BUDGET=1` (лимит: 8 ответов модели в минуту с адреса и 500 в сутки).
 - **Логи** только того, что пишет код. Журнал запросов выключен, чтобы точка из вопроса Siri не оседала в логах.
 
 ### Проверить, что всё поднялось
@@ -75,7 +75,7 @@ gcloud run deploy aidem --source . --region europe-west1 --allow-unauthenticated
 | Имя | Где | Зачем |
 |---|---|---|
 | `GEMINI_API_KEY` | секрет | Ответы, агент, голос, фото и смысловой поиск Gemini |
-| `GEMINI_MODEL` | переменная | Модель ответов. В коде по умолчанию `gemini-3.8-flash`, на демо `gemini-3.5-flash-lite` |
+| `GEMINI_MODEL` | переменная | Модель ответов. В коде по умолчанию `gemini-3.8-flash`, на демо `gemini-3.1-flash-lite`, запасная `gemini-3.5-flash-lite` (`GEMINI_SPARE_MODEL`) |
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | секрет, переменная | Запасной провайдер, если ключа Gemini нет |
 | `WEATHER` | переменная | `1` включает погоду Open-Meteo (без ключа) |
 | `GEMINI_AGENT_MODEL`, `GEMINI_EMBEDDING_MODEL`, `GEMINI_TTS_MODEL`, `GEMINI_TTS_VOICE` | переменные | Другие модели для агента, эмбеддингов и голоса, если нужно |

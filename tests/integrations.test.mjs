@@ -425,22 +425,25 @@ test('agent latency: a timed-out call is not retried and the tools already run s
   assert.ok(Date.now() - began < 2000);
 }));
 
-test('agent latency: out of quota on the first call, the spare model answers', withFetch(async (url, init) => {
+test('agent latency: out of quota or busy on the first call, the spare model answers', withFetch(async (url, init) => {
   if (String(url).includes('open-meteo')) return jsonResponse(weatherBody);
   globalThis.__models.push(modelOf(url));
-  if (modelOf(url) !== SPARE_AGENT_MODEL) return new Response('{"error":{"code":429}}', { status: 429 });
+  if (modelOf(url) !== SPARE_AGENT_MODEL) return new Response(`{"error":{"code":${globalThis.__status}}}`, { status: globalThis.__status });
   return jsonResponse(JSON.parse(init.body).contents.some(content => content.role === 'model') ? answerTurn : toolsTurn);
 }, async () => {
-  resetAgentState(); globalThis.__models = [];
-  const data = await runAgent({ query: 'кофе', ...START, minutes: 60 }, agentDeps({ totalMs: 20000 }));
-  assert.equal(data.mode, 'agent');
-  assert.equal(data.model, SPARE_AGENT_MODEL);
-  assert.equal(globalThis.__models.filter(model => model === SPARE_AGENT_MODEL).length, 2);
-  assert.equal(globalThis.__models.filter(model => model !== SPARE_AGENT_MODEL).length, 1, 'a 429 is not retried on the same model');
-  // The next run starts on the spare model at once.
-  globalThis.__models = [];
-  await runAgent({ query: 'кофе', ...START, minutes: 60 }, agentDeps());
-  assert.equal(globalThis.__models[0], SPARE_AGENT_MODEL);
+  // A 503 gets one quick retry on the same model first; a 429 none.
+  for (const [status, primaryCalls] of [[429, 1], [503, 2]]) {
+    resetAgentState(); globalThis.__models = []; globalThis.__status = status;
+    const data = await runAgent({ query: 'кофе', ...START, minutes: 60 }, agentDeps({ totalMs: 20000 }));
+    assert.equal(data.mode, 'agent', `status ${status}`);
+    assert.equal(data.model, SPARE_AGENT_MODEL);
+    assert.equal(globalThis.__models.filter(model => model === SPARE_AGENT_MODEL).length, 2);
+    assert.equal(globalThis.__models.filter(model => model !== SPARE_AGENT_MODEL).length, primaryCalls);
+    // The next run starts on the spare model at once.
+    globalThis.__models = [];
+    await runAgent({ query: 'кофе', ...START, minutes: 60 }, agentDeps());
+    assert.equal(globalThis.__models[0], SPARE_AGENT_MODEL);
+  }
   resetAgentState();
 }));
 
