@@ -1,6 +1,6 @@
-# Ulger in Gemini CLI
+# Aidem in Gemini CLI
 
-Ulger plans walks around Astana that fit a person's time: the way there, the visit, the way back and a 5-minute reserve, checked against recorded opening hours. Places come from OpenStreetMap and Overture Maps. The `ulger` MCP server gives you five read-only tools.
+Aidem plans walks around Astana that fit a person's time: the way there, the visit, the way back and a 5-minute reserve, checked against recorded opening hours. Places come from OpenStreetMap and Overture Maps. The `ulger` MCP server gives you five read-only tools.
 
 - `plan_walk` needs the start point (`lat`, `lon`). When the person names a place ("я у Байтерека", "near Khan Shatyr"), call `search_places` first and use its coordinates.
 - `build_route` turns 2–3 place ids into a micro-route with the shortest walking order and checks that it fits the time.

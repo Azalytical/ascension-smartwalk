@@ -1,4 +1,4 @@
-# Ulger: интеграции с Google и другими сервисами
+# Aidem: интеграции с Google и другими сервисами
 
 Всё работает на бесплатных тарифах, без биллинга Google Cloud. Адрес демо: https://ascension-smartwalk.azamatbreach.workers.dev
 
@@ -7,7 +7,7 @@
 | ИИ-агент, который сам выбирает инструменты и показывает шаги | `/agent`, `POST /api/agent` | Gemini API, function calling |
 | «Что это за здание?» по фото | `/agent`, `POST /api/vision` | Gemini API, мультимодальный ввод |
 | Ответ голосом (русский, казахский, английский) | `/agent`, `POST /api/speak` | Gemini TTS |
-| MCP-сервер с инструментами Ulger | `POST /mcp` | Model Context Protocol |
+| MCP-сервер с инструментами Aidem | `POST /mcp` | Model Context Protocol |
 | Расширение Gemini CLI | `gemini-extension.json` | Gemini CLI |
 | Агент на Google ADK | `integrations/adk/` | Agent Development Kit, готов к Agent Engine |
 | Маршрут пешком, место на карте | `links.googleMapsWalk`, `links.googleMaps`, `links.twoGis` | Google Maps URLs, 2ГИС |
@@ -59,12 +59,12 @@ gemini extensions install https://github.com/Azalytical/ascension-smartwalk
 Или вручную в `~/.gemini/settings.json`:
 
 ```json
-{ "mcpServers": { "ulger": { "httpUrl": "https://ascension-smartwalk.azamatbreach.workers.dev/mcp" } } }
+{ "mcpServers": { "aidem": { "httpUrl": "https://ascension-smartwalk.azamatbreach.workers.dev/mcp" } } }
 ```
 
 Дальше просто спросить: «Я у Байтерека, есть час, хочу кофе и прогуляться».
 
-**Claude Code:** `claude mcp add --transport http ulger https://ascension-smartwalk.azamatbreach.workers.dev/mcp`
+**Claude Code:** `claude mcp add --transport http aidem https://ascension-smartwalk.azamatbreach.workers.dev/mcp`
 
 **Google ADK:** см. `integrations/adk/README.md`.
 
@@ -72,9 +72,9 @@ gemini extensions install https://github.com/Azalytical/ascension-smartwalk
 
 `/api/recommend`, `plan_walk` и агент добавляют к каждому месту `links`:
 
-- `googleMapsWalk` — пешеходный маршрут в Google Maps **без точки старта**: приложение само начинает от места человека, Ulger его координаты в ссылку не пишет;
+- `googleMapsWalk` — пешеходный маршрут в Google Maps **без точки старта**: приложение само начинает от места человека, Aidem его координаты в ссылку не пишет;
 - `googleMaps` — точка на карте; `twoGis` — маршрут в 2ГИС (тоже без старта);
-- `googleCalendar` — событие «Ulger: место» на время всей прогулки с описанием «туда / на месте / обратно / запас» и временем возвращения.
+- `googleCalendar` — событие «Aidem: место» на время всей прогулки с описанием «туда / на месте / обратно / запас» и временем возвращения.
 
 Ссылки — обычные адреса без ключей: ни Google, ни 2ГИС ничего не узнают, пока человек сам не нажмёт.
 

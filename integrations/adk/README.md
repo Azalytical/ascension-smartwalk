@@ -1,6 +1,6 @@
-# Ulger на Google ADK
+# Aidem на Google ADK
 
-Агент на [Agent Development Kit](https://google.github.io/adk-docs/): Gemini планирует прогулки по Астане через MCP-сервер Ulger (`/mcp`). Те же 5 инструментов, что у агента на сайте: `plan_walk`, `search_places`, `place_details`, `build_route`, `get_weather`.
+Агент на [Agent Development Kit](https://google.github.io/adk-docs/): Gemini планирует прогулки по Астане через MCP-сервер Aidem (`/mcp`). Те же 5 инструментов, что у агента на сайте: `plan_walk`, `search_places`, `place_details`, `build_route`, `get_weather`.
 
 ## Запуск на своём компьютере
 
@@ -22,4 +22,4 @@ adk web        # или: adk run ulger_agent
 adk deploy agent_engine --project <PROJECT_ID> --region europe-west1 --staging_bucket gs://<BUCKET> ulger_agent
 ```
 
-Агенту нужен только доступ в интернет к `ULGER_MCP_URL`; данные и логика остаются в Ulger.
+Агенту нужен только доступ в интернет к `ULGER_MCP_URL`; данные и логика остаются в Айдём.
