@@ -223,6 +223,7 @@ export function mountSocial(root, ctx = {}) {
       event.preventDefault();
       const me = await run(() => social.register(name.value, emoji));
       if (!me) return;
+      root.scrollTop = 0;
       if (invite) await acceptInvite(invite.code);
       else toast(`Профиль создан, ${me.name}!`, 'success');
     };
@@ -241,9 +242,9 @@ export function mountSocial(root, ctx = {}) {
         h('span', { class: 'sx-label' }, 'Значок'), picker,
         h('button', { type: 'submit', class: 'btn btn-primary sx-btn sx-wide' }, invite?.inviter ? `Начать и добавить: ${invite.inviter.name}` : 'Начать')),
       h('details', { class: 'sx-details' }, h('summary', {}, 'Уже есть профиль на телефоне? Войти по коду'),
-        h('form', { class: 'sx-inline-form', onsubmit: async event => { event.preventDefault(); const me = await run(() => social.claimDevice(code.value)); if (me) toast(`Вы вошли как ${me.name}`, 'success'); } },
+        h('form', { class: 'sx-inline-form', onsubmit: async event => { event.preventDefault(); const me = await run(() => social.claimDevice(code.value)); if (me) { root.scrollTop = 0; toast(`Вы вошли как ${me.name}`, 'success'); } } },
           code, button('Войти', null, 'primary', { type: 'submit' })),
-        h('p', { class: 'sx-hint' }, 'Код показывается в профиле на другом устройстве: «Подключить часы или ещё одно устройство».')));
+        h('p', { class: 'sx-hint' }, 'Код показывается в профиле на другом устройстве: «Связать часы».')));
   }
 
   async function acceptInvite(code) {
@@ -591,7 +592,16 @@ export function mountSocial(root, ctx = {}) {
           item.myStatus !== 'on_way' && item.myStatus !== 'arrived' ? button('🚶 Я в пути', () => rsvp('on_way'), 'gold') : null,
           item.myStatus !== 'arrived' ? button('📍 Я на месте', () => rsvp('arrived'), item.myStatus === 'on_way' ? 'gold' : 'ghost') : null,
           button('Не смогу', () => rsvp('declined'), 'ghost'));
-    const message = h('input', { class: 'sx-input', maxlength: 280, placeholder: 'Написать участникам', 'aria-label': 'Сообщение' });
+    const message = h('input', { class: 'sx-input', maxlength: 280, placeholder: 'Написать участникам', 'aria-label': 'Сообщение', 'data-keep': `chat-${id}` });
+    const send = async event => {
+      event.preventDefault();
+      const text = message.value.trim();
+      if (!text) return;
+      message.value = '';
+      const sent = await run(() => social.act('postMessage', { id, body: text }));
+      const field = container.querySelector(`[data-keep="chat-${id}"]`);
+      if (!sent && field && !field.value) field.value = text;
+    };
     const etaFor = member => {
       const located = friend(member.id)?.location;
       return member.status === 'on_way' && located?.lat !== undefined ? ` · ≈${social.walkMinutes(located, item.place)} мин до места` : '';
@@ -613,9 +623,9 @@ export function mountSocial(root, ctx = {}) {
       h('h4', { class: 'sx-label' }, 'Сообщения'),
       h('ul', { class: 'sx-chat' }, item.messages.length ? item.messages.map(entry => h('li', { class: entry.author.id === me.id ? 'is-mine' : '' }, avatar(entry.author, 'xs'), h('span', {}, h('strong', {}, entry.author.id === me.id ? 'Вы' : entry.author.name), ' ', entry.body)))
         : h('li', { class: 'sx-hint' }, 'Напишите, если опаздываете.')),
-      item.status !== 'cancelled' ? h('form', { class: 'sx-inline-form', onsubmit: async event => { event.preventDefault(); if (!message.value.trim()) return; if (await run(() => social.act('postMessage', { id, body: message.value }))) { message.value = ''; render(true); } } },
+      item.status !== 'cancelled' ? h('form', { class: 'sx-inline-form', onsubmit: send },
         message, button('Отправить', null, 'primary', { type: 'submit' })) : null,
-      item.isHost && item.status !== 'cancelled' ? h('details', { class: 'sx-details' }, h('summary', {}, 'Управление встречей'),
+      item.isHost && item.status !== 'cancelled' ? h('details', { class: 'sx-details', 'data-pause-refresh': '' }, h('summary', {}, 'Управление встречей'),
         h('div', { class: 'sx-form' }, h('span', { class: 'sx-label' }, 'Перенести'), (() => { let next = item.startsAt; return [timePicker(next, value => { next = value; }), button('Сохранить новое время', () => run(() => social.act('updateMeetup', { id, startsAt: next }), 'Участники получили уведомление'), 'ghost')]; })(),
           button('Отменить встречу', async () => { if (confirm('Отменить встречу для всех?')) await run(() => social.act('cancelMeetup', { id }), 'Встреча отменена'); }, 'ghost', { class: 'btn btn-ghost sx-btn sx-danger' }))) : null);
   }
@@ -841,13 +851,24 @@ export function mountSocial(root, ctx = {}) {
     const overlay = view.overlay;
     // Forms keep what the person typed: polling refreshes lists and details, not open forms.
     if (!force && overlay && STATIC.has(overlay.type) && body) { updateMap(); return; }
+    // An open «Управление встречей» holds a time picker: refresh it only after the host acts.
+    if (!force && body && container.querySelector('details[open][data-pause-refresh]')) { updateMap(); return; }
     let content;
     if (!state.token) content = overlay?.type === 'event' ? overlayView(overlay) : onboarding();
     else if (!state.data) content = h('p', { class: 'sx-hint' }, state.error || 'Загружаем друзей…');
     else if (overlay) content = overlayView(overlay);
     else content = h('div', {}, tabs(), view.tab === 'friends' ? friendsView() : view.tab === 'meetups' ? meetupsView() : eventsView());
+    const typed = [...container.querySelectorAll('[data-keep]')].map(field => ({ key: field.dataset.keep, value: field.value, focused: field === document.activeElement,
+      start: field.selectionStart, end: field.selectionEnd }));
     body = h('div', { class: 'sx-body' }, content);
     container.replaceChildren(...[state.token && state.data ? header() : overlay ? h('header', { class: 'sx-header' }, backButton()) : null, body].filter(Boolean));
+    // Polling re-renders details every few seconds; what the person is typing survives it, with focus and caret.
+    for (const entry of typed) {
+      const field = container.querySelector(`[data-keep="${entry.key}"]`);
+      if (!field) continue;
+      field.value = entry.value;
+      if (entry.focused) { field.focus({ preventScroll: true }); try { field.setSelectionRange(entry.start, entry.end); } catch { /* not a text field */ } }
+    }
     updateMap();
   }
 
