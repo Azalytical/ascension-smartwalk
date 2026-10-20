@@ -49,7 +49,7 @@ export default {
   'place.why': 'Неге сай келеді', 'place.todo': 'Не істеуге болады', 'place.info': 'Мәліметтер', 'place.hours': 'Жұмыс уақыты',
   'place.phone': 'Телефон', 'place.site': 'Сайт', 'place.wheelchair': 'Арбамен кіру',
   'place.wheelchair.yes': 'Бар', 'place.wheelchair.limited': 'Ішінара', 'place.wheelchair.no': 'Жоқ',
-  'place.straight': 'Түзу сызықпен {d}', 'place.checks': 'Бұл деректер қайдан', 'place.aiShort': 'ЖИ идеясы', 'place.check.osm': 'Орын OpenStreetMap-те бар',
+  'place.straight': 'Түзу сызықпен {d}', 'place.checks': 'Бұл деректер қайдан', 'voice.answer': 'Нұсқалар: {n}. Біріншісі — {name}: жаяу {walk} мин, {time} қайтасыз.', 'voice.nearest': 'Ең жақыны — {name}, оған {n} мин керек.', 'place.aiShort': 'ЖИ идеясы', 'place.check.osm': 'Орын OpenStreetMap-те бар',
   'place.check.coords': 'Координаттар дереккөзден', 'place.check.hours': 'Жұмыс уақыты дереккөзден', 'place.check.noHours': 'Жұмыс уақыты белгісіз',
   'place.check.live': 'Дәл қазір ашық па, тексерілмеген', 'place.source': 'OpenStreetMap-те ашу', 'place.snapshot': 'Деректер күні: {date}',
   'place.plan': 'Жоспар', 'place.pairing': 'Жақын жерде тағы', 'place.pairingValue': 'орыннан {d}, серуенге +{n} мин', 'place.idea': 'Сервис идеясы, дереккөздегі мәлімет емес', 'place.friends': 'Достарды шақыру', 'place.address': 'Мекенжай', 'conf.high': 'Жоғары сенім', 'conf.medium': 'Орташа сенім', 'conf.low': 'Төмен сенім',

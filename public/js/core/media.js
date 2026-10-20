@@ -25,6 +25,22 @@ async function post(path, body, timeout = 45000) {
 export const identify = ({ image, lat, lon }) => post('/api/vision', { image, lat, lon });
 
 let playing = null;
+let audio = null;
+/** Call inside a tap: creates and resumes the one audio context, so a spoken answer can play later (iOS needs this). */
+export function unlockAudio() {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return null;
+  audio ||= new AudioContext();
+  audio.resume?.().catch(() => {});
+  try {
+    const source = audio.createBufferSource();
+    source.buffer = audio.createBuffer(1, 1, 22050);
+    source.connect(audio.destination);
+    source.start();
+  } catch { /* nothing to unlock */ }
+  return audio;
+}
+
 export function stopSpeaking() {
   playing?.stop();
   playing = null;
@@ -36,14 +52,14 @@ export async function speakText(text) {
   stopSpeaking();
   const clean = String(text || '').slice(0, 400);
   if (!clean) return;
-  // The audio context is created inside the tap so iOS lets it play.
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  const context = AudioContext ? new AudioContext() : null;
+  const context = audio || unlockAudio();
   try {
     if (!context) throw new Error('no audio');
-    const data = await post('/api/speak', { text: clean }, 30000);
+    const data = await post('/api/speak', { text: clean, lang: lang() }, 30000);
     const bytes = Uint8Array.from(atob(data.data), (char) => char.charCodeAt(0));
-    const samples = new Int16Array(bytes.buffer, 0, Math.floor(bytes.length / 2));
+    // A WAV answer starts with a RIFF header; the samples after it are the same 16-bit PCM.
+    const offset = bytes.length > 44 && String.fromCharCode(...bytes.subarray(0, 4)) === 'RIFF' ? 44 : 0;
+    const samples = new Int16Array(bytes.buffer, offset, Math.floor((bytes.length - offset) / 2));
     const buffer = context.createBuffer(1, samples.length, data.sampleRate || 24000);
     const channel = buffer.getChannelData(0);
     for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768;
@@ -62,10 +78,10 @@ export async function speakText(text) {
       const utterance = new SpeechSynthesisUtterance(clean);
       utterance.lang = { ru: 'ru-RU', kk: 'kk-KZ', en: 'en-US' }[lang()] || 'ru-RU';
       utterance.onend = resolve; utterance.onerror = resolve;
+      playing = { stop: () => { speechSynthesis.cancel(); resolve(); } };
       speechSynthesis.speak(utterance);
     });
   } finally {
     playing = null;
-    context?.close?.().catch(() => {});
   }
 }
