@@ -10,7 +10,7 @@ import * as layers from '../map/layers.js';
 import { setSnap, ensureAtLeast, getSnap } from '../ui/sheet.js';
 import { toast, announce } from '../ui/toast.js';
 import { timeRing } from '../ui/ring.js';
-import { art, categoryArt, categoryName, hoursStatus, hoursChip, share, backTime, confidenceChip, backButton, listenButton } from '../ui/common.js';
+import { art, categoryArt, categoryName, hoursStatus, hoursChip, share, backTime, confidenceChip, versusText, backButton, listenButton } from '../ui/common.js';
 import { placeView } from '../ui/place.js';
 import { ratingChip } from '../ui/rating.js';
 import { understand, canListen, startListening } from '../core/voice.js';
@@ -529,7 +529,9 @@ function renderResults() {
   const minutes = demo?.minutes ?? request.minutes;
   const surprise = result.surprise && !demo ? result.surprise : null;
 
+  const surpriseMode = Boolean(result.surprise && !result.demo);
   const rows = recs.map((place, index) => {
+    const versus = surpriseMode ? null : versusText(place);
     const status = hoursStatus(place, place.walkMinutes, place.visitMinutes, place.hoursCheck);
     return h('button', { class: `result-row${index === selected ? ' is-selected' : ''}`, type: 'button', dataset: { index }, onclick: () => openResult(index),
       onmouseenter: () => highlight(index), onfocus: () => highlight(index) },
@@ -537,7 +539,8 @@ function renderResults() {
     categoryArt(place.category, 44, 'art'),
     h('span', { class: 'result-text' }, h('strong', { class: 'result-name', text: place.name }),
       h('span', { class: 'meta' }, categoryName(place.category), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }), t('explore.walk', { n: place.walkMinutes })),
-      h('span', { class: 'result-badges' }, hoursChip(status), confidenceChip(place.confidence), ratingChip(place))),
+      h('span', { class: 'result-badges' }, hoursChip(status), confidenceChip(place.confidence), ratingChip(place)),
+      versus ? h('span', { class: 'result-versus', text: versus }) : null),
     h('span', { class: 'result-time' }, timeRing({ there: place.walkMinutes, visit: place.visitMinutes, back: place.returnMinutes, reserve: place.safetyReserveMinutes, size: 50, stroke: 6 }),
       h('span', { class: 'num result-total', text: t('plan.min', { n: place.totalMinutes }) })));
   });
@@ -549,7 +552,7 @@ function renderResults() {
     h('h2', { id: 'results-title', class: 'title-1', text: t(surprise ? 'results.surprise' : 'results.title', { min: minutes }) }),
     h('p', { class: 'meta' }, icon('pin', 'icon-xs'), t('results.start', { name: originName() }), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }),
       demo ? t('demo.at', { time: demo.time }) : t('plan.returnBy', { time: time(leave + request.minutes * 60000) })),
-    surprise ? h('p', { class: 'surprise-note' }, icon('sparkle', 'icon-xs'), h('span', { text: typeof surprise.note === 'string' && surprise.note ? surprise.note : t('surprise.note') })) : null,
+    surprise ? h('p', { class: 'surprise-note' }, icon('sparkle', 'icon-xs'), h('span', { text: surprise.poolSize > 1 ? t('surprise.notePool', { n: surprise.poolSize }) : t('surprise.note') })) : null,
     // The Gemini tip compares all the options, so it stays out when only the surprise is shown.
     surprise ? null : tip,
     notes.notices,
@@ -604,7 +607,7 @@ function notesView(recs, { skip = null } = {}) {
 function understoodRow(items) {
   const shown = (items || []).filter((item) => item.key !== 'location' && item.label);
   if (!shown.length) return null;
-  const icons = { time: 'clock', categories: 'filter', child: 'user', night: 'moon', group: 'friends', accessible: 'accessible', weather: 'cloud', hours: 'clock' };
+  const icons = { hidden: 'close', time: 'clock', categories: 'filter', child: 'user', night: 'moon', group: 'friends', accessible: 'accessible', weather: 'cloud', hours: 'clock' };
   return h('div', { class: 'understood' }, h('p', { class: 'understood-title', text: t('results.understood') }),
     h('div', { class: 'chip-row no-drag' }, shown.map((item) => h('span', { class: 'chip is-static' }, icon(icons[item.key] || 'check', 'icon-xs'), h('span', { class: 'chip-text', text: item.label })))));
 }
@@ -751,7 +754,7 @@ function renderPlace() {
   clear(root, placeView({ place, timing, start, serverHours: place.hoursCheck, why: place.why, activities: place.activities || [], warnings: place.warnings || [],
     backLabel: t('common.back'), onBack: () => { view = 'results'; render(); },
     onStart: () => { voiceTurns = 0; view = 'ready'; render(); }, voice: voiceButton(), onHide: () => hidePlace(place),
-    routeInfo: lastRoute?.id === place.id ? lastRoute.route : null, shareUrl: url.href, backAt: backOf(place) }));
+    routeInfo: lastRoute?.id === place.id ? lastRoute.route : null, shareUrl: url.href, backAt: backOf(place), spareAt: place.plan?.spareUntil || null }));
   // Opened by voice («второй»): say why it fits and how long it takes, then wait for «поехали».
   // The server's «why» is written for reading (all the minutes), so only Gemini's idea is said aloud.
   if (speakNext) answer(`${place.name}. ${place.aiWhy || ''} ${t('voice.place', { walk: place.walkMinutes, time: backOf(place) })}`);
