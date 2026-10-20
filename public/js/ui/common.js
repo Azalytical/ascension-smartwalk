@@ -109,17 +109,38 @@ export function notabilityChip(notability) {
 
 // «Почему это, а не другое»: one line per option from the server (versus), built only from confirmed data.
 // Gemini's line (aiVersus) is already in the asker's language; versus.text is Russian, so kk/en are put together from its reasons.
-const VERSUS = ['closer', 'shorter', 'roof', 'outdoor', 'hoursConfirmed', 'wheelchair', 'named', 'requestMatch', 'rated', 'longerVisit', 'otherKind', 'only', 'surprise', 'similar'];
+const VERSUS = ['closer', 'shorter', 'roof', 'outdoor', 'hoursConfirmed', 'later', 'wheelchair', 'named', 'requestMatch', 'rated', 'notable', 'feature', 'longerVisit', 'otherKind', 'only', 'surprise', 'similar'];
+// `feature` carries the record's fact as the server's Russian label; kk/en show it from this list or leave that reason out.
+const FACTS = {
+  'есть Wi-Fi': { en: 'has Wi-Fi', kk: 'Wi-Fi бар' }, 'есть места на улице': { en: 'outdoor seating', kk: 'далада отыратын орын бар' },
+  'можно взять с собой': { en: 'takeaway', kk: 'өзіңізбен алып кетуге болады' }, 'халяль': { en: 'halal', kk: 'халал' },
+  'кофейня': { en: 'coffee shop', kk: 'кофехана' }, 'бургеры': { en: 'burgers', kk: 'бургерлер' }, 'пицца': { en: 'pizza', kk: 'пицца' },
+  'курица': { en: 'chicken', kk: 'тауық еті' }, 'суши': { en: 'sushi', kk: 'суши' }, 'завтраки': { en: 'breakfast', kk: 'таңғы ас' },
+  'гриль': { en: 'grill', kk: 'гриль' }, 'десерты': { en: 'desserts', kk: 'десерттер' }, 'выпечка': { en: 'pastries', kk: 'тоқаштар' },
+  'кебаб': { en: 'kebab', kk: 'кебаб' }, 'стейки': { en: 'steaks', kk: 'стейктер' }, 'бранчи': { en: 'brunch', kk: 'бранч' },
+  'местная кухня': { en: 'local food', kk: 'жергілікті ас' }, 'итальянская кухня': { en: 'Italian food', kk: 'итальян асханасы' },
+  'азиатская кухня': { en: 'Asian food', kk: 'азия асханасы' }, 'китайская кухня': { en: 'Chinese food', kk: 'қытай асханасы' },
+  'турецкая кухня': { en: 'Turkish food', kk: 'түрік асханасы' }, 'японская кухня': { en: 'Japanese food', kk: 'жапон асханасы' },
+  'корейская кухня': { en: 'Korean food', kk: 'корей асханасы' }, 'русская кухня': { en: 'Russian food', kk: 'орыс асханасы' },
+  'европейская кухня': { en: 'European food', kk: 'еуропа асханасы' }, 'восточная кухня': { en: 'Eastern food', kk: 'шығыс асханасы' },
+  'грузинская кухня': { en: 'Georgian food', kk: 'грузин асханасы' }, 'французская кухня': { en: 'French food', kk: 'француз асханасы' },
+  'казахская кухня': { en: 'Kazakh food', kk: 'қазақ асханасы' }, 'узбекская кухня': { en: 'Uzbek food', kk: 'өзбек асханасы' },
+  'тайская кухня': { en: 'Thai food', kk: 'тай асханасы' }, 'средиземноморская кухня': { en: 'Mediterranean food', kk: 'Жерорта теңізі асханасы' },
+};
 export function versusText(place) {
   if (typeof place?.aiVersus === 'string' && place.aiVersus.trim()) return place.aiVersus.trim();
   const versus = place?.versus;
   if (!versus || typeof versus !== 'object') return null;
   if (lang() === 'ru' && versus.text) return versus.text;
   const parts = (Array.isArray(versus.reasons) ? versus.reasons : []).filter((reason) => VERSUS.includes(reason?.key)).map(({ key, params = {} }) => {
-    if (key === 'hoursConfirmed' && !params.closesAt) return t('vs.hoursConfirmedPlain');
+    if ((key === 'hoursConfirmed' || key === 'later') && !params.closesAt) return t(`vs.${key}Plain`);
     if (key === 'rated') return t('vs.rated', { average: Number(params.average).toLocaleString(lang() === 'en' ? 'en-GB' : 'ru-RU', { maximumFractionDigits: 1 }) });
+    if (key === 'feature') {
+      const fact = lang() === 'ru' ? params.fact : FACTS[params.fact]?.[lang()];
+      return fact ? t('vs.feature', { fact }) : null;
+    }
     return t(`vs.${key}`, { ...params, category: params.category ? categoryName(params.category).toLocaleLowerCase() : '' });
-  });
+  }).filter(Boolean).slice(0, 2);
   if (!parts.length) return versus.text || null;
   return parts.map((part, i) => (i ? part.charAt(0).toLocaleLowerCase() + part.slice(1) : part)).join('; ');
 }

@@ -607,7 +607,7 @@ function notesView(recs, { skip = null } = {}) {
 function understoodRow(items) {
   const shown = (items || []).filter((item) => item.key !== 'location' && item.label);
   if (!shown.length) return null;
-  const icons = { hidden: 'close', time: 'clock', categories: 'filter', child: 'user', night: 'moon', group: 'friends', accessible: 'accessible', weather: 'cloud', hours: 'clock' };
+  const icons = { hidden: 'close', surprise: 'sparkle', time: 'clock', categories: 'filter', child: 'user', night: 'moon', group: 'friends', accessible: 'accessible', weather: 'cloud', hours: 'clock' };
   return h('div', { class: 'understood' }, h('p', { class: 'understood-title', text: t('results.understood') }),
     h('div', { class: 'chip-row no-drag' }, shown.map((item) => h('span', { class: 'chip is-static' }, icon(icons[item.key] || 'check', 'icon-xs'), h('span', { class: 'chip-text', text: item.label })))));
 }
