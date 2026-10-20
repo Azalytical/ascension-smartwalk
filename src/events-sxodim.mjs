@@ -9,7 +9,9 @@
 const MONTH = '(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)';
 const ONE_DATE = `(?<![\\d:])\\d{1,2}(?:\\s*(?:[-–—]|,|и)\\s*\\d{1,2})*\\s+${MONTH}(?:\\s+\\d{4}(?:\\s*(?:г\\.|года))?)?`;
 const DATE = new RegExp(`(?:с\\s+)?${ONE_DATE}(?:\\s*(?:[-–—]|,|и|по|до)\\s*${ONE_DATE})*(?:,?\\s*(?:в|с)\\s+\\d{1,2}:\\d{2}(?:\\s*(?:[-–—]|до)\\s*\\d{1,2}:\\d{2})?)?`, 'iu');
-const PRICE = /(?:от\s*)?(?<![\d:])\d[\d\s]*(?:\s*(?:[-–—]|до)\s*\d[\d\s]*)?\s*(?:тенге|теңге|тг\.?|₸)|бесплатн[а-яё]*|тегін/iu;
+const ONE_PRICE = '(?:от\\s*)?(?<![\\d:])\\d[\\d\\s]*(?:\\s*(?:[-–—]|до)\\s*\\d[\\d\\s]*)?\\s*(?:тенге|теңге|тг\\.?|₸)(?:\\s*\\([^)]*\\))?';
+// Several prices in a row stay one field: «от 7000 тенге (взрослый), 3500 тенге (детский, 5-14 лет)».
+const PRICE = new RegExp(`${ONE_PRICE}(?:\\s*[,;/]\\s*${ONE_PRICE})*|бесплатн[а-яё]*|тегін`, 'iu');
 // Where the address starts: a street word in front («ул.», «пр.», «мкр») or behind («Достық көшесі»), or «Место сбора».
 const ADDRESS_START = /^(?:г\.\s*астана|ул\.|ул\s|улица|пр\.|пр-т|просп|проспект|шоссе|ш\.|бульвар|б-р|бул\.|мкр|микрорайон|пер\.|переулок|наб\.|набережная|пл\.|площадь|трасса|ж\.?\s?м\.?\s|жилой массив|место сбора)/iu;
 const STREET_AFTER = /\s(?:көшесі|даңғылы|ул\.?|улица|проспект|просп\.?|шоссе|бульвар|переулок)(?:\s|$)/iu;
@@ -94,8 +96,10 @@ export function parseListing(html) {
     // The card's text after the title link, up to the next card or the end of the grid.
     const next = cards[index + 1]?.start ?? page.length;
     let tail = page.slice(titleLink.end, Math.min(next, titleLink.end + 3000));
+    // The grid ends at the footer, a heading or the pagination; the cut goes before the whole tag, and a tag cut in half is dropped.
     const stop = tail.search(/<(?:footer|nav|h[1-3])\b|[?&]page=\d/i);
-    if (stop >= 0) tail = tail.slice(0, stop);
+    if (stop >= 0) tail = tail.slice(0, tail.lastIndexOf('<', stop) >= 0 ? tail.lastIndexOf('<', stop) : stop);
+    tail = tail.replace(/<[^>]*$/, '');
     const outside = html => fragments(html.replace(/<a\b[\s\S]*?<\/a\s*>/gi, ' ')).filter(part => part !== title && part !== category);
     let info = splitInfo(outside(tail));
     // Another layout: date and place before the title.

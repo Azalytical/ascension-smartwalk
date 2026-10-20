@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseListing, splitInfo } from '../src/events-sxodim.mjs';
 import { placeEvents, venueIndex, venueIndexData } from '../src/events-venues.mjs';
-import { localCityEvents, cityEventsState, refreshCityEvents, LISTING_PAGES } from '../src/events-live.mjs';
+import { localCityEvents, cityEventsState, refreshCityEvents, LISTING_PAGES, PARSER_VERSION } from '../src/events-live.mjs';
 import { CITY_EVENTS } from '../src/events.mjs';
 import { handleApi } from '../src/api.mjs';
 import { runTool } from '../src/tools.mjs';
@@ -40,6 +40,17 @@ test('the text of a card splits into date, price, venue and address', () => {
   assert.deepEqual(splitInfo(['от 3000 до 5000 тенге', '25 октября', 'Astana Opera']),
     { age: null, dateText: '25 октября', price: 'от 3000 до 5000 тенге', venue: 'Astana Opera', address: null });
   assert.equal(splitInfo(['5 000 ₸', '1 ноября в 19:00', 'Bar 1', 'Кабанбай батыра 43']).address, 'Кабанбай батыра 43');
+  // Seen on the live site on 20 Oct: two prices with notes, then the venue.
+  assert.deepEqual(splitInfo(['от 7000 тенге (взрослый), 3500 тенге (детский, 5-14 лет)', '25 июля - 28 ноября', 'Центральная мечеть', 'пр. Мангилик Ел, 65']),
+    { age: null, dateText: '25 июля - 28 ноября', price: 'от 7000 тенге (взрослый), 3500 тенге (детский, 5-14 лет)', venue: 'Центральная мечеть', address: 'пр. Мангилик Ел, 65' });
+});
+
+test('the last card ends before the pagination, without pieces of its tags', () => {
+  // Seen on the live site on 20 Oct: «пр. Кабанбай Батыра, 34, <a class="page-link" href="…/afisha» in the address.
+  const page = `<div><a href="/astana/event/kviz-100"><img alt="Квиз"></a><a href="/astana/event/kviz-100">Квиз, плиз! #4</a>
+    <p>3500 тенге, 24 октября в 18:00, Гриль-бар Взлётный, пр. Кабанбай Батыра, 34</p></div>
+    <ul class="pagination"><li class="page-item"><a class="page-link" href="https://sxodim.com/astana/afisha?page=2">2</a></li></ul>`;
+  assert.equal(parseListing(page)[0].address, 'пр. Кабанбай Батыра, 34');
 });
 
 test('venues are placed from the place base, the same with the index the Worker bundle carries', () => {
@@ -134,6 +145,22 @@ test('a run that finds too little keeps the last good listing', async () => {
   const status = await store.storage.get('status');
   assert.equal(status.ok, false);
   assert.equal(status.problem, 'too_few_events');
+});
+
+test('a listing read by an older parser is collected again on the next visit', async () => {
+  const pages = { afisha: listing, 'events/kontserty': listing.replace(/\/astana\/event\/([a-z0-9-]+)/g, '/astana/event/$1-2') };
+  const store = localCityEvents({ manual: true, fetcher: sxodim(pages).fetcher, places, now: morning });
+  await refreshCityEvents({ CITY_EVENTS_LOCAL: store });
+  await collect(store);
+  const live = await store.storage.get('live');
+  assert.equal(live.parser, PARSER_VERSION);
+  await store.storage.put('live', { ...live, parser: PARSER_VERSION - 1 });
+  store.options.now = morning + 600000;
+  await cityEventsState({ CITY_EVENTS_LOCAL: store });
+  assert.notEqual(store.storage.alarmAt, null, 'a run starts at once, not after the hour that follows a failure');
+  await collect(store);
+  assert.equal((await store.storage.get('live')).parser, PARSER_VERSION);
+  assert.equal((await store.storage.get('status')).reason, 'parser');
 });
 
 test('a slow store never holds up a walk: the snapshot is used', async () => {
