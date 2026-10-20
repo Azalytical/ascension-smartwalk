@@ -95,6 +95,7 @@ function planWalk(args, { dataset, now }) {
       distanceMeters: p.distanceMeters, walkMinutes: p.walkMinutes, visitMinutes: p.visitMinutes, returnMinutes: p.returnMinutes,
       totalMinutes: p.totalMinutes, hours: { status: p.hoursCheck?.status || 'no_data', closesAt: p.hoursCheck?.closesAt ?? null },
       why: p.why, ...(p.plan?.text ? { plan: p.plan.text } : {}), ...(p.confidence ? { confidence: { level: p.confidence.level, reasons: p.confidence.reasons } } : {}),
+      ...(p.notability && p.notability.level !== 'low' ? { notability: p.notability.label } : {}),
       activities: p.activities, warnings: p.warnings.slice(0, 2), dataSource: sourceOf(p), sourceUrl: p.sourceUrl,
       links: placeLinks(p, { start: begin, sourceLabel: sourceOf(p) }) })),
     ...(result.route ? { microRoute: { summary: result.route.summary, totalMinutes: result.route.totalMinutes, stops: result.route.stops.map(stop => ({ id: String(stop.id), name: stop.name, category: stop.category })) } } : {}),
@@ -102,6 +103,8 @@ function planWalk(args, { dataset, now }) {
       walkMinutes: result.nearestBeyondLimits.walkMinutes, neededMinutes: result.nearestBeyondLimits.neededMinutes } } : {}),
     ...(Array.isArray(result.understood) ? { understood: result.understood.map(item => item.label) } : {}),
     ...(result.unconfirmed?.length ? { unconfirmed: result.unconfirmed } : {}),
+    ...(result.beyondWalk ? { beyondWalk: { name: result.beyondWalk.name, category: result.beyondWalk.category,
+      distanceKm: Math.round(result.beyondWalk.distanceMeters / 100) / 10, walkMinutes: result.beyondWalk.walkMinutes, needsTransport: true } } : {}),
     notes: result.warnings, rejected: result.retrieval.rejected, ...SOURCE,
     method: 'Отбор по расстоянию, категории, времени и часам работы из OSM; время пешком — оценка по прямой ×1,35 при 4,2 км/ч, резерв 5 минут.'
   };

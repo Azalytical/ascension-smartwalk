@@ -429,6 +429,26 @@ function groupFormat(poi, kind) {
   return GROUP_KINDS[normalize(tags['overture:category']).trim()] ?? GROUP_KINDS[kind] ?? GROUP_CUISINES[cuisine] ?? null;
 }
 
+/**
+ * How well-known a place is in open data. Not a rating and not visitor numbers: a Wikidata or Wikipedia entry,
+ * a listing in more than one source and names in several languages are what a source-grounded service can see.
+ */
+export function notabilityFor(poi) {
+  const tags = poi.tags && !Array.isArray(poi.tags) ? poi.tags : {};
+  const reasons = [];
+  let points = 0;
+  if (poi.wikidata || tags.wikidata) { points += 2; reasons.push('есть в Wikidata'); }
+  if (poi.wikipedia || tags.wikipedia) { points += 1; reasons.push('есть статья в Википедии'); }
+  const sources = 1 + (Array.isArray(poi.alsoIn) ? new Set(poi.alsoIn.map(item => item?.source).filter(Boolean)).size : 0);
+  if (sources > 1) { points += 1; reasons.push(`есть в ${sources} открытых источниках`); }
+  const names = new Set([poi.name, poi.nameRu, poi.nameKk, poi.nameEn, ...(Array.isArray(poi.aliases) ? poi.aliases : [])]
+    .filter(name => typeof name === 'string' && name.trim()).map(name => name.trim())).size;
+  if (names >= 4) { points += 1; reasons.push(`${names} вариантов названия на разных языках`); }
+  const level = points >= 3 ? 'high' : points >= 1 ? 'medium' : 'low';
+  return { level, points, label: { high: 'Известное место по открытым данным', medium: 'Есть в открытых справочниках', low: 'Мало упоминаний в открытых данных' }[level],
+    reasons, basis: 'open_data_mentions', isRating: false };
+}
+
 function intentScore(poi, kind, hours, intents, wheelchair) {
   let points = poi.nameIsGenerated ? -20 : 0;
   const tags = poi.tags && !Array.isArray(poi.tags) ? poi.tags : {};
@@ -437,6 +457,9 @@ function intentScore(poi, kind, hours, intents, wheelchair) {
   const chain = Boolean(poi.brand || tags.brand) || fastFood;
   if (intents.unusual) points += chain ? -10 : UNUSUAL.includes(poi.category) && !poi.nameIsGenerated ? 10 : 0;
   if (intents.sightseeing && ['museum', 'attraction'].includes(poi.category) && !poi.nameIsGenerated) points += 5;
+  // A tourist leans towards places open data knows well; at most +8, below the category weight. Not for «необычное»:
+  // chains are listed in more sources, and an unusual request wants the opposite.
+  if (intents.sightseeing && !poi.nameIsGenerated) points += 2 * Math.min(4, notabilityFor(poi).points);
   if (intents.quiet) points += ['nightlife', 'mall'].includes(poi.category) || fastFood ? -10 : ['cafe', 'park'].includes(poi.category) || kind === 'library' ? 5 : 0;
   if (intents.night) points += (hours?.status === 'open' ? 10 : 0) + ({ nightlife: 12, culture: 8 }[poi.category] ?? 0);
   if (intents.group) points += fastFood ? -10 : (GROUP.includes(poi.category) ? 5 : 0) + (groupFormat(poi, kind) ? 8 : 0);
@@ -761,7 +784,7 @@ export function recommend(dataset, input, context = {}) {
       walkMinutes, visitMinutes, returnMinutes, safetyReserveMinutes: RESERVE, totalMinutes,
       why: whyFor({ ...pick, weather }, constraints, intents, reference), activities: activitiesFor(category), activitiesAreSuggestions: true,
       plan: planFor({ ...pick, poi }, constraints, reference, pairing), pairing,
-      confidence: confidenceFor(poi, hours, constraints), provenance: provenanceFor(poi), wheelchair: wheelchairOf(poi),
+      confidence: confidenceFor(poi, hours, constraints), notability: notabilityFor(poi), provenance: provenanceFor(poi), wheelchair: wheelchairOf(poi),
       warnings: warningsFor(poi, constraints, hours), evidence, score, scoreBreakdown, matchedTerms,
       hoursCheck: hours ?? { status: poi.openingHours ? 'not_checked' : 'no_data' } };
   });
@@ -807,12 +830,15 @@ export function recommend(dataset, input, context = {}) {
     warnings.unshift(`${capitalize(LABELS[missing.category])} в ваше время не помещается: ближайший вариант «${missing.name}», около ${missing.walkMinutes} мин пешком в одну сторону, `
       + `нужно примерно ${missing.neededMinutes} мин${constraints.returnToStart ? ' с возвращением' : ''}. Режим работы для него не проверялся.`);
   }
-  if (intents.sightseeing && recommendations.length && recommendations.length < 3 && nearestSight) {
+  const beyondWalk = intents.sightseeing && recommendations.length && recommendations.length < 3 && nearestSight
+    ? { id: nearestSight.poi.id, name: nearestSight.poi.name, category: nearestSight.poi.category, distanceMeters: Math.round(nearestSight.directDistance),
+      walkMinutes: nearestSight.walkMinutes, needsTransport: true } : null;
+  if (beyondWalk) {
     const km = (nearestSight.directDistance / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 });
     warnings.unshift(`Пешком отсюда мест для осмотра мало. Ближайшее за пределами вашего времени: «${nearestSight.poi.name}», около ${km} км по прямой, `
       + `примерно ${nearestSight.walkMinutes} мин пешком в одну сторону. Дальше нужен транспорт; его время сервис не считает.`);
   }
-  return { recommendations, route, nearestBeyondLimits, nearestMissing, constraints, warnings, unconfirmed: unconfirmedFor(constraints, recommendations),
+  return { recommendations, route, nearestBeyondLimits, nearestMissing, beyondWalk, constraints, warnings, unconfirmed: unconfirmedFor(constraints, recommendations),
     intents: Object.keys(intents).filter(key => intents[key] === true),
     understood: understoodFor(constraints, requested, excluded, intents, reference, nightShift, weather, weatherRoof, meant),
     weather: weather ? { ...context.weather, condition: weather.label, text: weather.text, roofOnly: weatherRoof } : null,
