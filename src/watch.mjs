@@ -14,6 +14,18 @@ const MOODS = {
 };
 const LABELS = { park: 'парк', cafe: 'кафе', museum: 'музей', playground: 'детская площадка', attraction: 'достопримечательность',
   restaurant: 'где поесть', mall: 'торговый центр', culture: 'культурное место', family: 'место для семейного отдыха', nightlife: 'бар или паб' };
+const EN_LABELS = { park: 'a park', cafe: 'a cafe', museum: 'a museum', playground: 'a playground', attraction: 'a sight',
+  restaurant: 'a place to eat', mall: 'a shopping centre', culture: 'a cultural venue', family: 'a family place', nightlife: 'a bar or pub' };
+// What Siri says when there is no plan to read, in the language of the question.
+const SAY = {
+  ru: { nothing: 'Рядом не нашлось мест, на которые хватит времени. Попробуйте дать прогулке больше времени.', outside: 'Aidem пока подбирает прогулки только в Астане.',
+    mood: 'Неизвестное настроение прогулки.', busy: 'Слишком много запросов. Попробуйте через минуту.' },
+  en: { nothing: 'Nothing nearby fits your time. Try giving the walk more time.', outside: 'For now Aidem plans walks only in Astana.',
+    mood: 'Unknown walk mood.', busy: 'Too many requests. Try again in a minute.', failed: 'Aidem could not answer right now. Please try again.' }
+};
+/** English when the question is in Latin letters or lang=en asks for it; otherwise Russian. */
+export const spokenLanguage = (text, lang) => (lang === 'en' || (!lang && /[a-z]/i.test(text || '') && !/[а-яёәғқңөұүһі]/iu.test(text || '')) ? 'en' : 'ru');
+export const say = (key, lang) => SAY[lang]?.[key] || SAY.ru[key];
 const HEADERS = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin' };
 
 const buckets = new Map();
@@ -33,6 +45,7 @@ export function plural(number, one, few, many) {
   return many;
 }
 const minutes = number => `${number} ${plural(number, 'минуту', 'минуты', 'минут')}`;
+const enMinutes = number => `${number} ${number === 1 ? 'minute' : 'minutes'}`;
 
 // Astana is UTC+5 all year.
 function astanaTime(date) {
@@ -46,10 +59,17 @@ export const ATTRIBUTION = '© OpenStreetMap contributors, Overture Maps Foundat
 const sourceOf = place => ({ label: place.source?.label || 'OpenStreetMap', license: place.source?.license || 'ODbL-1.0',
   attribution: place.source?.attribution || '© OpenStreetMap contributors' });
 
-export function spokenPlan(plan, now = new Date()) {
+export function spokenPlan(plan, now = new Date(), lang = 'ru') {
   const [first, ...rest] = plan.places;
-  if (!first) return 'Рядом не нашлось мест, на которые хватит времени. Попробуйте дать прогулке больше времени.';
+  if (!first) return say('nothing', lang);
   const back = astanaTime(new Date(now.getTime() + first.totalMinutes * 60000));
+  if (lang === 'en') {
+    let english = `${first.name}, ${EN_LABELS[first.category] || 'a place'}. About ${enMinutes(first.walkMinutes)} on foot; `
+      + `the whole walk there and back takes about ${enMinutes(first.totalMinutes)}, so you are back by ${back}.`;
+    if (first.hours?.status === 'open' && first.hours.closesAt) english += ` ${first.source?.label || 'The source'} lists it as open until ${first.hours.closesAt}.`;
+    if (rest.length) english += ` Also: ${rest.map(place => `${place.name}, ${enMinutes(place.walkMinutes)} on foot`).join('; ')}.`;
+    return english;
+  }
   let text = `${first.name}, ${LABELS[first.category] || 'место'}. Идти примерно ${minutes(first.walkMinutes)}, `
     + `вся прогулка с дорогой обратно займёт примерно ${minutes(first.totalMinutes)}, вернётесь к ${back}.`;
   if (first.hours?.status === 'open' && first.hours.closesAt) text += ` По данным ${first.source?.label || 'источника'} работает до ${first.hours.closesAt}.`;
@@ -58,12 +78,12 @@ export function spokenPlan(plan, now = new Date()) {
 }
 
 /** The assistant's answer as one paragraph for Siri: Gemini's own words, or the same places read like a plan without it. */
-export function spokenAnswer(answer, now = new Date()) {
-  if (typeof answer?.error === 'string') return answer.error;
+export function spokenAnswer(answer, now = new Date(), lang = 'ru') {
+  if (typeof answer?.error === 'string') return lang === 'en' ? say('failed', lang) : answer.error;
   if (answer?.mode === 'agent' && answer.summary) return answer.summary;
   const places = (answer?.places || []).filter(place => Number.isFinite(place.totalMinutes))
     .map(place => ({ ...place, source: { label: place.dataSource || 'OpenStreetMap' } }));
-  return spokenPlan({ places }, now);
+  return spokenPlan({ places }, now, lang);
 }
 
 function failure(message, status, text) {
@@ -110,12 +130,13 @@ export function handleWatch(request, env, pois) {
   if (url.pathname.startsWith('/api/watch/push/')) return handlePush(request, env, url);
   if (url.pathname !== '/api/watch/plan') return null;
   const text = url.searchParams.get('format') === 'text';
+  const lang = spokenLanguage(url.searchParams.get('q'), url.searchParams.get('lang'));
   if (!['GET', 'HEAD'].includes(request.method)) return failure('Метод не поддерживается', 405, false);
-  if (!env.LOCAL_DEVELOPMENT && !allowed(clientIp(request))) return failure('Слишком много запросов. Попробуйте через минуту.', 429, text);
+  if (!env.LOCAL_DEVELOPMENT && !allowed(clientIp(request))) return failure(say('busy', lang), 429, text);
   // Shortcuts on iOS may send a comma as the decimal separator.
   const number = name => Number(String(url.searchParams.get(name) ?? '').replace(',', '.'));
   const mood = url.searchParams.get('mood') || 'any';
-  if (!Object.hasOwn(MOODS, mood)) return failure('Неизвестное настроение прогулки.', 400, text);
+  if (!Object.hasOwn(MOODS, mood)) return failure(say('mood', lang), 400, text);
   const query = [MOODS[mood].query, (url.searchParams.get('q') || '').slice(0, 200)].filter(Boolean).join(' ');
   const total = url.searchParams.has('minutes') ? number('minutes') : 45;
   const input = { lat: number('lat'), lon: number('lon'), minutes: total, query, category: 'any', returnToStart: true,
@@ -126,7 +147,7 @@ export function handleWatch(request, env, pois) {
   catch (error) {
     if (error?.code !== 'INVALID_INPUT') throw error;
     const outside = /Широта|Долгота/.test(error.message);
-    return failure(outside ? 'Aidem пока подбирает прогулки только в Астане.' : error.message, 400, text);
+    return failure(outside ? say('outside', lang) : error.message, 400, text);
   }
   const plan = {
     start: { lat: input.lat, lon: input.lon }, minutes: total, mood, query,
@@ -140,6 +161,6 @@ export function handleWatch(request, env, pois) {
     })),
     attribution: ATTRIBUTION, estimate: 'Время пешком — оценка по прямой ×1,35 при 4,2 км/ч, с резервом 5 минут.'
   };
-  if (text) return new Response(spokenPlan(plan), { headers: { ...HEADERS, 'Content-Type': 'text/plain; charset=utf-8' } });
+  if (text) return new Response(spokenPlan(plan, new Date(), lang), { headers: { ...HEADERS, 'Content-Type': 'text/plain; charset=utf-8' } });
   return new Response(JSON.stringify(plan), { headers: { ...HEADERS, 'Content-Type': 'application/json; charset=utf-8' } });
 }

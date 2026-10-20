@@ -3,7 +3,7 @@ import { semanticCategories } from './semantic.mjs';
 import { currentWeather } from './weather.mjs';
 import { handleTelegram } from './telegram.mjs';
 import { handleSocial } from './social/routes.mjs';
-import { handleWatch, spokenAnswer } from './watch.mjs';
+import { handleWatch, spokenAnswer, spokenLanguage, say } from './watch.mjs';
 import { handleMcp } from './mcp.mjs';
 import { runAgent } from './agent.mjs';
 import { identifyPlace, speak, listen, MediaError } from './media.mjs';
@@ -383,8 +383,11 @@ async function watchAsk(request, url, env, dataset) {
   const body = { query: (url.searchParams.get('q') || '').trim().slice(0, 500) || 'Куда сходить рядом?', lat: number('lat'), lon: number('lon'),
     minutes: url.searchParams.has('minutes') ? number('minutes') : 45, ...(url.searchParams.has('lang') ? { lang: url.searchParams.get('lang') } : {}) };
   const text = url.searchParams.get('format') === 'text';
+  // An English question gets an English answer, from Gemini and without it.
+  const lang = spokenLanguage(url.searchParams.get('q'), url.searchParams.get('lang'));
+  if (lang === 'en' && !body.lang) body.lang = 'en';
   if (!(body.lat >= 51 && body.lat <= 51.35 && body.lon >= 71.25 && body.lon <= 71.65)) {
-    const message = 'Aidem пока подбирает прогулки только в Астане.';
+    const message = say('outside', lang);
     return text ? new Response(message, { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Access-Control-Allow-Origin': '*' } }) : json({ error: message }, 400);
   }
   const headers = new Headers({ 'Content-Type': 'application/json' });
@@ -394,7 +397,7 @@ async function watchAsk(request, url, env, dataset) {
   const answer = await response.json();
   if (!text) return json(answer, response.status, { 'Access-Control-Allow-Origin': '*' });
   // Siri reads the body aloud, so an error is said as text with status 200.
-  return new Response(spokenAnswer(answer), { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' } });
+  return new Response(spokenAnswer(answer, new Date(), lang), { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' } });
 }
 
 export async function handleApi(request, env = {}, dataset = []) {
