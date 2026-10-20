@@ -23,7 +23,7 @@ const SCENARIOS = [
     match: 'ноч|night|түн|необычн|unusual|ерекше', title: { ru: 'Необычное ночью, 23:30', kk: 'Түнде ерекше бір нәрсе, 23:30', en: 'Something unusual at night, 23:30' } },
 ];
 // What the results screen and the place card read; the rest of the engine's answer stays out of the file.
-const KEEP = ['recommendations', 'warnings', 'unconfirmed', 'understood', 'route', 'nearestBeyondLimits', 'generation'];
+const KEEP = ['recommendations', 'warnings', 'warningKeys', 'unconfirmed', 'unconfirmedKeys', 'understood', 'route', 'nearestBeyondLimits', 'generation'];
 
 export function demoAnswers(places) {
   const scenarios = SCENARIOS.map(({ id, title, match, start, minutes, maxWalkMinutes, time, query }) => {

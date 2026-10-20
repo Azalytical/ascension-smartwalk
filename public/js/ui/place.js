@@ -9,6 +9,7 @@ import { timeRing } from './ring.js';
 import { categoryArt, categoryName, hoursStatus, hoursChip, navLinks, share, backTime, confidenceChip, notabilityChip, versusText, backButton, watchButton, listenButton } from './common.js';
 import { toast } from './toast.js';
 import { ratingBlock, ratingChip } from './rating.js';
+import { confidenceReasons, notabilityReasons, planSteps } from './server-text.js';
 
 const WHEELCHAIR = { yes: 'place.wheelchair.yes', limited: 'place.wheelchair.limited', no: 'place.wheelchair.no' };
 
@@ -46,8 +47,8 @@ export function placeView({ place, timing, start, serverHours, why, activities =
     ['check', 'good', t('place.check.in', { source: sourceName })],
     ['check', 'good', t('place.check.coords')],
     place.openingHours ? ['check', 'good', t('place.check.hours')] : ['info', 'muted', t('place.check.noHours')],
-    ...(place.confidence?.reasons || []).slice(0, 3).map((reason) => ['info', 'muted', capitalize(reason)]),
-    ...(place.notability?.reasons?.length ? [['info', 'muted', t('place.check.notability', { list: place.notability.reasons.join(', ') })]] : []),
+    ...confidenceReasons(place).slice(0, 3).map((reason) => ['info', 'muted', capitalize(reason)]),
+    ...(notabilityReasons(place).length ? [['info', 'muted', t('place.check.notability', { list: notabilityReasons(place).join(', ') })]] : []),
     ['info', 'muted', t('place.check.ratings')],
     ['info', 'muted', t('place.check.live')],
   ];
@@ -58,7 +59,7 @@ export function placeView({ place, timing, start, serverHours, why, activities =
   const friends = window.SeruenSocial?.planMeetup
     ? h('button', { class: 'btn btn-quiet btn-sm', type: 'button', onclick: () => window.SeruenSocial.planMeetup({ id: place.id, name: place.name, lat: place.lat, lon: place.lon, category: place.category }) }, icon('friends'), t('place.friends'))
     : null;
-  const steps = Array.isArray(place.plan?.steps) ? place.plan.steps : [];
+  const steps = planSteps(place);
   const pairing = place.pairing?.name ? place.pairing : null;
 
   return h('article', { class: 'view place-view', 'aria-labelledby': 'place-title' },

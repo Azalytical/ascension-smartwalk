@@ -314,24 +314,29 @@ const OUTDOOR = ['park', 'attraction', 'playground'];
  */
 function confidenceFor(poi, hours, constraints) {
   let points = 2;
-  const reasons = [];
-  if (hours?.status === 'open') { points++; reasons.push(`режим работы из источника покрывает весь визит${hours.closesAt ? ` (до ${hours.closesAt})` : ''}`); }
-  else if (hours?.status === 'unknown') { points--; reasons.push('формат режима работы не разобран'); }
-  else if (!poi.openingHours && OUTDOOR.includes(poi.category)) reasons.push('открытая территория, режим работы в источнике не указан');
-  else if (!poi.openingHours) { points--; reasons.push('режим работы неизвестен'); }
-  if (poi.nameIsGenerated) { points--; reasons.push('название в источнике не указано'); }
-  if (poi.source?.id && poi.source.id !== 'osm') reasons.push(`данные ${poi.source.label ?? 'внешнего источника'}`);
+  const items = [];
+  const add = (key, text, params = {}) => items.push({ key, params, text });
+  if (hours?.status === 'open') { points++; add('hoursCover', `режим работы из источника покрывает весь визит${hours.closesAt ? ` (до ${hours.closesAt})` : ''}`, { closesAt: hours.closesAt ?? null }); }
+  else if (hours?.status === 'unknown') { points--; add('hoursUnparsed', 'формат режима работы не разобран'); }
+  else if (!poi.openingHours && OUTDOOR.includes(poi.category)) add('openArea', 'открытая территория, режим работы в источнике не указан');
+  else if (!poi.openingHours) { points--; add('hoursUnknown', 'режим работы неизвестен'); }
+  if (poi.nameIsGenerated) { points--; add('noName', 'название в источнике не указано'); }
+  if (poi.source?.id && poi.source.id !== 'osm') add('external', `данные ${poi.source.label ?? 'внешнего источника'}`, { source: poi.source.label ?? null });
   if (constraints.accessible) {
     const wheelchair = wheelchairOf(poi);
-    if (wheelchair === 'yes') { points++; reasons.push('в источнике отмечен доступ для коляски'); }
-    else { points--; reasons.push(wheelchair === 'limited' ? 'доступ для коляски в источнике ограниченный' : 'безбарьерность в источнике не указана'); }
+    if (wheelchair === 'yes') { points++; add('wheelchairYes', 'в источнике отмечен доступ для коляски'); }
+    else if (wheelchair === 'limited') { points--; add('wheelchairLimited', 'доступ для коляски в источнике ограниченный'); }
+    else { points--; add('wheelchairUnknown', 'безбарьерность в источнике не указана'); }
   }
   const level = points >= 3 ? 'high' : points === 2 ? 'medium' : 'low';
   return { level, label: { high: 'Высокая уверенность', medium: 'Средняя уверенность', low: 'Низкая уверенность' }[level],
-    basis: 'data_completeness', reasons };
+    basis: 'data_completeness', ...split(items, 'reasons', 'reasonKeys') };
 }
 
 const sourceLabel = poi => poi.source?.label ?? 'OpenStreetMap';
+// Texts below are Russian; each also goes out as a key with params, so the app can say it in Kazakh or English.
+// The Russian text stays for the watch, Telegram, Gemini and older clients.
+const split = (items, texts, keys) => ({ [texts]: items.map(item => item.text), [keys]: items.map(({ key, params }) => ({ key, params })) });
 
 function provenanceFor(poi) {
   return {
@@ -348,25 +353,30 @@ function planFor(pick, constraints, reference, pairing) {
   const { poi, walkMinutes, visitMinutes, returnMinutes } = pick;
   const activity = (activitiesFor(poi.category)?.[0] ?? '').split(';')[0].replace(/\.$/, '');
   const steps = [`${walkMinutes} мин пешком до «${poi.name}»`, `${visitMinutes} мин на месте: ${activity.charAt(0).toLocaleLowerCase('ru')}${activity.slice(1)}`];
-  if (pairing) steps.push(`если останется время, ${pairing.label} «${pairing.name}» в ${pairing.distanceMeters} м (+${pairing.extraMinutes} мин)`);
-  if (constraints.returnToStart) steps.push(`${returnMinutes} мин обратно`);
+  const stepKeys = [{ key: 'walk', params: { minutes: walkMinutes, name: poi.name } }, { key: 'visit', params: { minutes: visitMinutes, category: poi.category } }];
+  if (pairing) {
+    steps.push(`если останется время, ${pairing.label} «${pairing.name}» в ${pairing.distanceMeters} м (+${pairing.extraMinutes} мин)`);
+    stepKeys.push({ key: pairing.category === 'cafe' ? 'pairingCafe' : 'pairingWalk', params: { name: pairing.name, meters: pairing.distanceMeters, extra: pairing.extraMinutes } });
+  }
+  if (constraints.returnToStart) { steps.push(`${returnMinutes} мин обратно`); stepKeys.push({ key: 'back', params: { minutes: returnMinutes } }); }
   const busy = walkMinutes + visitMinutes + returnMinutes;
   const reserve = constraints.safetyReserveMinutes;
   const backAt = reference ? localClock(new Date(reference.getTime() + busy * 60000)) : null;
   // «С запасом до»: the same clock time plus the reserve the visitor chose.
   const spareUntil = reference ? localClock(new Date(reference.getTime() + (busy + reserve) * 60000)) : null;
-  return { steps, text: `План: ${steps.join(' → ')}.${backAt ? ` ${constraints.returnToStart ? 'Вернётесь' : 'Закончите'} примерно к ${backAt}.` : ''}`,
+  return { steps, stepKeys, text: `План: ${steps.join(' → ')}.${backAt ? ` ${constraints.returnToStart ? 'Вернётесь' : 'Закончите'} примерно к ${backAt}.` : ''}`,
     leaveAt: reference ? localClock(reference) : null, backAt, spareUntil, reserveMinutes: reserve, isEstimate: true };
 }
 
 function hoursWarning(poi, hours) {
-  if (!poi.openingHours) return 'Режим работы неизвестен; открытие в момент визита не подтверждено.';
+  if (!poi.openingHours) return { key: 'hoursUnknown', params: {}, text: 'Режим работы неизвестен; открытие в момент визита не подтверждено.' };
   if (hours?.status === 'open') {
-    return `По режиму работы из источника место открыто на всё время визита${hours.closesAt ? ` (до ${hours.closesAt})` : ', круглосуточно'}; `
-      + 'открытие в момент визита, праздники и исключения не проверены.';
+    return { key: 'hoursOpen', params: { closesAt: hours.closesAt ?? null },
+      text: `По режиму работы из источника место открыто на всё время визита${hours.closesAt ? ` (до ${hours.closesAt})` : ', круглосуточно'}; `
+        + 'открытие в момент визита, праздники и исключения не проверены.' };
   }
-  if (hours?.status === 'unknown') return 'Указан режим работы из источника, но его формат не разобран автоматически; открытие в момент визита и исключения не проверены.';
-  return 'Указан режим работы из источника; открытие в момент визита и исключения не проверены.';
+  if (hours?.status === 'unknown') return { key: 'hoursUnparsed', params: {}, text: 'Указан режим работы из источника, но его формат не разобран автоматически; открытие в момент визита и исключения не проверены.' };
+  return { key: 'hoursUnchecked', params: {}, text: 'Указан режим работы из источника; открытие в момент визита и исключения не проверены.' };
 }
 
 const SOCKET_WISH = /розет|socket|outlet|қуат|заряд/i;
@@ -375,39 +385,45 @@ const QUIET_WISH = /тих|quiet|тыныш|спокой/i;
 /** Wishes from the request that no source confirms, so an answer must say they are unchecked rather than imply them. */
 function unconfirmedFor(constraints, recommendations) {
   const items = [];
-  if (SOCKET_WISH.test(constraints.query)) items.push('розетки');
-  if (QUIET_WISH.test(constraints.query)) items.push('тишина');
-  if (constraints.accessible && !(recommendations.length && recommendations.every(rec => rec.wheelchair === 'yes'))) items.push('безбарьерность');
-  if (constraints.groupSize || constraints.group) items.push(constraints.groupSize ? `места для ${constraints.groupSize} человек` : 'места для компании');
-  if (constraints.withChild) items.push('безопасность и оснащённость для ребёнка');
-  return items;
+  const add = (key, text, params = {}) => items.push({ key, params, text });
+  if (SOCKET_WISH.test(constraints.query)) add('sockets', 'розетки');
+  if (QUIET_WISH.test(constraints.query)) add('quiet', 'тишина');
+  if (constraints.accessible && !(recommendations.length && recommendations.every(rec => rec.wheelchair === 'yes'))) add('access', 'безбарьерность');
+  if (constraints.groupSize) add('groupSize', `места для ${constraints.groupSize} человек`, { size: constraints.groupSize });
+  else if (constraints.group) add('group', 'места для компании');
+  if (constraints.withChild) add('child', 'безопасность и оснащённость для ребёнка');
+  return split(items, 'unconfirmed', 'unconfirmedKeys');
 }
 
 function warningsFor(poi, constraints, hours) {
-  const warnings = [hoursWarning(poi, hours),
-  'Время посещения — плановая оценка, без очередей, билетов и текущей загрузки.'];
-  if (!poi.retrievedAt) warnings.push('Дата получения сведений об этом месте неизвестна.');
+  const items = [hoursWarning(poi, hours)];
+  const add = (key, text, params = {}) => items.push({ key, params, text });
+  add('visitEstimate', 'Время посещения — плановая оценка, без очередей, билетов и текущей загрузки.');
+  if (!poi.retrievedAt) add('noRetrievedAt', 'Дата получения сведений об этом месте неизвестна.');
   const access = normalize(poi.access ?? (poi.tags && !Array.isArray(poi.tags) ? poi.tags.access : null));
-  if (!access) warnings.push('Условия входа и доступ на территорию неизвестны; уточните перед выходом.');
-  else warnings.push(`Условия доступа в источнике: ${access}. Актуальные ограничения на вход не проверены.`);
+  if (!access) add('accessUnknown', 'Условия входа и доступ на территорию неизвестны; уточните перед выходом.');
+  else add('access', `Условия доступа в источнике: ${access}. Актуальные ограничения на вход не проверены.`, { access });
   if (poi.source?.id && poi.source.id !== 'osm') {
-    warnings.push(`Место из ${poi.source.label ?? 'внешнего источника'}: координаты и актуальность взяты из страниц бизнеса, режим работы неизвестен.`);
+    add('external', `Место из ${poi.source.label ?? 'внешнего источника'}: координаты и актуальность взяты из страниц бизнеса, режим работы неизвестен.`, { source: poi.source.label ?? null });
   }
   if (poi.nameIsGenerated) {
-    warnings.push(poi.landmark ? `Название в источнике не указано; подписали по ближайшему месту «${poi.landmark.name}» (${poi.landmark.distanceMeters} м), ориентируйтесь по точке на карте.`
-      : 'Название в источнике не указано; ориентируйтесь по точке на карте.');
+    if (poi.landmark) {
+      add('nameNear', `Название в источнике не указано; подписали по ближайшему месту «${poi.landmark.name}» (${poi.landmark.distanceMeters} м), ориентируйтесь по точке на карте.`,
+        { landmark: poi.landmark.name, meters: poi.landmark.distanceMeters });
+    } else add('noName', 'Название в источнике не указано; ориентируйтесь по точке на карте.');
   }
-  if (constraints.withChild) warnings.push('Категория подходит для поиска прогулки с ребёнком; безопасность, возрастные ограничения и доступность не проверены.');
-  if (SOCKET_WISH.test(constraints.query)) warnings.push('Наличие доступных посетителю розеток не подтверждено.');
-  if (QUIET_WISH.test(constraints.query)) warnings.push('Тишина и текущий уровень шума не подтверждены.');
+  if (constraints.withChild) add('child', 'Категория подходит для поиска прогулки с ребёнком; безопасность, возрастные ограничения и доступность не проверены.');
+  if (SOCKET_WISH.test(constraints.query)) add('socket', 'Наличие доступных посетителю розеток не подтверждено.');
+  if (QUIET_WISH.test(constraints.query)) add('quiet', 'Тишина и текущий уровень шума не подтверждены.');
   if (constraints.accessible || /коляск|wheelchair|доступн|арбамен|арба/i.test(constraints.query)) {
-    warnings.push(wheelchairOf(poi) === 'yes' ? 'В источнике отмечен доступ для коляски (wheelchair=yes); путь до входа и состояние пандуса не проверены.'
-      : 'Безбарьерность входа и всего пути не подтверждена.');
+    if (wheelchairOf(poi) === 'yes') add('wheelchairYes', 'В источнике отмечен доступ для коляски (wheelchair=yes); путь до входа и состояние пандуса не проверены.');
+    else add('wheelchairUnknown', 'Безбарьерность входа и всего пути не подтверждена.');
   }
-  if (constraints.night && OUTDOOR.includes(poi.category)) warnings.push('Поздно вечером выбирайте освещённые людные места; освещение и безопасность не проверены.');
-  if (constraints.night && poi.category === 'nightlife') warnings.push('Возрастные ограничения и фейс-контроль не проверены.');
-  if (constraints.groupSize || constraints.group) warnings.push(`Наличие мест${constraints.groupSize ? ` для ${constraints.groupSize} человек` : ' для компании'} не проверено; лучше позвонить или забронировать заранее.`);
-  return warnings;
+  if (constraints.night && OUTDOOR.includes(poi.category)) add('nightOutdoor', 'Поздно вечером выбирайте освещённые людные места; освещение и безопасность не проверены.');
+  if (constraints.night && poi.category === 'nightlife') add('nightlife', 'Возрастные ограничения и фейс-контроль не проверены.');
+  if (constraints.groupSize) add('groupSize', `Наличие мест для ${constraints.groupSize} человек не проверено; лучше позвонить или забронировать заранее.`, { size: constraints.groupSize });
+  else if (constraints.group) add('group', 'Наличие мест для компании не проверено; лучше позвонить или забронировать заранее.');
+  return split(items, 'warnings', 'warningKeys');
 }
 
 const GAMBLING = /(?:^|[^\p{L}])(?:бк|букмекер\p{L}*|казино|casino|betting|1xbet|parimatch|olimpbet|fonbet)(?:[^\p{L}]|$)|fairplay\.kz/iu;
@@ -510,18 +526,19 @@ function groupFormat(poi, kind) {
  */
 export function notabilityFor(poi) {
   const tags = poi.tags && !Array.isArray(poi.tags) ? poi.tags : {};
-  const reasons = [];
+  const items = [];
+  const add = (key, text, params = {}) => items.push({ key, params, text });
   let points = 0;
-  if (poi.wikidata || tags.wikidata) { points += 2; reasons.push('есть в Wikidata'); }
-  if (poi.wikipedia || tags.wikipedia) { points += 1; reasons.push('есть статья в Википедии'); }
+  if (poi.wikidata || tags.wikidata) { points += 2; add('wikidata', 'есть в Wikidata'); }
+  if (poi.wikipedia || tags.wikipedia) { points += 1; add('wikipedia', 'есть статья в Википедии'); }
   const sources = 1 + (Array.isArray(poi.alsoIn) ? new Set(poi.alsoIn.map(item => item?.source).filter(Boolean)).size : 0);
-  if (sources > 1) { points += 1; reasons.push(`есть в ${sources} открытых источниках`); }
+  if (sources > 1) { points += 1; add('sources', `есть в ${sources} открытых источниках`, { n: sources }); }
   const names = new Set([poi.name, poi.nameRu, poi.nameKk, poi.nameEn, ...(Array.isArray(poi.aliases) ? poi.aliases : [])]
     .filter(name => typeof name === 'string' && name.trim()).map(name => name.trim())).size;
-  if (names >= 4) { points += 1; reasons.push(`${names} вариантов названия на разных языках`); }
+  if (names >= 4) { points += 1; add('names', `${names} вариантов названия на разных языках`, { n: names }); }
   const level = points >= 3 ? 'high' : points >= 1 ? 'medium' : 'low';
   return { level, points, label: { high: 'Известное место по открытым данным', medium: 'Есть в открытых справочниках', low: 'Мало упоминаний в открытых данных' }[level],
-    reasons, basis: 'open_data_mentions', isRating: false };
+    ...split(items, 'reasons', 'reasonKeys'), basis: 'open_data_mentions', isRating: false };
 }
 
 function intentScore(poi, kind, hours, intents, wheelchair) {
@@ -569,27 +586,39 @@ function factsFor(poi) {
 function whyFor(pick, constraints, intents, reference) {
   const { poi, walkMinutes, totalMinutes, hours, categoryIntent, kindMatch } = pick;
   const label = capitalize(LABELS[poi.category]);
-  let match;
-  if (kindMatch || categoryIntent) match = `${label} — под ваш запрос${constraints.withChild ? ' с ребёнком' : ''}`;
-  else if (constraints.withChild) match = `${label} — подходит для прогулки с ребёнком по категории места`;
-  else if (intents.sightseeing && SIGHTS.includes(poi.category)) match = `${label} — можно осмотреть за отведённое время`;
-  else if (intents.night && hours?.status === 'open') match = `${label} — открыто на время визита по данным источника`;
-  else if (pick.weather?.bad && INDOOR.includes(poi.category)) match = `${label} — под крышей: сейчас ${pick.weather.text}`;
-  else if (intents.night && OUTDOOR.includes(poi.category)) match = `${label} — под открытым небом, режим работы для визита не нужен по категории места`;
-  else if (intents.unusual && UNUSUAL.includes(poi.category)) match = `${label} — под запрос «что-то необычное»: не сетевое заведение`;
-  else match = `${label} рядом с выбранной точкой`;
-  if (intents.accessible && wheelchairOf(poi) === 'yes') match += ', в источнике отмечен доступ для коляски';
+  const category = poi.category;
+  // `parts` say the same as the text, piece by piece, for the app's Kazakh and English.
+  let match, part;
+  if (kindMatch || categoryIntent) { match = `${label} — под ваш запрос${constraints.withChild ? ' с ребёнком' : ''}`; part = { key: 'request', params: { category, child: Boolean(constraints.withChild) } }; }
+  else if (constraints.withChild) { match = `${label} — подходит для прогулки с ребёнком по категории места`; part = { key: 'child', params: { category } }; }
+  else if (intents.sightseeing && SIGHTS.includes(poi.category)) { match = `${label} — можно осмотреть за отведённое время`; part = { key: 'sightseeing', params: { category } }; }
+  else if (intents.night && hours?.status === 'open') { match = `${label} — открыто на время визита по данным источника`; part = { key: 'nightOpen', params: { category } }; }
+  else if (pick.weather?.bad && INDOOR.includes(poi.category)) {
+    match = `${label} — под крышей: сейчас ${pick.weather.text}`;
+    part = { key: 'roof', params: { category, degrees: pick.weather.degrees, condition: pick.weather.kind } };
+  } else if (intents.night && OUTDOOR.includes(poi.category)) { match = `${label} — под открытым небом, режим работы для визита не нужен по категории места`; part = { key: 'nightOutdoor', params: { category } }; }
+  else if (intents.unusual && UNUSUAL.includes(poi.category)) { match = `${label} — под запрос «что-то необычное»: не сетевое заведение`; part = { key: 'unusual', params: { category } }; }
+  else { match = `${label} рядом с выбранной точкой`; part = { key: 'near', params: { category } }; }
+  const parts = [part];
+  if (intents.accessible && wheelchairOf(poi) === 'yes') { match += ', в источнике отмечен доступ для коляски'; parts.push({ key: 'wheelchair', params: {} }); }
   const format = intents.group && !poi.nameIsGenerated ? groupFormat(poi, pick.kind) : null;
-  if (format) match += `; для компании${constraints.groupSize ? ` из ${constraints.groupSize}` : ''} по данным источника: ${format}`;
+  if (format) {
+    match += `; для компании${constraints.groupSize ? ` из ${constraints.groupSize}` : ''} по данным источника: ${format}`;
+    parts.push({ key: 'groupFormat', params: { size: constraints.groupSize ?? null, format } });
+  }
   const facts = factsFor(poi).filter(fact => fact !== format);
-  if (facts.length) match += `; ${format ? 'также' : 'по данным источника'}: ${facts.join(', ')}`;
+  if (facts.length) { match += `; ${format ? 'также' : 'по данным источника'}: ${facts.join(', ')}`; parts.push({ key: format ? 'factsAlso' : 'facts', params: { facts } }); }
   // The clock time below is the same «вернётесь к» as plan.backAt and the app: the way there, the visit and back; the reserve is spare.
   const reserve = constraints.safetyReserveMinutes;
   const time = `примерно ${walkMinutes} мин в одну сторону, ${totalMinutes - reserve} мин ${constraints.returnToStart ? 'туда, на месте и обратно' : 'туда и на месте'}`
     + ` и ещё ${reserve} мин в запасе из ваших ${constraints.minutes}`;
+  parts.push({ key: 'time', params: { walk: walkMinutes, busy: totalMinutes - reserve, returnToStart: Boolean(constraints.returnToStart), reserve, minutes: constraints.minutes } });
   const open = hours?.status === 'open' ? `; по режиму работы из источника открыто ${hours.closesAt ? `до ${hours.closesAt}` : 'круглосуточно'}` : '';
-  const back = reference ? `; ${constraints.returnToStart ? 'вернётесь' : 'закончите'} примерно к ${localClock(new Date(reference.getTime() + (totalMinutes - reserve) * 60000))}` : '';
-  return `${match}; ${time}${open}${back}.`;
+  if (open) parts.push({ key: 'open', params: { closesAt: hours.closesAt ?? null } });
+  const backAt = reference ? localClock(new Date(reference.getTime() + (totalMinutes - reserve) * 60000)) : null;
+  const back = backAt ? `; ${constraints.returnToStart ? 'вернётесь' : 'закончите'} примерно к ${backAt}` : '';
+  if (backAt) parts.push({ key: 'back', params: { at: backAt, returnToStart: Boolean(constraints.returnToStart) } });
+  return { text: `${match}; ${time}${open}${back}.`, parts };
 }
 
 /** The nearest named place within 250 m, so a nameless «Фонтан» or «Детская площадка» can be told apart and found. */
@@ -709,23 +738,33 @@ function seeded(seed) {
 
 /** What the system used to answer: shown to the visitor, as the task requires. */
 function understoodFor(constraints, requested, excluded, intents, reference, nightShift, weather, weatherRoof, meant) {
+  // `params` carry what the label says, so the app can put it in Kazakh or English.
   const items = [
-    { key: 'location', label: 'Точка старта: используется только для расчёта, не сохраняется и не передаётся модели' },
+    { key: 'location', label: 'Точка старта: используется только для расчёта, не сохраняется и не передаётся модели', params: {} },
     { key: 'time', label: `${constraints.minutes} мин всего, до ${constraints.maxWalkMinutes} мин пешком в одну сторону${constraints.returnToStart ? ', с возвращением' : ''}`
-      + `, запас ${constraints.safetyReserveMinutes} мин` },
+      + `, запас ${constraints.safetyReserveMinutes} мин`,
+    params: { minutes: constraints.minutes, maxWalk: constraints.maxWalkMinutes, returnToStart: Boolean(constraints.returnToStart), reserve: constraints.safetyReserveMinutes } },
   ];
-  if (requested.length) items.push({ key: 'categories', label: `Категории: ${requested.map(category => CATEGORY_NAMES[category]).join(', ')}` });
-  if (meant.length) items.push({ key: 'semantic', label: `Смысл запроса по эмбеддингам Gemini: ${meant.map(category => CATEGORY_NAMES[category]).join(', ')}` });
-  if (excluded.length) items.push({ key: 'excluded', label: `Без: ${excluded.map(category => CATEGORY_NAMES[category]).join(', ')}` });
-  if (constraints.withChild) items.push({ key: 'child', label: constraints.withChildFromQuery ? 'С ребёнком (понято из запроса)' : 'С ребёнком' });
-  if (intents.sightseeing) items.push({ key: 'sightseeing', label: 'Посмотреть город: достопримечательности, музеи, парки' });
-  if (intents.night) items.push({ key: 'night', label: nightShift ? 'Поздно вечером: режим работы проверен на сегодня, 22:00' : 'Поздно вечером: только места, открытые на время визита' });
-  if (intents.unusual) items.push({ key: 'unusual', label: 'Необычное: выше места культуры и городские объекты, ниже сетевые заведения' });
-  if (intents.group) items.push({ key: 'group', label: intents.groupSize ? `Компания из ${intents.groupSize} человек` : 'Компания' });
-  if (intents.accessible) items.push({ key: 'accessible', label: 'Доступно для коляски: места, где в данных отмечено «нет», убраны' });
-  if (intents.quiet) items.push({ key: 'quiet', label: 'Спокойное место: ниже бары, фастфуд и торговые центры' });
-  if (weather) items.push({ key: 'weather', label: `Погода сейчас: ${weather.text} (Open-Meteo)${weatherRoof ? ', поэтому только места под крышей' : ''}` });
-  if (reference && !nightShift) items.push({ key: 'hours', label: `Режим работы проверен на ${localClock(reference)}` });
+  if (requested.length) items.push({ key: 'categories', label: `Категории: ${requested.map(category => CATEGORY_NAMES[category]).join(', ')}`, params: { categories: requested } });
+  if (meant.length) items.push({ key: 'semantic', label: `Смысл запроса по эмбеддингам Gemini: ${meant.map(category => CATEGORY_NAMES[category]).join(', ')}`, params: { categories: meant } });
+  if (excluded.length) items.push({ key: 'excluded', label: `Без: ${excluded.map(category => CATEGORY_NAMES[category]).join(', ')}`, params: { categories: excluded } });
+  if (constraints.withChild) {
+    items.push({ key: 'child', label: constraints.withChildFromQuery ? 'С ребёнком (понято из запроса)' : 'С ребёнком', params: { fromQuery: Boolean(constraints.withChildFromQuery) } });
+  }
+  if (intents.sightseeing) items.push({ key: 'sightseeing', label: 'Посмотреть город: достопримечательности, музеи, парки', params: {} });
+  if (intents.night) {
+    items.push({ key: 'night', label: nightShift ? 'Поздно вечером: режим работы проверен на сегодня, 22:00' : 'Поздно вечером: только места, открытые на время визита',
+      params: { shifted: Boolean(nightShift) } });
+  }
+  if (intents.unusual) items.push({ key: 'unusual', label: 'Необычное: выше места культуры и городские объекты, ниже сетевые заведения', params: {} });
+  if (intents.group) items.push({ key: 'group', label: intents.groupSize ? `Компания из ${intents.groupSize} человек` : 'Компания', params: { size: intents.groupSize ?? null } });
+  if (intents.accessible) items.push({ key: 'accessible', label: 'Доступно для коляски: места, где в данных отмечено «нет», убраны', params: {} });
+  if (intents.quiet) items.push({ key: 'quiet', label: 'Спокойное место: ниже бары, фастфуд и торговые центры', params: {} });
+  if (weather) {
+    items.push({ key: 'weather', label: `Погода сейчас: ${weather.text} (Open-Meteo)${weatherRoof ? ', поэтому только места под крышей' : ''}`,
+      params: { degrees: weather.degrees, condition: weather.kind, roof: Boolean(weatherRoof) } });
+  }
+  if (reference && !nightShift) items.push({ key: 'hours', label: `Режим работы проверен на ${localClock(reference)}`, params: { at: localClock(reference) } });
   return items;
 }
 
@@ -963,54 +1002,65 @@ export function recommend(dataset, input, context = {}) {
       evidence.push({ field: 'address', label: 'Адрес из источника', value: poi.address, sourceUrl: addressUrl, retrievedAt: poi.retrievedAt ?? null });
     }
     const pairing = pairingFor(pick, prepared, constraints, reference, pickedIds);
+    const why = whyFor({ ...pick, weather }, constraints, intents, reference);
     return { ...poi, kind: pick.kind, distanceMeters: Math.ceil(directDistance), estimatedWalkDistanceMeters: Math.ceil(directDistance * DETOUR),
       walkMinutes, visitMinutes, returnMinutes, safetyReserveMinutes: reserve, totalMinutes,
-      why: whyFor({ ...pick, weather }, constraints, intents, reference), activities: activitiesFor(category), activitiesAreSuggestions: true,
+      why: why.text, whyKeys: why.parts, activities: activitiesFor(category), activitiesAreSuggestions: true,
       plan: planFor({ ...pick, poi }, constraints, reference, pairing), pairing,
       confidence: confidenceFor(poi, hours, constraints), notability: notabilityFor(poi), provenance: provenanceFor(poi), wheelchair: wheelchairOf(poi),
       // People's stars, kept apart from notability (open data): shown as «Оценки пользователей Aidem».
       ...(ratings ? { userRating: ratingSummary(ratings.get(String(pick.poi.id))?.count, ratings.get(String(pick.poi.id))?.sum) } : {}),
-      warnings: warningsFor(poi, constraints, hours), evidence, score, scoreBreakdown, matchedTerms,
+      ...warningsFor(poi, constraints, hours), evidence, score, scoreBreakdown, matchedTerms,
       hoursCheck: hours ?? { status: poi.openingHours ? 'not_checked' : 'no_data' } };
   });
   versusFor(recommendations.map((card, index) => ({ ...card, kindMatch: picks[index].kindMatch, categoryIntent: picks[index].categoryIntent || picks[index].nameMatch })),
     { weather, surprise, intents }).forEach((versus, index) => { recommendations[index].versus = versus; });
   const route = surprise ? null : microRoute(candidates, { ...constraints, foodFocus: requested.length > 0 && requested.every(category => FOOD.includes(category)), routeAsked: intents.route === true }, reference, walkBetween);
-  const warnings = [
-    'Расстояние указано по прямой. Время пешком — оценка: расстояние × 1,35 при 4,2 км/ч; переходы, ограждения, входы и погода не проверены.',
-    `Каждая карточка — отдельный вариант прогулки. В суммарное время входят путь, посещение, выбранный возврат и резерв ${reserve} минут.`,
-    'Актуальное открытие мест, цены и наличие свободных мест не проверены.',
-  ];
+  // Each note also goes to warningKeys at the same index, as a key with params for the app's Kazakh and English.
+  const warnings = [];
+  const warningKeys = [];
+  const note = (key, text, params = {}, first = false) => { warnings[first ? 'unshift' : 'push'](text); warningKeys[first ? 'unshift' : 'push']({ key, params }); };
+  note('distance', 'Расстояние указано по прямой. Время пешком — оценка: расстояние × 1,35 при 4,2 км/ч; переходы, ограждения, входы и погода не проверены.');
+  note('cards', `Каждая карточка — отдельный вариант прогулки. В суммарное время входят путь, посещение, выбранный возврат и резерв ${reserve} минут.`, { reserve });
+  note('live', 'Актуальное открытие мест, цены и наличие свободных мест не проверены.');
   if (namedMissed && !recommendations.some(rec => rec.scoreBreakdown.name >= namedMissed.score)) {
     const { poi, reason, walkMinutes, totalMinutes } = namedMissed;
-    warnings.push(reason === 'closed'
-      ? `«${poi.name}» по режиму работы из источника закрыто к моменту визита, поэтому его нет среди вариантов.`
-      : `«${poi.name}» не помещается: около ${walkMinutes} мин пешком в одну сторону, нужно примерно ${totalMinutes} мин${constraints.returnToStart ? ' с возвращением' : ''}.`);
+    if (reason === 'closed') note('namedClosed', `«${poi.name}» по режиму работы из источника закрыто к моменту визита, поэтому его нет среди вариантов.`, { name: poi.name });
+    else {
+      note('namedTooFar', `«${poi.name}» не помещается: около ${walkMinutes} мин пешком в одну сторону, нужно примерно ${totalMinutes} мин${constraints.returnToStart ? ' с возвращением' : ''}.`,
+        { name: poi.name, walk: walkMinutes, needed: totalMinutes, returnToStart: Boolean(constraints.returnToStart) });
+    }
   }
   if (kinds.length && !kindMatches.length && recommendations.length) {
-    warnings.push('Мест именно этого вида в пределах вашего времени не нашлось; ниже ближайшие варианты той же категории.');
+    note('kindMissing', 'Мест именно этого вида в пределах вашего времени не нашлось; ниже ближайшие варианты той же категории.');
   }
-  if (constraints.visitDate && !reference) warnings.push('Указана дата без времени: режим работы на эту дату автоматически не проверяется.');
+  if (constraints.visitDate && !reference) note('dateNoTime', 'Указана дата без времени: режим работы на эту дату автоматически не проверяется.');
   if (weather?.bad && !weatherRoof && named.some(category => OUTDOOR.includes(category))) {
-    warnings.push(`Сейчас ${weather.text} по данным Open-Meteo: на улице оденьтесь по погоде или добавьте к запросу «под крышей».`);
+    note('weatherOutdoor', `Сейчас ${weather.text} по данным Open-Meteo: на улице оденьтесь по погоде или добавьте к запросу «под крышей».`,
+      { degrees: weather.degrees, condition: weather.kind });
   }
-  if (nightShift) warnings.push(`Ночной запрос сделан днём: режим работы проверен на сегодня, 22:00 (сейчас ${localClock(now)}).`);
-  if (counters.closedByHours) warnings.push(`Исключено мест, закрытых к моменту визита по режиму работы из источника: ${counters.closedByHours}.`);
-  if (counters.unknownHoursAtNight) warnings.push(`Поздно вечером не предлагаем заведения без режима работы в источнике: исключено ${counters.unknownHoursAtNight}.`);
-  if (counters.notAccessible) warnings.push(`Исключено мест, где в источнике отмечено отсутствие доступа для коляски: ${counters.notAccessible}.`);
+  if (nightShift) note('nightShift', `Ночной запрос сделан днём: режим работы проверен на сегодня, 22:00 (сейчас ${localClock(now)}).`, { now: localClock(now) });
+  if (counters.closedByHours) note('closedByHours', `Исключено мест, закрытых к моменту визита по режиму работы из источника: ${counters.closedByHours}.`, { n: counters.closedByHours });
+  if (counters.unknownHoursAtNight) {
+    note('unknownHoursAtNight', `Поздно вечером не предлагаем заведения без режима работы в источнике: исключено ${counters.unknownHoursAtNight}.`, { n: counters.unknownHoursAtNight });
+  }
+  if (counters.notAccessible) note('notAccessible', `Исключено мест, где в источнике отмечено отсутствие доступа для коляски: ${counters.notAccessible}.`, { n: counters.notAccessible });
   if (intents.accessible && recommendations.length && !recommendations.some(rec => rec.wheelchair === 'yes')) {
-    warnings.push('Среди подходящих по времени мест нет отмеченных в источнике как доступные для коляски; безбарьерность вариантов ниже не подтверждена.');
+    note('noAccessible', 'Среди подходящих по времени мест нет отмеченных в источнике как доступные для коляски; безбарьерность вариантов ниже не подтверждена.');
   }
   const nearestBeyondLimits = !recommendations.length && nearest ? { id: nearest.poi.id, name: nearest.poi.name, category: nearest.poi.category,
     walkMinutes: nearest.walkMinutes, neededMinutes: nearest.totalMinutes, sourceUrl: nearest.poi.sourceUrl, lat: nearest.poi.lat, lon: nearest.poi.lon,
     hoursChecked: false } : null;
-  if (!recommendations.length) warnings.unshift('В текущем наборе данных нет подтверждённых вариантов под все ограничения. Увеличьте время или измените категорию и точку старта.');
+  if (!recommendations.length) note('noResults', 'В текущем наборе данных нет подтверждённых вариантов под все ограничения. Увеличьте время или измените категорию и точку старта.', {}, true);
   if (nearestBeyondLimits) {
-    warnings.unshift(`Ближе всего подходит «${nearestBeyondLimits.name}» (${LABELS[nearestBeyondLimits.category]}): около ${nearestBeyondLimits.walkMinutes} мин пешком в одну сторону, `
+    note('nearestBeyond', `Ближе всего подходит «${nearestBeyondLimits.name}» (${LABELS[nearestBeyondLimits.category]}): около ${nearestBeyondLimits.walkMinutes} мин пешком в одну сторону, `
       + `нужно примерно ${nearestBeyondLimits.neededMinutes} мин${constraints.returnToStart ? ' с возвращением' : ''}. Режим работы для него не проверялся. `
       + `${[nearestBeyondLimits.neededMinutes > constraints.minutes ? `Увеличьте время до ${nearestBeyondLimits.neededMinutes} мин` : '',
         nearestBeyondLimits.walkMinutes > constraints.maxWalkMinutes ? `разрешите до ${nearestBeyondLimits.walkMinutes} мин пешком в одну сторону` : '']
-        .filter(Boolean).join(' и ').replace(/^р/, 'Р')} или измените точку старта.`);
+        .filter(Boolean).join(' и ').replace(/^р/, 'Р')} или измените точку старта.`,
+      { name: nearestBeyondLimits.name, category: nearestBeyondLimits.category, walk: nearestBeyondLimits.walkMinutes, needed: nearestBeyondLimits.neededMinutes,
+        returnToStart: Boolean(constraints.returnToStart), moreTime: nearestBeyondLimits.neededMinutes > constraints.minutes,
+        moreWalk: nearestBeyondLimits.walkMinutes > constraints.maxWalkMinutes }, true);
   }
   // A category the visitor named but no card covers: say where the nearest one is and how much time it needs.
   const nearestMissing = recommendations.length ? named
@@ -1020,24 +1070,26 @@ export function recommend(dataset, input, context = {}) {
       return { category, id: poi.id, name: poi.name, walkMinutes, neededMinutes: totalMinutes, sourceUrl: poi.sourceUrl, lat: poi.lat, lon: poi.lon, hoursChecked: false };
     }) : [];
   for (const missing of [...nearestMissing].reverse()) {
-    warnings.unshift(`${capitalize(LABELS[missing.category])} в ваше время не помещается: ближайший вариант «${missing.name}», около ${missing.walkMinutes} мин пешком в одну сторону, `
-      + `нужно примерно ${missing.neededMinutes} мин${constraints.returnToStart ? ' с возвращением' : ''}. Режим работы для него не проверялся.`);
+    note('missingCategory', `${capitalize(LABELS[missing.category])} в ваше время не помещается: ближайший вариант «${missing.name}», около ${missing.walkMinutes} мин пешком в одну сторону, `
+      + `нужно примерно ${missing.neededMinutes} мин${constraints.returnToStart ? ' с возвращением' : ''}. Режим работы для него не проверялся.`,
+    { category: missing.category, name: missing.name, walk: missing.walkMinutes, needed: missing.neededMinutes, returnToStart: Boolean(constraints.returnToStart) }, true);
   }
   const beyondWalk = intents.sightseeing && recommendations.length && recommendations.length < 3 && nearestSight
     ? { id: nearestSight.poi.id, name: nearestSight.poi.name, category: nearestSight.poi.category, distanceMeters: Math.round(nearestSight.directDistance),
       walkMinutes: nearestSight.walkMinutes, needsTransport: true } : null;
   if (beyondWalk) {
     const km = (nearestSight.directDistance / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 });
-    warnings.unshift(`Пешком отсюда мест для осмотра мало. Ближайшее за пределами вашего времени: «${nearestSight.poi.name}», около ${km} км по прямой, `
-      + `примерно ${nearestSight.walkMinutes} мин пешком в одну сторону. Дальше нужен транспорт; его время сервис не считает.`);
+    note('beyondWalk', `Пешком отсюда мест для осмотра мало. Ближайшее за пределами вашего времени: «${nearestSight.poi.name}», около ${km} км по прямой, `
+      + `примерно ${nearestSight.walkMinutes} мин пешком в одну сторону. Дальше нужен транспорт; его время сервис не считает.`,
+    { name: nearestSight.poi.name, km: Math.round(nearestSight.directDistance / 100) / 10, walk: nearestSight.walkMinutes }, true);
   }
   const understood = understoodFor(constraints, requested, excluded, intents, reference, nightShift, weather, weatherRoof, meant);
   if (counters.excludedByUser) {
     const n = counters.excludedByUser;
-    understood.push({ key: 'hidden', label: `Не предлагаем ${n} ${fewOf(n, 'место', 'места', 'мест')}, ${fewOf(n, 'которое', 'которые', 'которые')} вы скрыли` });
+    understood.push({ key: 'hidden', label: `Не предлагаем ${n} ${fewOf(n, 'место', 'места', 'мест')}, ${fewOf(n, 'которое', 'которые', 'которые')} вы скрыли`, params: { n } });
   }
-  if (surprise) understood.push({ key: 'surprise', label: `Удиви меня: одно случайное место из ${surprise.poolSize} подходящих по времени и часам работы` });
-  return { recommendations, route, nearestBeyondLimits, nearestMissing, beyondWalk, constraints, warnings, unconfirmed: unconfirmedFor(constraints, recommendations),
+  if (surprise) understood.push({ key: 'surprise', label: `Удиви меня: одно случайное место из ${surprise.poolSize} подходящих по времени и часам работы`, params: { poolSize: surprise.poolSize } });
+  return { recommendations, route, nearestBeyondLimits, nearestMissing, beyondWalk, constraints, warnings, warningKeys, ...unconfirmedFor(constraints, recommendations),
     intents: Object.keys(intents).filter(key => intents[key] === true), understood, surprise,
     weather: weather ? { ...context.weather, condition: weather.label, text: weather.text, roofOnly: weatherRoof } : null,
     retrieval: { method: meant.length ? 'geo_keyword_retrieval_with_gemini_embeddings' : 'deterministic_geo_keyword_retrieval',

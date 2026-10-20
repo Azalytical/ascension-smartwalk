@@ -126,7 +126,10 @@ const FACTS = {
   'грузинская кухня': { en: 'Georgian food', kk: 'грузин асханасы' }, 'французская кухня': { en: 'French food', kk: 'француз асханасы' },
   'казахская кухня': { en: 'Kazakh food', kk: 'қазақ асханасы' }, 'узбекская кухня': { en: 'Uzbek food', kk: 'өзбек асханасы' },
   'тайская кухня': { en: 'Thai food', kk: 'тай асханасы' }, 'средиземноморская кухня': { en: 'Mediterranean food', kk: 'Жерорта теңізі асханасы' },
+  'караоке': { en: 'karaoke', kk: 'караоке' }, 'тематический ресторан': { en: 'theme restaurant', kk: 'тақырыптық мейрамхана' }, 'фудкорт': { en: 'food court', kk: 'фудкорт' },
 };
+/** A fact from the record (the server's Russian label) in the interface language, or null when there is no translation. */
+export const factName = (fact) => (lang() === 'ru' ? fact : FACTS[fact]?.[lang()] ?? null);
 export function versusText(place) {
   if (typeof place?.aiVersus === 'string' && place.aiVersus.trim()) return place.aiVersus.trim();
   const versus = place?.versus;
@@ -136,7 +139,7 @@ export function versusText(place) {
     if ((key === 'hoursConfirmed' || key === 'later') && !params.closesAt) return t(`vs.${key}Plain`);
     if (key === 'rated') return t('vs.rated', { average: Number(params.average).toLocaleString(lang() === 'en' ? 'en-GB' : 'ru-RU', { maximumFractionDigits: 1 }) });
     if (key === 'feature') {
-      const fact = lang() === 'ru' ? params.fact : FACTS[params.fact]?.[lang()];
+      const fact = factName(params.fact);
       return fact ? t('vs.feature', { fact }) : null;
     }
     return t(`vs.${key}`, { ...params, category: params.category ? categoryName(params.category).toLocaleLowerCase() : '' });
