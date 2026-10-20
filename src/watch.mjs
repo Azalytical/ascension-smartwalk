@@ -1,4 +1,5 @@
 import { recommend } from './retrieval.mjs';
+import { validateReminder } from './watch-push.mjs';
 
 // Compact plans for the watch client and voice assistants. Deterministic only: no language model,
 // so a glance on the wrist answers within one request and does not spend the Gemini quota.
@@ -56,13 +57,46 @@ function failure(message, status, text) {
   return new Response(JSON.stringify({ error: message }), { status, headers: { ...HEADERS, 'Content-Type': 'application/json; charset=utf-8' } });
 }
 
+function clientIp(request) {
+  return request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For')?.split(',')[0].trim() || 'anonymous';
+}
+
+async function handlePush(request, env, url) {
+  const hub = env.WATCH_PUSH ? env.WATCH_PUSH.get(env.WATCH_PUSH.idFromName('astana')) : env.WATCH_PUSH_LOCAL;
+  if (!hub) return failure('Напоминания на часы пока недоступны.', 503, false);
+  if (url.pathname === '/api/watch/push/key') {
+    if (request.method !== 'GET') return failure('Метод не поддерживается', 405, false);
+    return hub.fetch(new Request('https://watch.internal/key'));
+  }
+  const action = { '/api/watch/push/remind': 'schedule', '/api/watch/push/cancel': 'cancel' }[url.pathname];
+  if (!action) return null;
+  if (request.method !== 'POST') return failure('Метод не поддерживается', 405, false);
+  const origin = request.headers.get('Origin');
+  if (origin && origin !== url.origin) return failure('Запрос должен исходить с сайта Seruen', 403, false);
+  if (!env.LOCAL_DEVELOPMENT && !allowed(clientIp(request))) return failure('Слишком много запросов. Попробуйте через минуту.', 429, false);
+  if (Number(request.headers.get('Content-Length')) > 4096) return failure('Запрос слишком большой', 413, false);
+  let body;
+  try { body = JSON.parse((await request.text()).slice(0, 4096)); } catch { return failure('Некорректный JSON', 400, false); }
+  let input;
+  if (action === 'cancel') {
+    if (typeof body?.id !== 'string' || !/^[0-9a-f-]{36}$/.test(body.id)) return failure('Некорректный идентификатор.', 400, false);
+    input = { id: body.id };
+  } else {
+    const checked = validateReminder(body);
+    if (checked.error) return failure(checked.error, 400, false);
+    input = { ...checked, subject: url.origin };
+  }
+  const response = await hub.fetch(new Request(`https://watch.internal/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
+  return new Response(await response.text(), { status: response.status, headers: { ...HEADERS, 'Content-Type': 'application/json; charset=utf-8' } });
+}
+
 export function handleWatch(request, env, pois) {
   const url = new URL(request.url);
+  if (url.pathname.startsWith('/api/watch/push/')) return handlePush(request, env, url);
   if (url.pathname !== '/api/watch/plan') return null;
   const text = url.searchParams.get('format') === 'text';
   if (!['GET', 'HEAD'].includes(request.method)) return failure('Метод не поддерживается', 405, false);
-  const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For')?.split(',')[0].trim() || 'anonymous';
-  if (!env.LOCAL_DEVELOPMENT && !allowed(ip)) return failure('Слишком много запросов. Попробуйте через минуту.', 429, text);
+  if (!env.LOCAL_DEVELOPMENT && !allowed(clientIp(request))) return failure('Слишком много запросов. Попробуйте через минуту.', 429, text);
   // Shortcuts on iOS may send a comma as the decimal separator.
   const number = name => Number(String(url.searchParams.get(name) ?? '').replace(',', '.'));
   const mood = url.searchParams.get('mood') || 'any';

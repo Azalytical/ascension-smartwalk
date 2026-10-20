@@ -10,7 +10,8 @@
   ];
   const TIMES = [30, 45, 60, 90, 120];
   const CATEGORIES = { cafe: ['coffee', 'Кафе'], restaurant: ['food', 'Поесть'], park: ['park', 'Парк'], playground: ['family', 'Площадка'],
-    museum: ['museum', 'Музей'], attraction: ['landmark', 'Интересное'], mall: ['indoor', 'Под крышей'], culture: ['museum', 'Культура'] };
+    museum: ['museum', 'Музей'], attraction: ['landmark', 'Интересное'], mall: ['indoor', 'Под крышей'], culture: ['museum', 'Культура'],
+    family: ['family', 'Для семьи'] };
   // Same estimate as the server: straight line × 1.35 at 4.2 km/h, plus a 5-minute reserve.
   const METERS_PER_MINUTE = 4200 / 60 / 1.35;
   const RESERVE_MINUTES = 5;
@@ -293,7 +294,8 @@
       deadline: now + state.plan.minutes * 60000, pos: { lat: start.lat, lon: start.lon }, accuracy: null, alerted: false, arrivedAt: null
     };
     setupRing(state.walk);
-    $('demo-badge').hidden = !state.demo;
+    setNote(state.demo ? 'ДЕМО ×30' : '');
+    if (window.SeruenRemind?.supported()) remindOnWrist(state.walk);
     $('view-go').classList.remove('late', 'over', 'stay', 'alert');
     if (!state.demo) {
       listenCompass();
@@ -312,7 +314,42 @@
     state.timer = setInterval(tick, state.demo ? 200 : 1000);
   }
 
+  function setNote(text) {
+    $('demo-badge').textContent = text;
+    $('demo-badge').hidden = !text;
+  }
+
+  // Reminders through the phone's notifications reach any paired watch or band, even with this page closed.
+  function remindOnWrist(walk) {
+    walk.leaveAt = walk.t0 + (state.plan.minutes - walk.place.returnMinutes - RESERVE_MINUTES) * 60000;
+    if (walk.demo) {
+      // Demo time is accelerated, so only ask for permission now; the notification goes out when the demo says "time to go back".
+      window.SeruenRemind.permission().catch(() => {});
+      return;
+    }
+    const name = walk.place.name.slice(0, 60);
+    const reminders = [];
+    if (walk.leaveAt - 5 * 60000 > Date.now() + 60000) {
+      reminders.push({ at: walk.leaveAt - 5 * 60000, tag: 'seruen-soon', title: 'Через 5 минут обратно',
+        body: `Выйдите из «${name}» в ${time(walk.leaveAt)}, чтобы вернуться к ${time(walk.deadline)}.` });
+    }
+    reminders.push({ at: Math.max(Date.now(), walk.leaveAt), tag: 'seruen-back', title: 'Пора обратно',
+      body: `До старта примерно ${walk.place.returnMinutes} мин пешком. Успеете к ${time(walk.deadline)}.` });
+    window.SeruenRemind.schedule(reminders).then((result) => {
+      if (!result.ok) return;
+      if (state.walk !== walk) { window.SeruenRemind.cancel(result.id); return; }
+      walk.reminderId = result.id;
+      setNote(`🔔 напомню в ${time(walk.leaveAt)}`);
+    });
+  }
+
+  function cancelReminders(walk) {
+    if (walk?.reminderId) window.SeruenRemind?.cancel(walk.reminderId);
+    if (walk) walk.reminderId = null;
+  }
+
   function stopWalk() {
+    cancelReminders(state.walk);
     clearInterval(state.timer);
     if (state.watchId !== undefined && state.watchId !== null) navigator.geolocation?.clearWatch(state.watchId);
     state.watchId = null;
@@ -345,6 +382,8 @@
     const view = $('view-go');
     view.classList.toggle('stay', phase === 'stay');
     walk.realStart = performance.now();
+    // Leaving early: the scheduled "time to go back" is no longer needed.
+    if (phase === 'back' && !walk.alerted) cancelReminders(walk);
     if (phase === 'stay') { walk.arrivedAt = clock(); buzz([70, 70, 70]); }
   }
 
@@ -357,6 +396,10 @@
     void view.offsetWidth;
     view.classList.add('alert');
     buzz([400, 150, 400, 150, 400]);
+    if (walk.demo && window.SeruenRemind?.supported() && Notification.permission === 'granted') {
+      window.SeruenRemind.schedule([{ at: Date.now(), tag: 'seruen-back', title: 'Пора обратно',
+        body: `До старта примерно ${walk.place.returnMinutes} мин пешком. Успеете к ${time(walk.deadline)}.` }]);
+    }
     setPhase('back');
   }
 
