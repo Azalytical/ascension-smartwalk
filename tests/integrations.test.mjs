@@ -443,3 +443,54 @@ test('agent latency: out of quota on the first call, the spare model answers', w
   assert.equal(globalThis.__models[0], SPARE_AGENT_MODEL);
   resetAgentState();
 }));
+
+test('agent steps carry a key and params for the Kazakh and English page; place reasons keep their keys away from Gemini', withFetch(async (url, init) => {
+  if (String(url).includes('open-meteo')) return jsonResponse(weatherBody);
+  const body = JSON.parse(init.body);
+  globalThis.__requests.push(body);
+  return jsonResponse(body.contents.some(content => content.role === 'model') ? answerTurn : toolsTurn);
+}, async () => {
+  resetAgentState(); globalThis.__requests = [];
+  const data = await runAgent({ query: 'кофе', ...START, minutes: 60 }, agentDeps());
+  const [weather, plan, answer] = data.steps;
+  assert.equal(weather.key, 'weather');
+  assert.deepEqual(weather.params, { available: true, temperature: -4, feelsLike: -11, wind: 12, code: 3, indoor: true });
+  assert.equal(plan.key, 'plan');
+  assert.equal(plan.params.minutes, 60);
+  assert.equal(plan.params.query, 'кофе');
+  assert.deepEqual(plan.params.places[0], { name: 'Кофейня у Байтерека', walk: data.places[0].walkMinutes, total: data.places[0].totalMinutes });
+  assert.deepEqual(answer, { ...answer, key: 'answer', params: { names: ['Кофейня у Байтерека'] } });
+  assert.ok(!/"lat"|"lon"|51\.12|71\.43/.test(JSON.stringify(data.steps.map(step => step.params))), 'step params hold no coordinates');
+  assert.ok(Array.isArray(data.places[0].whyKeys) && data.places[0].whyKeys.length, 'the page gets the keys of «Почему подходит»');
+  assert.ok(!JSON.stringify(globalThis.__requests).includes('whyKeys'), 'Gemini does not get them');
+}));
+
+test('agent: a typed query takes the page language where its letters cannot tell', async () => {
+  const deps = { ...agentDeps(), env: {} };
+  const kk = await runAgent({ query: 'кофе', ...START, minutes: 60, uiLang: 'kk' }, deps);
+  assert.match(kk.summary, /Төменде|Мұндай/);
+  const en = await runAgent({ query: 'coffee', ...START, minutes: 60, uiLang: 'kk' }, deps);
+  assert.match(en.summary, /Below|No places/);
+  const ru = await runAgent({ query: 'кофе', ...START, minutes: 60, uiLang: 'en' }, deps);
+  assert.match(ru.summary, /Ниже|Подходящих/);
+  const viaApi = await (await handleApi(new Request('https://demo.example/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: 'кофе', ...START, minutes: 60, uiLang: 'kk' }) }), env, pois)).json();
+  assert.match(viaApi.summary, /Төменде|Мұндай/);
+});
+
+test('agent page: every text exists in Russian, Kazakh and English, and steps show no raw JSON', async () => {
+  const { default: TEXT } = await import('../public/agent-i18n.js');
+  const html = readFileSync(new URL('../public/agent.html', import.meta.url), 'utf8');
+  const script = readFileSync(new URL('../public/agent.js', import.meta.url), 'utf8');
+  const pageKeys = [...html.matchAll(/data-i18n(?:-label|-placeholder|-q)?="([^"]+)"/g)].map(match => match[1]);
+  const scriptKeys = [...script.matchAll(/tr\('([^'$]+)'/g)].map(match => match[1]);
+  assert.ok(pageKeys.length > 30 && scriptKeys.length > 30);
+  for (const key of [...pageKeys, ...scriptKeys]) {
+    for (const lang of key.startsWith('s.') ? ['kk', 'en'] : ['ru', 'kk', 'en']) assert.ok(Object.hasOwn(TEXT[lang], key), `${lang}: ${key}`);
+  }
+  for (const key of Object.keys(TEXT.ru)) for (const lang of ['kk', 'en']) assert.ok(Object.hasOwn(TEXT[lang], key), `${lang}: ${key}`);
+  for (const tool of ['get_weather', 'plan_walk', 'search_places', 'place_details', 'build_route', 'check', 'give_answer']) assert.ok(TEXT.en[`tool.${tool}`]);
+  assert.ok(!script.includes('JSON.stringify(step'), 'a step is not printed as JSON');
+  const russianOutsideComments = script.split('\n').map(line => line.replace(/\/\/.*$/, '')).filter(line => /[а-яё]/i.test(line));
+  assert.deepEqual(russianOutsideComments, [], 'every text of the page comes from agent-i18n.js');
+});

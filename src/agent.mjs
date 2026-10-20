@@ -63,7 +63,7 @@ const DECLARATIONS = [
       route: { type: 'BOOLEAN', description: 'true, если ответ — маршрут из build_route.' } }, required: ['summary', 'place_ids'] } }
 ];
 
-const HIDDEN = new Set(['lat', 'lon', 'links', 'sourceUrl', 'path', 'googleMapsRoute', 'area', 'start', 'activities', 'source', 'license', 'attribution', 'method', 'notes', 'rejected']);
+const HIDDEN = new Set(['lat', 'lon', 'links', 'sourceUrl', 'path', 'googleMapsRoute', 'area', 'start', 'activities', 'source', 'license', 'attribution', 'method', 'notes', 'rejected', 'whyKeys']);
 /** What Gemini sees of a tool result: no coordinates or links, only facts it may cite. */
 export function modelView(value) {
   if (Array.isArray(value)) return value.map(modelView);
@@ -71,19 +71,35 @@ export function modelView(value) {
   return Object.fromEntries(Object.entries(value).filter(([key]) => !HIDDEN.has(key)).map(([key, item]) => [key, modelView(item)]));
 }
 
+const CATEGORY_RU = { park: 'парк', cafe: 'кафе', museum: 'музей', playground: 'детская площадка', attraction: 'достопримечательность', restaurant: 'где поесть',
+  mall: 'торговый центр', culture: 'театр и кино', family: 'семейный отдых', nightlife: 'бары и клубы' };
 const STATUS = { open: 'открыто', closed: 'закрыто', closes_early: 'закроется раньше', unknown: 'часы не разобраны', no_data: 'часов нет', not_checked: 'не проверено' };
+// Each step is written in Russian and sent as a key with params too: the page builds the Kazakh and English line from them (public/agent-i18n.js).
 function describe(name, args, result) {
-  if (result.error) return { label: 'Ошибка инструмента', summary: result.error };
+  if (result.error) return { label: 'Ошибка инструмента', summary: result.error, key: 'error', params: {} };
+  const query = args.query ? String(args.query).slice(0, 60) : '';
   switch (name) {
     case 'get_weather': return { label: 'Проверил погоду', summary: result.available
       ? `${Math.round(result.temperature)}°, ощущается ${Math.round(result.feelsLike)}°, ветер ${Math.round(result.windSpeed)} м/с, ${result.description}. ${result.advice.text}`
-      : result.advice.text };
-    case 'plan_walk': return { label: `Подобрал места на ${result.minutes} мин${args.query ? `: «${String(args.query).slice(0, 60)}»` : ''}`,
-      summary: result.places.length ? result.places.map(p => `${p.name} — ${p.walkMinutes} мин туда, всего ${p.totalMinutes} мин`).join('; ') : 'Под эти ограничения ничего не нашлось.' };
-    case 'search_places': return { label: `Искал в базе${args.query ? `: «${String(args.query).slice(0, 40)}»` : ''}${args.category ? ` (${args.category})` : ''}`,
-      summary: result.places.length ? `Найдено ${result.total}: ${result.places.slice(0, 3).map(p => p.name).join(', ')}` : 'Ничего не найдено.' };
-    case 'place_details': return { label: `Открыл карточку: ${result.name}`, summary: `Часы: ${result.openingHours || 'нет данных'} → ${STATUS[result.hours.status] || result.hours.status}` };
-    case 'build_route': return { label: 'Собрал мини-маршрут', summary: `${result.stops.map(s => s.name).join(' → ')}: всего ${result.totalMinutes} мин, ${result.fits ? 'помещается' : 'не помещается'} в ${result.minutes} мин` };
+      : result.advice.text,
+    key: 'weather', params: result.available ? { available: true, temperature: Math.round(result.temperature), feelsLike: Math.round(result.feelsLike),
+      wind: Math.round(result.windSpeed), code: result.weatherCode ?? null, indoor: Boolean(result.advice.preferIndoor) } : { available: false } };
+    case 'plan_walk': return { label: `Подобрал места на ${result.minutes} мин${query ? `: «${query}»` : ''}`,
+      summary: result.places.length ? result.places.map(p => `${p.name} — ${p.walkMinutes} мин туда, всего ${p.totalMinutes} мин`).join('; ') : 'Под эти ограничения ничего не нашлось.',
+      key: 'plan', params: { minutes: result.minutes, query, places: result.places.map(p => ({ name: p.name, walk: p.walkMinutes, total: p.totalMinutes })) } };
+    case 'search_places': return { label: `Искал в базе${args.query ? `: «${String(args.query).slice(0, 40)}»` : ''}${args.category ? ` (${CATEGORY_RU[args.category] || args.category})` : ''}`,
+      summary: result.places.length ? `Найдено ${result.total}: ${result.places.slice(0, 3).map(p => p.name).join(', ')}` : 'Ничего не найдено.',
+      key: 'search', params: { query: args.query ? String(args.query).slice(0, 40) : '', category: args.category || '', total: result.total ?? result.places.length,
+        names: result.places.slice(0, 3).map(p => p.name) } };
+    case 'place_details': return { label: `Открыл карточку: ${result.name}`, summary: `Часы: ${result.openingHours || 'нет данных'} → ${STATUS[result.hours.status] || result.hours.status}`,
+      key: 'details', params: { name: result.name, hours: result.openingHours || '', status: result.hours.status } };
+    case 'build_route': {
+      // A stop closed on arrival is named: «не помещается» alone read as if the time were short.
+      const closed = result.closedOnArrival || [];
+      const verdict = closed.length ? `к приходу закрыто: ${closed.join(', ')}` : `${result.fits ? 'помещается' : 'не помещается'} в ${result.minutes} мин`;
+      return { label: 'Собрал мини-маршрут', summary: `${result.stops.map(s => s.name).join(' → ')}: всего ${result.totalMinutes} мин, ${verdict}`,
+        key: 'route', params: { stops: result.stops.map(s => s.name), total: result.totalMinutes, fits: result.fits, minutes: result.minutes, closed } };
+    }
     default: return { label: name, summary: '' };
   }
 }
@@ -133,8 +149,9 @@ function astanaNow(now) {
 }
 
 /**
- * Run the agent. input: { query, lat, lon, minutes?, withChild?, lang?, reserveMinutes?, excludeIds?, previous?: { query, summary } }
- * (previous = the last turn of a spoken conversation; reserveMinutes and the hidden places are the visitor's settings, filled in by the server).
+ * Run the agent. input: { query, lat, lon, minutes?, withChild?, lang?, uiLang?, reserveMinutes?, excludeIds?, previous?: { query, summary } }
+ * (lang = the language a phrase was spoken in, it decides the answer's language; uiLang = the page's language, used where a typed query's letters
+ * cannot tell; previous = the last turn of a spoken conversation; reserveMinutes and the hidden places are the visitor's settings, filled in by the server).
  * deps: { env, dataset, limitedJson, answerLanguage, unsupported (RegExp), now?, fetchImpl? (weather only), attemptMs?, totalMs? }.
  */
 export function resetAgentState() { primaryRefusedAt = 0; thinkingAccepted = true; }
@@ -194,7 +211,7 @@ export async function runAgent(input, deps) {
     if (!steps.some(step => step.tool === 'plan_walk')) walk = await execute('plan_walk', { query: input.query });
     const plan = [...seen.values()].filter(place => Number.isFinite(place.totalMinutes)).slice(0, 3);
     // Without the model the answer still speaks the visitor's language.
-    const lang = ['ru', 'kk', 'en'].includes(input.lang) ? input.lang : answerLanguage(input.query);
+    const lang = ['ru', 'kk', 'en'].includes(input.lang) ? input.lang : answerLanguage(input.query, input.uiLang);
     let summary = plan.length ? FALLBACK_TEXT.some[lang](reserve) : FALLBACK_TEXT.none[lang];
     const far = walk?.beyondWalk ?? lastPlanBeyond;
     if (plan.length && far) summary += ` ${farNote(far, lang)}`;
@@ -208,7 +225,7 @@ export async function runAgent(input, deps) {
   // The agent always runs on a fast model: GEMINI_MODEL may name a slower one for the walk summary.
   const primary = env.GEMINI_AGENT_MODEL || DEFAULT_AGENT_MODEL;
   let model = Date.now() - primaryRefusedAt < 5 * 60000 ? SPARE_AGENT_MODEL : primary;
-  const language = ['ru', 'kk', 'en'].includes(input.lang) ? input.lang : answerLanguage(input.query);
+  const language = ['ru', 'kk', 'en'].includes(input.lang) ? input.lang : answerLanguage(input.query, input.uiLang);
   const previousTurn = input.previous ? { query: input.previous.query, answer: input.previous.summary } : undefined;
   const contents = [{ role: 'user', parts: [{ text: JSON.stringify({ answerLanguage: language, query: String(input.query || '').slice(0, 500),
     minutes: input.minutes, reserveMinutes: reserve, withChild: Boolean(input.withChild), now: astanaNow(now), start: 'точка человека известна серверу', ...(previousTurn ? { previousTurn } : {}) }) }] }];
@@ -253,12 +270,14 @@ export async function runAgent(input, deps) {
       if (problem) {
         rejected = true;
         steps.push({ tool: 'check', args: {}, label: 'Сервер вернул ответ на доработку',
-          summary: claim ? `Нет в данных: «${claim}»` : foreign ? 'Ответ не на языке вопроса' : 'Места только из найденных', ms: 0 });
+          summary: claim ? `Нет в данных: «${claim}»` : foreign ? 'Ответ не на языке вопроса' : 'Места только из найденных',
+          key: 'check', params: { reason: claim ? 'claim' : foreign ? 'language' : 'places', ...(claim ? { claim } : {}) }, ms: 0 });
         contents.push({ role: 'user', parts: calls.map(({ functionCall: { name, id } }) => ({ functionResponse: { name, ...(id ? { id } : {}),
           response: { error: name === 'give_answer' ? `Ответ отклонён проверкой: ${problem}. Вызови give_answer ещё раз.` : 'Не выполнено: сначала исправь ответ.' } } })) });
         continue;
       }
-      steps.push({ tool: 'give_answer', args: {}, label: 'Сформулировал ответ', summary: `Gemini выбрал: ${ids.map(id => seen.get(id).name).join(', ')}`, ms: 0 });
+      const names = ids.map(id => seen.get(id).name);
+      steps.push({ tool: 'give_answer', args: {}, label: 'Сформулировал ответ', summary: `Gemini выбрал: ${names.join(', ')}`, key: 'answer', params: { names }, ms: 0 });
       // Few places within walking range: the hint about transport stays even when Gemini leaves it out.
       const far = lastPlanBeyond && !summary.includes(lastPlanBeyond.name) && !/транспорт|такси|автобус|көлік|transport|taxi|bus/iu.test(summary);
       return finish('agent', far ? `${summary} ${farNote(lastPlanBeyond, language)}` : summary, ids, { route: answer.route === true, model });
