@@ -167,7 +167,7 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
 .fact span{font-size:24px;color:var(--muted);line-height:1.4;display:block;margin-top:6px}
 .limits{margin-top:200px}
 .limits h3{font-size:30px;letter-spacing:2px;text-transform:uppercase;color:var(--orange);font-weight:650}
-.limits li{list-style:none;font-size:31px;line-height:1.4;padding:22px 0;border-top:1.5px solid var(--line)}
+.limits li{list-style:none;font-size:31px;line-height:1.4;padding:15px 0;border-top:1.5px solid var(--line)}
 .limits li b{font-weight:650}
 
 /* ============ SLIDE: ПЛАН РАЗВИТИЯ ============ */
@@ -325,7 +325,7 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
   <h2 class="reveal d2">Модель объясняет только то, <em>что нашёл поиск</em>.</h2>
   <div class="pipe">
     <div class="step reveal d2"><span class="n">01 · ДАННЫЕ</span><h3>OSM + Overture</h3><p>Сбор скриптами, дубли сведены, источник у каждой записи</p><div class="fig">2255<small>мест</small></div></div>
-    <div class="step reveal d3"><span class="n">02 · ПОИСК</span><h3>Отбор кандидатов</h3><p>Категория, текст запроса на RU/KZ/EN, расстояние</p><div class="fig">3<small>языка</small></div></div>
+    <div class="step reveal d3"><span class="n">02 · ПОИСК</span><h3>Отбор кандидатов</h3><p>Смысл запроса через Gemini Embeddings, категория и расстояние, RU/KZ/EN</p><div class="fig">3<small>языка</small></div></div>
     <div class="step reveal d4"><span class="n">03 · ПРОВЕРКА</span><h3>Время и часы</h3><p>Бюджет прогулки и режим работы на весь визит</p><div class="fig">145/146<small>форматов</small></div></div>
     <div class="step ai reveal d5"><span class="n">04 · GEMINI</span><h3>Объяснение «почему»</h3><p>Видит только найденные записи; ID источников сверяются</p><div class="fig">3.5 Flash-Lite</div></div>
     <div class="step reveal d6"><span class="n">05 · ОТВЕТ</span><h3>Карточки</h3><p>Факты из данных отдельно от сгенерированного текста</p><div class="fig">1–3<small>места</small></div></div>
@@ -342,6 +342,7 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
   <div class="g-table">
     <div class="g-row reveal d2"><b>Gemini · function calling</b><p>Сам решает, что проверить: погоду, места, часы, дорогу; шаги видны</p><code>/agent</code></div>
     <div class="g-row reveal d2"><b>Gemini · объяснения</b><p>«Почему сюда» и «что делать» для каждого места, сервер сверяет факты</p><code>карточки</code></div>
+    <div class="g-row reveal d2"><b>Gemini · embeddings</b><p>Понимает запрос по смыслу: «подышать свежим воздухом» → парк</p><code>поиск мест</code></div>
     <div class="g-row reveal d3"><b>Gemini · фото</b><p>«Что это за здание?»: фото → место из базы и факты с меткой «идея ИИ»</p><code>/agent, камера</code></div>
     <div class="g-row reveal d3"><b>Gemini · голос</b><p>Ответ звучит голосом, в том числе по-казахски</p><code>«Озвучить»</code></div>
     <div class="g-row reveal d4"><b>MCP + Gemini CLI</b><p>Наши инструменты для любого ИИ: gemini extensions install …</p><code>терминал</code></div>
@@ -374,7 +375,7 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
   <div class="crit"><span>Завершённость</span><span>Этика и приватность</span></div>
   <div>
     <div class="kicker reveal d1">09 <b>/ Проверки</b></div>
-    <div class="score reveal d2">115<small>/115</small></div>
+    <div class="score reveal d2">123<small>/123</small></div>
     <p class="cap reveal d3">автотестов проходят: поиск, часы и погода, друзья и встречи, часы на руке, приватность и лимиты</p>
     <div class="facts">
       <div class="fact reveal d4"><strong>2255</strong><span>мест после сведения дублей</span></div>
