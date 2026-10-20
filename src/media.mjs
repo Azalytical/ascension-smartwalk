@@ -45,7 +45,7 @@ async function gemini(model, body, env, limitedJson, maximum, timeout = 15000) {
   finally { clearTimeout(timer); }
 }
 
-const VISION_PROMPT = 'Ты помощник Seruen в Астане. На фото — то, на что человек навёл камеру. Ниже список мест рядом из базы Seruen с расстоянием и стороной, '
+const VISION_PROMPT = 'Ты помощник Ulger в Астане. На фото — то, на что человек навёл камеру. Ниже список мест рядом из базы Ulger с расстоянием и стороной, '
   + 'где место находится относительно взгляда камеры (если компас известен). Определи, какое место из списка на фото. Выбирай placeId только из списка и только если '
   + 'узнаёшь его уверенно; иначе placeId пустая строка. seen — одно короткое предложение о том, что видно на фото, без выдумывания названий. facts — до 2 коротких '
   + 'общеизвестных фактов о выбранном месте (их покажут с пометкой «идея ИИ»), без часов работы, цен и событий. Пиши на языке answerLanguage. '
@@ -54,7 +54,7 @@ const VISION_PROMPT = 'Ты помощник Seruen в Астане. На фот
 /** POST /api/vision { image (base64 or data URL), mimeType?, lat, lon, heading?, lang? } */
 export async function identifyPlace(input, { env, dataset, limitedJson }) {
   const lat = Number(input?.lat), lon = Number(input?.lon);
-  if (!(lat >= BOUNDS.minLat && lat <= BOUNDS.maxLat && lon >= BOUNDS.minLon && lon <= BOUNDS.maxLon)) throw new MediaError('Seruen узнаёт места только в Астане: передайте lat и lon.');
+  if (!(lat >= BOUNDS.minLat && lat <= BOUNDS.maxLat && lon >= BOUNDS.minLon && lon <= BOUNDS.maxLon)) throw new MediaError('Ulger узнаёт места только в Астане: передайте lat и lon.');
   let image = typeof input?.image === 'string' ? input.image : '';
   let mimeType = typeof input?.mimeType === 'string' ? input.mimeType : 'image/jpeg';
   const dataUrl = /^data:(image\/[a-z]+);base64,/i.exec(image);

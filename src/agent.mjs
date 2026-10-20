@@ -1,4 +1,4 @@
-// Seruen agent: Gemini decides which tools to call (weather, walk plan, place search, details, micro-route) and finishes
+// Ulger agent: Gemini decides which tools to call (weather, walk plan, place search, details, micro-route) and finishes
 // with a structured answer. Every step is returned so the page can show how the answer was reached.
 // The visitor's point never reaches Gemini: the server fills it into tool calls and strips coordinates from tool results.
 import { runTool, ToolError, CATEGORIES } from './tools.mjs';
@@ -7,7 +7,7 @@ import { placeLinks, mapLinks } from './links.mjs';
 const MAX_TURNS = 5, MAX_TOOL_CALLS = 6, TOTAL_MS = 30000, ATTEMPT_MS = 12000;
 export const DEFAULT_AGENT_MODEL = 'gemini-3.5-flash-lite';
 
-const SYSTEM = 'Ты агент Seruen: подбираешь прогулку по Астане ровно под время человека. Точку старта знает только сервер: он сам подставляет её в инструменты, '
+const SYSTEM = 'Ты агент Ulger: подбираешь прогулку по Астане ровно под время человека. Точку старта знает только сервер: он сам подставляет её в инструменты, '
   + 'ты координат не видишь и не спрашиваешь. Порядок: если человек пойдёт по улице или упомянул погоду, вызови get_weather; затем plan_walk с его временем и пожеланием '
   + '(при плохой погоде добавь в query «под крышей»); если просят несколько мест подряд, маршрут или «с ... а потом ...», вызови build_route с 2–3 id из результатов; '
   + 'search_places и place_details — только если без них нельзя ответить. Не больше 4 инструментов, затем обязательно give_answer. '

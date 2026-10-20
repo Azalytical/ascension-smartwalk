@@ -1,4 +1,4 @@
-// Seruen agent page: asks /api/agent, then replays the agent's steps and shows the answer with map and calendar links.
+// Ulger agent page: asks /api/agent, then replays the agent's steps and shows the answer with map and calendar links.
 const $ = id => document.getElementById(id);
 const state = { lat: 51.1283, lon: 71.4304, minutes: 60 };
 const CATEGORY = { park: 'парк', cafe: 'кафе', museum: 'музей', playground: 'детская площадка', attraction: 'достопримечательность',
@@ -194,7 +194,7 @@ $('photo').addEventListener('change', async () => {
     if (!response.ok) throw new Error(data.error);
     const parts = [el('img', { src: image, alt: 'Ваше фото' })];
     if (data.place) {
-      parts.push(el('h3', { text: data.place.name }), el('span', { class: 'tag', text: `название: ${data.nameSource || 'база Seruen'} · уверенность: ${{ high: 'высокая', medium: 'средняя', low: 'низкая' }[data.confidence] || data.confidence}` }));
+      parts.push(el('h3', { text: data.place.name }), el('span', { class: 'tag', text: `название: ${data.nameSource || 'база Ulger'} · уверенность: ${{ high: 'высокая', medium: 'средняя', low: 'низкая' }[data.confidence] || data.confidence}` }));
       if (data.facts.length) parts.push(el('ul', { class: 'facts' }, ...data.facts.map(fact => el('li', {}, el('span', { class: 'tag ai', text: 'идея ИИ' }), document.createTextNode(` ${fact}`)))));
       parts.push(el('div', { class: 'links' }, el('a', { href: data.place.links.googleMapsWalk, target: '_blank', rel: 'noopener', text: 'Google Maps' }),
         el('a', { href: data.place.links.twoGis, target: '_blank', rel: 'noopener', text: '2ГИС' })));
