@@ -109,18 +109,37 @@
     });
   }
 
-  async function resolveStart() {
+  const ago = (ms) => { const minutes = Math.round((Date.now() - ms) / 60000); return minutes < 1 ? 'только что' : `${minutes} мин назад`; };
+
+  // The paired phone's own point, when Friends → «показывать, где я» is on there and the point is fresh.
+  async function phonePosition() {
+    if (!socialToken()) return null;
+    try {
+      const share = (await loadSocial()).share;
+      if (!share?.hasPoint || Date.now() - share.updatedAt > 15 * 60000) return null;
+      const point = { lat: share.lat, lon: share.lon, accuracy: share.accuracy, updatedAt: share.updatedAt };
+      return inAstana(point) ? point : null;
+    } catch { return null; }
+  }
+
+  // Where the walk starts: the watch's own GPS, else the paired phone's point, else a fixed start. Every card says which,
+  // so a fixed point is never passed off as the real location.
+  async function resolveStart(fallback) {
     const option = STARTS[state.startIndex];
-    if (option.key !== 'here') return { lat: option.lat, lon: option.lon, name: option.name, here: false };
-    const fallback = { ...STARTS[1], here: false };
-    if (state.demo) return { ...fallback, note: 'Демо: старт от Байтерека' };
+    if (!fallback && option.key !== 'here') return { lat: option.lat, lon: option.lon, name: option.name, here: false };
+    const base = fallback || { lat: STARTS[1].lat, lon: STARTS[1].lon, name: STARTS[1].name, label: STARTS[1].label };
+    const from = base.label || base.name;
+    if (state.demo) return { ...base, here: false, note: `Демо: старт от ${from}` };
+    let outside = false;
     try {
       const point = await currentPosition();
-      if (inAstana(point)) return { ...point, name: 'Старт', here: true };
-      return { ...fallback, note: 'Вы не в Астане: старт от Байтерека' };
-    } catch {
-      return { ...fallback, note: 'Без геолокации: старт от Байтерека' };
-    }
+      if (inAstana(point)) return { ...point, name: 'Старт', here: true, source: 'watch', note: '📍 По геопозиции часов' };
+      outside = true;
+    } catch { /* no GPS in this browser, denied or timed out */ }
+    const phone = await phonePosition();
+    if (phone) return { ...phone, name: 'Старт', here: true, source: 'phone', note: `📍 Место с телефона, ${ago(phone.updatedAt)}` };
+    return { ...base, here: false, warn: true,
+      note: outside ? `Вы не в Астане: считаю от ${from}` : `⚠ Часы не дали геопозицию: считаю от ${from}` };
   }
 
   async function findPlaces(mood) {
@@ -262,6 +281,10 @@
     limit = setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 5000);
   }
 
+  function startNote(start) {
+    return element('p', `start-note${start.warn ? ' warn' : ''}${start.source ? ` from-${start.source}` : ''}`, start.note);
+  }
+
   function renderResults() {
     const list = $('results');
     list.replaceChildren();
@@ -308,7 +331,7 @@
       go.type = 'button';
       go.addEventListener('click', () => startWalk(place));
       card.append(top, element('p', 'card-name', place.name), walk, back, element('p', 'card-hours', facts.join(' · ')), go);
-      if (index === 0 && start.note) card.append(element('p', 'card-hours', start.note));
+      if (index === 0 && start.note) card.prepend(startNote(start));
       list.append(card);
     });
   }
@@ -435,10 +458,24 @@
       listenCompass();
       if (navigator.geolocation) {
         state.watchId = navigator.geolocation.watchPosition((position) => {
-          if (!state.walk) return;
-          state.walk.pos = { lat: position.coords.latitude, lon: position.coords.longitude };
-          state.walk.accuracy = position.coords.accuracy;
+          if (state.walk !== walk) return;
+          walk.pos = { lat: position.coords.latitude, lon: position.coords.longitude };
+          walk.accuracy = position.coords.accuracy;
+          walk.fix = 'watch';
+          walk.fixAt = Date.now();
         }, () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+      }
+      if (walk.start.source === 'phone') { walk.fix = 'phone'; walk.fixAt = walk.start.updatedAt; }
+      if (socialToken()) {
+        state.phoneTimer = setInterval(async () => {
+          if (state.walk !== walk || (walk.fix === 'watch' && Date.now() - walk.fixAt < 30000)) return;
+          const phone = await phonePosition();
+          if (!phone || state.walk !== walk || phone.updatedAt === walk.fixAt) return;
+          walk.pos = { lat: phone.lat, lon: phone.lon };
+          walk.accuracy = phone.accuracy;
+          walk.fix = 'phone';
+          walk.fixAt = phone.updatedAt;
+        }, 15000);
       }
     }
     keepAwake();
@@ -449,8 +486,21 @@
   }
 
   function setNote(text) {
-    $('demo-badge').textContent = text;
-    $('demo-badge').hidden = !text;
+    if (state.walk) state.walk.note = text;
+    renderNote(state.walk, text);
+  }
+
+  // Without a live position the arrow is drawn from the start, and the badge says so.
+  function renderNote(walk, text = walk?.note || '') {
+    let shown = text;
+    if (walk && !walk.demo) {
+      const live = walk.fix === 'watch' && Date.now() - walk.fixAt < 60000;
+      // The first fix can take a few seconds.
+      if (!live && (walk.fix || Date.now() - walk.t0 > 8000)) shown = walk.fix === 'phone' ? `📍 с телефона, ${ago(walk.fixAt)}` : '⚠ нет GPS на часах';
+    }
+    $('demo-badge').textContent = shown;
+    $('demo-badge').hidden = !shown;
+    $('demo-badge').classList.toggle('gps-off', Boolean(walk && !walk.demo && shown !== text));
   }
 
   // Reminders through the phone's notifications reach any paired watch or band, even with this page closed.
@@ -486,7 +536,9 @@
     cancelReminders(state.walk);
     clearInterval(state.timer);
     clearInterval(state.poll);
+    clearInterval(state.phoneTimer);
     state.poll = null;
+    state.phoneTimer = null;
     if (state.watchId !== undefined && state.watchId !== null) navigator.geolocation?.clearWatch(state.watchId);
     state.watchId = null;
     window.removeEventListener('deviceorientationabsolute', onOrientation);
@@ -556,6 +608,7 @@
   function tick() {
     const walk = state.walk;
     if (!walk) return;
+    if (!walk.demo) renderNote(walk);
     if (walk.kind !== 'place') { tickTarget(walk); return; }
     const target = walk.phase === 'back' ? walk.start : walk.place;
     if (walk.demo) simulate(walk, target);
@@ -773,7 +826,7 @@
         element('p', 'card-hours', 'Позовите друзей на встречу в Aidem на телефоне, и она появится здесь.'));
       list.append(card);
     }
-    if (start.note) list.firstChild.append(element('p', 'card-hours', start.note));
+    if (start.note) list.firstChild.prepend(startNote(start));
     refreshMeetCount();
   }
 
@@ -944,23 +997,32 @@
   }
 
   // Phone hand-off: /watch#to=51.1,71.4&name=…&cat=cafe&from=51.12,71.43&fromName=…&min=45&walk=4&visit=20&back=4
-  function handoff() {
+  async function handoff() {
     const hash = new URLSearchParams(location.hash.slice(1));
     if (!hash.has('to')) return false;
     const pair = (value) => { const [lat, lon] = String(value || '').split(',').map(Number); return inAstana({ lat, lon }) ? { lat, lon } : null; };
     const to = pair(hash.get('to'));
-    const from = pair(hash.get('from')) || { lat: STARTS[1].lat, lon: STARTS[1].lon };
     if (!to) return false;
-    const whole = (name, fallback) => { const value = Math.round(Number(hash.get(name))); return Number.isFinite(value) && value >= 0 && value <= 240 ? value : fallback; };
-    const walkMinutes = whole('walk', Math.ceil(haversine(from, to) / METERS_PER_MINUTE));
+    const given = pair(hash.get('from'));
+    const fromName = (hash.get('fromName') || '').slice(0, 60);
+    show('loading');
+    $('loading-text').textContent = 'Где вы?…';
+    const start = await resolveStart(given ? { ...given, name: fromName || 'Старт', label: fromName || 'точки с телефона' } : undefined);
+    const whole = (name, fallback) => {
+      const value = hash.has(name) ? Math.round(Number(hash.get(name))) : NaN;
+      return Number.isFinite(value) && value >= 0 && value <= 240 ? value : fallback;
+    };
+    const meters = haversine(start, to);
+    // Times in the link were counted from the phone's start; from a real position they are counted again.
+    const walkMinutes = start.here ? Math.max(1, Math.ceil(meters / METERS_PER_MINUTE)) : whole('walk', Math.max(1, Math.ceil(meters / METERS_PER_MINUTE)));
     const visitMinutes = whole('visit', 20);
-    const returnMinutes = whole('back', walkMinutes);
+    const returnMinutes = start.here ? walkMinutes : whole('back', walkMinutes);
     const total = walkMinutes + visitMinutes + returnMinutes + RESERVE_MINUTES;
     const minutes = Math.max(whole('min', total), total);
     state.mood = 'any';
-    state.plan = { minutes, at: Date.now(), start: { ...from, name: (hash.get('fromName') || 'Старт').slice(0, 60) },
+    state.plan = { minutes, at: Date.now(), start,
       places: [{ id: 'handoff', name: (hash.get('name') || 'Место').slice(0, 80), category: hash.get('cat') || 'attraction', ...to,
-        distanceMeters: Math.round(haversine(from, to)), walkMinutes, visitMinutes, returnMinutes, totalMinutes: total, hours: { status: 'no_data' } }] };
+        distanceMeters: Math.round(meters), walkMinutes, visitMinutes, returnMinutes, totalMinutes: total, hours: { status: 'no_data' } }] };
     renderResults();
     $('ask-gemini').hidden = true;
     show('results');
@@ -972,7 +1034,6 @@
     $('time-chip').addEventListener('click', () => { state.minutes = TIMES[(TIMES.indexOf(state.minutes) + 1) % TIMES.length]; save(); renderHome(); });
     $('start-chip').addEventListener('click', () => {
       state.startIndex = (state.startIndex + 1) % STARTS.length;
-      if (STARTS[state.startIndex].key === 'here' && !navigator.geolocation) state.startIndex = 1;
       save(); renderHome();
     });
     $('ask-gemini').addEventListener('click', askGemini);
@@ -1028,5 +1089,5 @@
   $('watch-url').textContent = `${location.host}/watch`;
   bind();
   renderHome();
-  if (!handoff()) show('home');
+  handoff().then((handled) => { if (!handled) show('home'); });
 })();
