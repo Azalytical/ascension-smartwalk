@@ -125,12 +125,21 @@ test('status reports the generation provider without the key', async () => {
   assert.equal(JSON.parse(text).generationProvider, 'gemini'); assert.ok(!text.includes('g-secret'));
 });
 
-test('in-memory budget limits one address to 8 requests a minute', async () => {
-  const env = { MEMORY_BUDGET: true };
-  const statuses = [];
-  for (let i = 0; i < 9; i++) statuses.push((await handleApi(request(valid, { 'X-Forwarded-For': '203.0.113.7, 10.0.0.1' }), env, [poi])).status);
-  assert.deepEqual(statuses.slice(0, 8), Array(8).fill(200)); assert.equal(statuses[8], 429);
-  assert.equal((await handleApi(request(valid, { 'X-Forwarded-For': '203.0.113.8' }), env, [poi])).status, 200);
+test('in-memory budget: Gemini for 8 requests a minute per address, then places without it, and only a flood is refused', async () => {
+  const env = { MEMORY_BUDGET: true, GEMINI_API_KEY: 'g' };
+  const original = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; return new Response('{}', { status: 400 }); };
+  try {
+    const answers = [];
+    for (let i = 0; i < 61; i++) answers.push(await handleApi(request(valid, { 'X-Forwarded-For': '203.0.113.7, 10.0.0.1' }), env, [poi]));
+    assert.deepEqual(answers.slice(0, 60).map(response => response.status), Array(60).fill(200));
+    const ninth = await answers[8].json();
+    assert.equal(ninth.recommendations.length, 1); assert.equal(ninth.generation.reason, 'request_budget_unavailable');
+    assert.ok(calls <= 8 * 2, 'Gemini is asked only within the first 8 requests');
+    assert.equal(answers[60].status, 429);
+    assert.equal((await handleApi(request(valid, { 'X-Forwarded-For': '203.0.113.8' }), env, [poi])).status, 200);
+  } finally { globalThis.fetch = original; }
 });
 
 test('a busy Gemini is retried, and client errors are not', async () => {

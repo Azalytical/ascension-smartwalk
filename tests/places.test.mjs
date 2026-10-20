@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { recommend, prepareDataset, placeCategory } from '../src/retrieval.mjs';
+import { recommend, prepareDataset, placeCategory, preparedPlaces } from '../src/retrieval.mjs';
 import { handleApi } from '../src/api.mjs';
 
 const places = JSON.parse(readFileSync(new URL('../data/places.json', import.meta.url), 'utf8'));
@@ -123,6 +123,26 @@ test('/api/places serves the map layer, filters, and details', async () => {
   assert.equal((await get('/api/places?bbox=1,2,3')).status, 400);
   assert.equal((await handleApi(new Request('https://smartwalk.test/api/places', { method: 'POST' }), {}, places)).status, 405);
   const status = await (await get('/api/status')).json();
-  assert.equal(status.poiCount, places.length);
+  // Places after merging duplicates, the number the search, the map and «Моё» show; the raw records are reported apart.
+  assert.equal(status.poiCount, preparedPlaces(places).length);
+  assert.equal(status.sourceRecords, places.length);
+  assert.ok(status.poiCount < status.sourceRecords);
   assert.equal(status.source, 'OpenStreetMap, Overture Maps');
+});
+
+test('a place asked for by name is found in either script, and one left out is named above the list', () => {
+  const aitu = { lat: 51.0906, lon: 71.418, minutes: 120, maxWalkMinutes: 15, returnToStart: true };
+  for (const query of ['Мега', 'Mega', 'в Мегу', 'Mega Silk Way']) {
+    const result = recommend(places, { ...aitu, query, visitDate: '2026-10-21T15:00:00+05:00' });
+    assert.equal(result.recommendations[0].name, 'Mega Silk Way', query);
+  }
+  // At 22:30 the mall is closed by its hours: the answer says so instead of silently showing other places.
+  const late = recommend(places, { ...aitu, query: 'Мега', visitDate: '2026-10-21T22:30:00+05:00' });
+  assert.ok(!late.recommendations.some(place => place.name === 'Mega Silk Way'));
+  assert.ok(late.warnings.some(note => note.startsWith('«Mega Silk Way» по режиму работы из источника закрыто')));
+  // Kazakh letters and a Latin spelling match the Russian one.
+  const baiterek = { lat: 51.1283, lon: 71.4304, minutes: 60, maxWalkMinutes: 15, returnToStart: true, visitDate: '2026-10-21T15:00:00+05:00' };
+  for (const query of ['Байтерек', 'Baiterek']) assert.equal(recommend(places, { ...baiterek, query }).recommendations[0].name, 'Бәйтерек', query);
+  // Category words stay categories: «кафе» does not prefer places that merely have «Кафе» in the name.
+  assert.equal(recommend(places, { ...aitu, query: 'кафе' }).retrieval.nameMatches, 0);
 });
