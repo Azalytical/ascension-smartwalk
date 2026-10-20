@@ -60,6 +60,20 @@ test('unknown moods, methods and paths are rejected', async () => {
   assert.equal((await handleApi(new Request('https://demo.example/api/watch/other'), {}, pois)).status, 404);
 });
 
+test('Siri can ask the assistant a free question and hears a text answer', async () => {
+  const ask = (query, init) => handleApi(new Request(`https://demo.example/api/watch/ask?${query}`, init), {}, pois);
+  // Without a Gemini key the agent falls back to the same tools, read like a plan.
+  const text = await (await ask(`format=text&lat=51,1283&lon=71,4304&minutes=45&q=${encodeURIComponent('где выпить кофе?')}`)).text();
+  assert.match(text, /^Кофейня у Байтерека, кафе\. Идти примерно \d+ минут/);
+  const json = await (await ask('lat=51.1283&lon=71.4304&q=coffee')).json();
+  assert.equal(json.mode, 'fallback');
+  assert.ok(json.places.length >= 1);
+  const outside = await ask('format=text&lat=43.2&lon=76.9&q=coffee');
+  assert.equal(outside.status, 200);
+  assert.match(await outside.text(), /только в Астане/);
+  assert.equal((await ask('lat=51.1283&lon=71.4304', { method: 'POST' })).status, 405);
+});
+
 test('nothing in reach is said honestly', () => {
   assert.match(spokenPlan({ places: [] }), /не нашлось/);
 });

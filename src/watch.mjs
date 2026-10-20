@@ -57,6 +57,15 @@ export function spokenPlan(plan, now = new Date()) {
   return text;
 }
 
+/** The assistant's answer as one paragraph for Siri: Gemini's own words, or the same places read like a plan without it. */
+export function spokenAnswer(answer, now = new Date()) {
+  if (typeof answer?.error === 'string') return answer.error;
+  if (answer?.mode === 'agent' && answer.summary) return answer.summary;
+  const places = (answer?.places || []).filter(place => Number.isFinite(place.totalMinutes))
+    .map(place => ({ ...place, source: { label: place.dataSource || 'OpenStreetMap' } }));
+  return spokenPlan({ places }, now);
+}
+
 function failure(message, status, text) {
   // Voice assistants read the body aloud; an error status would only show a generic failure.
   if (text) return new Response(message, { status: 200, headers: { ...HEADERS, 'Content-Type': 'text/plain; charset=utf-8' } });

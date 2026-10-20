@@ -24,9 +24,10 @@
           <h1 class="title" id="home-title">Куда?</h1>
           <!-- The mic is a label for the field: on Apple Watch a tap opens watchOS dictation; where the browser can listen, watch.js records instead. -->
           <form class="search" id="search-form" role="search" action="#">
-            <input class="search-input" id="search-input" type="search" name="q" placeholder="Найти место" enterkeyhint="search" autocomplete="off" aria-label="Найти место по названию" maxlength="60">
+            <input class="search-input" id="search-input" type="search" name="q" placeholder="Найти место" enterkeyhint="search" autocomplete="off" aria-label="Найти место по названию или задать вопрос" maxlength="120">
             <label class="voice" id="voice" for="search-input" role="button" tabindex="0" aria-label="Сказать голосом, куда идти">🎤</label>
           </form>
+          <button class="chip chip-ai" id="ai-chip" type="button"><span class="spark" aria-hidden="true">✦</span> <b>Спросить ИИ</b></button>
           <div class="moods">
             <button class="mood" type="button" data-mood="coffee"><img src="/assets/icons/categories/coffee-64.webp" alt="" width="32" height="32"><span>Кофе</span></button>
             <button class="mood" type="button" data-mood="park"><img src="/assets/icons/categories/park-64.webp" alt="" width="32" height="32"><span>Парк</span></button>
@@ -41,6 +42,19 @@
           <p class="footnote">© OpenStreetMap contributors, Overture Maps Foundation</p>
         </section>
 
+        <!-- The assistant: the same Gemini agent as /agent on the phone. Apple Watch answers through its own dictation in the field. -->
+        <section class="view view-ask" id="view-ask" aria-labelledby="ask-title" hidden>
+          <h2 class="ask-title" id="ask-title"><span class="spark" aria-hidden="true">✦</span> Спросите Aidem</h2>
+          <p class="ask-context" id="ask-context" hidden></p>
+          <form class="search" id="ask-form" action="#">
+            <input class="search-input" id="ask-input" type="text" name="q" placeholder="Ваш вопрос" enterkeyhint="send" autocomplete="off" aria-label="Вопрос помощнику Aidem" maxlength="300">
+            <label class="voice" id="ask-voice" for="ask-input" role="button" tabindex="0" aria-label="Спросить голосом">🎤</label>
+          </form>
+          <div class="examples" id="ask-examples"></div>
+          <button class="action ghost" id="ask-home" type="button">Назад</button>
+          <button class="text-button" id="ask-reset" type="button" hidden>Новый разговор</button>
+        </section>
+
         <section class="view view-loading" id="view-loading" hidden>
           <div class="spinner" aria-hidden="true"></div>
           <p class="loading-text" id="loading-text" role="status">Ищем рядом…</p>
@@ -49,6 +63,7 @@
         <section class="view view-results" id="view-results" aria-label="Варианты прогулки" hidden>
           <div class="results" id="results"></div>
           <div class="results-end">
+            <button class="action" id="ask-more" type="button" hidden><span class="spark" aria-hidden="true">✦</span>&nbsp;Спросить ещё</button>
             <button class="action ghost" id="ask-gemini" type="button">Почему эти? · Gemini</button>
             <p class="tip" id="gemini-tip" role="status" hidden></p>
             <button class="action ghost" id="back-home" type="button">Назад</button>

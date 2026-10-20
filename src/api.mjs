@@ -2,7 +2,7 @@ import { recommend, placeCategory } from './retrieval.mjs';
 import { currentWeather } from './weather.mjs';
 import { handleTelegram } from './telegram.mjs';
 import { handleSocial } from './social/routes.mjs';
-import { handleWatch } from './watch.mjs';
+import { handleWatch, spokenAnswer } from './watch.mjs';
 import { handleMcp } from './mcp.mjs';
 import { runAgent } from './agent.mjs';
 import { identifyPlace, speak, listen, MediaError } from './media.mjs';
@@ -373,6 +373,28 @@ async function gemini(request, url, env, dataset) {
   }
 }
 
+// Siri's «Куда сходить» with a free question: the same agent and budget as /api/agent, answered as text Siri reads aloud.
+async function watchAsk(request, url, env, dataset) {
+  if (request.method !== 'GET') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'GET' });
+  // Shortcuts on iOS may send a comma as the decimal separator.
+  const number = name => Number(String(url.searchParams.get(name) ?? '').replace(',', '.'));
+  const body = { query: (url.searchParams.get('q') || '').trim().slice(0, 500) || 'Куда сходить рядом?', lat: number('lat'), lon: number('lon'),
+    minutes: url.searchParams.has('minutes') ? number('minutes') : 45, ...(url.searchParams.has('lang') ? { lang: url.searchParams.get('lang') } : {}) };
+  const text = url.searchParams.get('format') === 'text';
+  if (!(body.lat >= 51 && body.lat <= 51.35 && body.lon >= 71.25 && body.lon <= 71.65)) {
+    const message = 'Aidem пока подбирает прогулки только в Астане.';
+    return text ? new Response(message, { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Access-Control-Allow-Origin': '*' } }) : json({ error: message }, 400);
+  }
+  const headers = new Headers({ 'Content-Type': 'application/json' });
+  for (const name of ['CF-Connecting-IP', 'X-Forwarded-For']) if (request.headers.has(name)) headers.set(name, request.headers.get(name));
+  const agentUrl = new URL('/api/agent', url);
+  const response = await gemini(new Request(agentUrl, { method: 'POST', headers, body: JSON.stringify(body) }), agentUrl, env, dataset);
+  const answer = await response.json();
+  if (!text) return json(answer, response.status, { 'Access-Control-Allow-Origin': '*' });
+  // Siri reads the body aloud, so an error is said as text with status 200.
+  return new Response(spokenAnswer(answer), { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' } });
+}
+
 export async function handleApi(request, env = {}, dataset = []) {
   const url = new URL(request.url);
   const pois = Array.isArray(dataset) ? dataset : dataset.pois || [];
@@ -394,6 +416,7 @@ export async function handleApi(request, env = {}, dataset = []) {
     if (!poi) return json({ error: 'Место не найдено' }, 404);
     return json({ ...poi, category: placeCategory(poi), kind: poi.category ?? null }, 200, { 'Cache-Control': 'public, max-age=300' });
   }
+  if (url.pathname === '/api/watch/ask') return watchAsk(request, url, env, dataset);
   if (url.pathname.startsWith('/api/watch/')) return (await handleWatch(request, env, pois)) ?? json({ error: 'Не найдено' }, 404);
   if (url.pathname === '/telegram/webhook') {
     if (request.method !== 'POST') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'POST' });
