@@ -4,6 +4,7 @@ import { resolve, extname } from 'node:path';
 import { handleApi } from '../src/api.mjs';
 import { localSocialHub } from '../src/social/local.mjs';
 import { localWatchPush } from '../src/watch-push.mjs';
+import { preparePublic } from './prepare-public.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 // SMARTWALK_PRODUCTION=1 (set in the Dockerfile for Cloud Run) listens on all interfaces and enforces the request budget.
@@ -17,8 +18,9 @@ const env = { GEMINI_API_KEY: process.env.GEMINI_API_KEY, GEMINI_MODEL: process.
   WATCH_PUSH_LOCAL: localWatchPush() };
 const port = Number(process.env.PORT || 8789);
 const host = process.env.HOST || '127.0.0.1';
+await preparePublic();
 const dataset = JSON.parse(await readFile(resolve(root, 'data/places.json'), 'utf8'));
-const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.ico': 'image/x-icon', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg' };
+const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.ico': 'image/x-icon', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg' };
 createServer(async (req, res) => {
   try {
     const chunks = []; let count = 0;

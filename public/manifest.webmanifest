@@ -1,0 +1,27 @@
+{
+  "name": "Seruen: прогулки по Астане",
+  "short_name": "Seruen",
+  "description": "ИИ подберёт место рядом и вернёт вас вовремя.",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#F4F3EF",
+  "theme_color": "#0E1621",
+  "lang": "ru",
+  "categories": ["travel", "navigation", "lifestyle"],
+  "icons": [
+    { "src": "/assets/brand/seruen/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/brand/seruen/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/brand/seruen/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/assets/brand/seruen/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/assets/brand/seruen/mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Кофе за 45 минут", "short_name": "Кофе", "url": "/?t=45&q=%D0%BA%D0%BE%D1%84%D0%B5&go=1", "icons": [{ "src": "/assets/icons/categories/coffee-128.webp", "sizes": "128x128", "type": "image/webp" }] },
+    { "name": "Прогулка на 30 минут", "short_name": "30 минут", "url": "/?t=30&go=1", "icons": [{ "src": "/assets/brand/seruen/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Места рядом", "short_name": "Рядом", "url": "/?tab=explore", "icons": [{ "src": "/assets/icons/categories/landmark-128.webp", "sizes": "128x128", "type": "image/webp" }] }
+  ]
+}
