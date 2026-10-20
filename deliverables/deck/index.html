@@ -4,501 +4,790 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Aidem · Ascension · Build with AI 2026</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=Unbounded:wght@700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='116' fill='%230E1621'/%3E%3Cg transform='rotate(45 256 256)'%3E%3Cpath d='M318 139.5A132 132 0 1 1 194 139.5' fill='none' stroke='%23F5B700' stroke-width='44' stroke-linecap='round'/%3E%3Ccircle cx='256' cy='124' r='28' fill='%234AA8FF'/%3E%3C/g%3E%3C/svg%3E">
 <style>
 /* ===========================================
-   THEME: цвета и шрифты бренда Aidem (v2/design/README.md)
-   Меняйте здесь, чтобы перекрасить всю презентацию
+   ШРИФТЫ: лежат рядом, интернет не нужен
+   =========================================== */
+@font-face{font-family:"Onest";font-weight:100 900;font-display:block;src:url(assets/fonts/onest-cyrillic.woff2) format("woff2");unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:"Onest";font-weight:100 900;font-display:block;src:url(assets/fonts/onest-cyrillic-ext.woff2) format("woff2");unicode-range:U+0460-052F,U+1C80-1C8A,U+20B4,U+2DE0-2DFF,U+A640-A69F,U+FE2E-FE2F}
+@font-face{font-family:"Onest";font-weight:100 900;font-display:block;src:url(assets/fonts/onest-latin-ext.woff2) format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:"Onest";font-weight:100 900;font-display:block;src:url(assets/fonts/onest-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Unbounded";font-weight:700;font-display:block;src:url(assets/fonts/unbounded-700.woff2) format("woff2")}
+
+/* ===========================================
+   THEME: тёмная тема бренда Aidem, как в ролике (v2/design/README.md)
    =========================================== */
 :root{
-  --paper:#F4F3EF; --paper-2:#E8E6DF; --ink:#0E1621; --muted:#5B6573; --line:#DAD8D0;
-  --teal:#0B6FD6; --mint:#FFC21A; --orange:#F5B700; --leaf:#1A8CFF; --sage:#9FB3C8; --sky:#4AA8FF;
-  --stage-bg:#0A0F15; --slide-bg:var(--paper);
-  --font:"Onest",system-ui,sans-serif; --hand:"Onest",system-ui,sans-serif; --wordmark:"Unbounded","Onest",sans-serif;
+  --bg:#0A0F15; --bg-deep:#05080C; --surface:#121922; --surface-2:#18212C;
+  --ink:#F2F4F7; --muted:rgba(242,244,247,.66); --faint:rgba(242,244,247,.42);
+  --line:rgba(242,244,247,.10); --line-2:rgba(242,244,247,.18);
+  --gold:#FFC21A; --gold-2:#F5B700; --sky:#4AA8FF; --green:#3FD17A; --amber:#FFB547; --red:#FF6B6F;
+  --font:"Onest",system-ui,sans-serif; --wordmark:"Unbounded","Onest",sans-serif;
   --pad:120px;
-  --ease:cubic-bezier(.16,1,.3,1);
 }
 *{margin:0;padding:0;box-sizing:border-box}
 
-/* === FIXED 16:9 STAGE (viewport-base.css из frontend-slides) === */
-html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--stage-bg,#000)}
-.deck-viewport{position:fixed;inset:0;overflow:hidden;background:var(--stage-bg,#000)}
-.deck-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:var(--slide-bg,#fff)}
-.slide{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;display:block;visibility:hidden;opacity:0;pointer-events:none;background:var(--slide-bg,#fff)}
-.slide.active,.slide.visible{visibility:visible;opacity:1;pointer-events:auto;z-index:1}
-img,video,canvas,svg{max-width:100%;max-height:100%}
-.deck-controls{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000}
-@media print{
-  html,body{width:1920px;height:auto;overflow:visible;background:#fff}
-  .deck-viewport{position:static;overflow:visible;background:#fff}
-  .deck-stage{position:static;width:auto;height:auto;transform:none!important;background:none}
-  .slide{position:relative;display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;width:1920px;height:1080px;break-after:page;page-break-after:always}
-  .slide:last-child{break-after:auto;page-break-after:auto}
-  .deck-controls{display:none!important}
-}
-@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.2s!important}}
+/* === FIXED 16:9 STAGE === */
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#000}
+.deck-viewport{position:fixed;inset:0;overflow:hidden;background:#000}
+.deck-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:var(--bg)}
+.slide{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;display:block;visibility:hidden;opacity:0;pointer-events:none;z-index:1}
+.slide.active{visibility:visible;opacity:1;pointer-events:auto;z-index:2}
+.notes{display:none}
+
+/* === ФОН: точки 2255 мест Астаны и мягкий свет, плывут между слайдами === */
+.bg{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;background:radial-gradient(1400px 900px at 50% 45%,#101924 0%,rgba(10,15,21,0) 70%),var(--bg)}
+.orb{position:absolute;left:0;top:0;width:1600px;height:1600px;margin:-800px 0 0 -800px;border-radius:50%}
+.orb.gold{background:radial-gradient(closest-side,rgba(255,194,26,.16),rgba(255,194,26,.05) 45%,rgba(255,194,26,0))}
+.orb.sky{background:radial-gradient(closest-side,rgba(74,168,255,.18),rgba(74,168,255,.05) 45%,rgba(74,168,255,0))}
+#dots{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:50% 50%;opacity:.2}
+.vignette{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,0) 55%,rgba(0,0,0,.5) 100%)}
 
 /* === BASE TYPE === */
-body{font-family:var(--font);color:var(--ink);-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1}
+body{font-family:var(--font);color:var(--ink);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
 .slide{padding:var(--pad);font-family:var(--font);color:var(--ink)}
-.kicker{font-size:22px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--teal);display:flex;gap:14px;align-items:center}
-.kicker b{color:var(--muted);font-weight:500}
-h1{font-size:150px;line-height:1;letter-spacing:-7px;font-weight:700}
-h2{font-size:96px;line-height:1.02;letter-spacing:-4px;font-weight:700}
-h2 em,h1 em{font-style:normal;color:var(--teal)}
-.lead{font-size:38px;line-height:1.4;color:var(--muted);max-width:1100px}
-.hand{font-family:var(--hand);font-size:34px;font-weight:600;color:var(--teal);transform:rotate(-3deg);display:inline-block}
+.kicker{font-size:22px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);display:flex;gap:14px;align-items:center;position:relative;z-index:3}
+.kicker b{color:var(--faint);font-weight:600}
+h1{font-size:150px;line-height:1;letter-spacing:-.04em;font-weight:800}
+h2{font-size:92px;line-height:1.03;letter-spacing:-.04em;font-weight:780}
+h1 em,h2 em{font-style:normal;color:var(--gold)}
+.lead{font-size:36px;line-height:1.42;color:var(--muted);max-width:1000px}
+.gold{color:var(--gold)} .sky{color:var(--sky)}
+.wordmark{font-family:var(--wordmark);font-weight:700;letter-spacing:-.035em;text-transform:lowercase;line-height:1}
+.wordmark .ai{color:var(--gold)}
+/* маска для слов заголовка: слово поднимается из-под строки */
+.w{display:inline-block;overflow:hidden;vertical-align:top;padding:.08em .02em .12em;margin:-.08em -.02em -.12em}
+.wi{display:inline-block;will-change:transform}
 
-/* Критерий жюри: маленькая плашка в правом верхнем углу */
-.crit{position:absolute;top:70px;right:var(--pad);display:flex;gap:10px;z-index:3}
-.crit span{font-size:20px;font-weight:600;padding:10px 18px;border-radius:999px;background:#fff;border:1.5px solid var(--line);color:var(--ink)}
-.crit span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--teal);margin-right:10px;vertical-align:2px}
+/* Критерий жюри: плашки в правом верхнем углу */
+.crit{position:absolute;top:70px;right:var(--pad);display:flex;gap:10px;z-index:4}
+.crit span{font-size:20px;font-weight:600;padding:10px 18px;border-radius:999px;background:rgba(242,244,247,.06);border:1px solid var(--line-2);color:var(--ink);white-space:nowrap}
+.crit span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--gold);margin-right:10px;vertical-align:2px;box-shadow:0 0 12px var(--gold)}
 
-/* Нижняя линия: бюджет времени выступления — фирменный приём продукта */
-.talkbar{position:absolute;left:var(--pad);right:var(--pad);bottom:56px;display:flex;align-items:center;gap:24px;font-size:20px;color:var(--muted);z-index:3}
-.talkbar .track{flex:1;height:8px;border-radius:5px;background:var(--paper-2);overflow:hidden;display:flex;gap:4px}
-.talkbar .track i{display:block;height:100%;border-radius:3px;background:var(--leaf)}
-.talkbar .track i.now{background:var(--orange)}
-.talkbar .track i.left{background:var(--sage);opacity:.45}
-.dark .talkbar .track{background:#ffffff14}
+/* Стекло: карточки на тёмном */
+.glass{background:linear-gradient(180deg,rgba(26,35,47,.88),rgba(15,21,29,.88));border:1px solid var(--line-2);border-radius:26px;box-shadow:0 30px 80px -20px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.06)}
 
-/* === ANIMATION: появление при показе слайда === */
-.reveal{opacity:0;transform:translateY(28px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
-.slide.visible .reveal{opacity:1;transform:none}
-.d1{transition-delay:.08s}.d2{transition-delay:.18s}.d3{transition-delay:.28s}.d4{transition-delay:.38s}.d5{transition-delay:.48s}.d6{transition-delay:.58s}
-.grow{transform-origin:left center;transform:scaleX(0);transition:transform 1.1s var(--ease)}
-.slide.visible .grow{transform:scaleX(1)}
+/* Телефон: экран продукта в рамке */
+.phone{position:absolute;padding:11px;border-radius:54px;background:linear-gradient(150deg,#3a4452 0%,#151b23 38%,#0b0f14 100%);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.10),0 60px 120px -40px rgba(0,0,0,.9),0 30px 80px -50px rgba(74,168,255,.35);z-index:3}
+.phone .scr{border-radius:44px;overflow:hidden;aspect-ratio:779/1328;background:#F4F3EF}
+.phone img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
+.phone.back{filter:none;opacity:.92}
 
-/* === BUDGET BAR: туда / визит / обратно / резерв === */
-.budget{display:flex;gap:8px;height:36px}
-.budget>div{border-radius:8px;position:relative}
-.b-there{background:var(--leaf)} .b-visit{background:var(--orange)} .b-back{background:var(--sage)} .b-res{background:repeating-linear-gradient(135deg,#d6d9cd 0 8px,#e9eae2 8px 16px)} .b-free{background:transparent;border:2px dashed var(--line)}
-.legend{display:flex;gap:8px;margin-top:18px}
-.legend>div{font-size:24px;color:var(--muted)}
-.legend strong{display:block;font-size:44px;color:var(--ink);letter-spacing:-1.5px;font-weight:650}
+/* Видео и фото на весь слайд */
+.media{position:absolute;inset:0;z-index:0;overflow:hidden}
+.media img,.media video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.pdf .media video{display:none}
 
-/* === SCREENSHOT FRAME === */
-.shot{border-radius:22px;overflow:hidden;background:#fff;box-shadow:0 2px 0 var(--line),0 40px 90px -30px #0E162140;border:1.5px solid var(--line)}
-.shot img{display:block;width:100%;height:100%;object-fit:cover;max-width:none;max-height:none}
+/* Полоса времени выступления: фирменный приём продукта (бюджет времени) */
+.talkbar{position:absolute;left:var(--pad);right:var(--pad);bottom:46px;display:flex;align-items:center;gap:24px;font-size:19px;color:var(--faint);z-index:20;pointer-events:none}
+.talkbar .track{flex:1;height:6px;display:flex;gap:4px}
+.talkbar .track i{display:block;height:100%;border-radius:3px;background:rgba(74,168,255,.75);position:relative;overflow:hidden}
+.talkbar .track i.left{background:rgba(242,244,247,.12)}
+.talkbar .track i.now{background:rgba(242,244,247,.14)}
+.talkbar .track i.now b{position:absolute;inset:0;background:var(--gold);box-shadow:0 0 14px var(--gold);transform-origin:left center}
+.talkbar.hidden{opacity:0}
 
-/* ============ SLIDE 1: ТИТУЛ ============ */
-.s-title{background:var(--paper)}
-.s-title .brand{display:flex;align-items:center;gap:20px;font-size:38px;font-weight:750;letter-spacing:-1.4px}
-.s-title .mark{width:72px;height:72px;border-radius:20px;background:var(--ink);display:grid;place-items:center}
-.s-title .mark svg{width:52px;height:52px}
-.wordmark{font-family:var(--wordmark);font-weight:700;letter-spacing:-1px;text-transform:lowercase}
-.s-title h1{margin-top:90px;font-size:140px;letter-spacing:-6.5px}
-.s-title .lead{margin-top:50px;max-width:820px;font-size:36px}
-.s-title .meta{position:absolute;left:var(--pad);bottom:110px;font-size:26px;color:var(--muted);display:flex;flex-direction:column;gap:10px}
-.s-title .meta b{color:var(--ink);font-weight:600}
-.s-title .shot{position:absolute;left:1040px;top:600px;width:1000px;height:563px;border-radius:22px 0 0 0}
-.s-title .hand{position:absolute;left:1060px;top:500px}
-/* ============ SLIDE 2: ПРОБЛЕМА ============ */
-.s-problem{background:var(--ink);color:var(--paper)}
-.s-problem .kicker{color:var(--mint)}
-.s-problem .big{position:absolute;right:120px;top:150px;font-size:520px;line-height:.8;letter-spacing:-30px;font-weight:800;color:var(--mint)}
-.s-problem .big small{display:block;font-size:44px;letter-spacing:0;font-weight:500;color:#ffffffa0;text-align:right;margin-top:28px;margin-right:30px}
-.s-problem h2{margin-top:150px;max-width:960px;color:#fff}
-.s-problem h2 em{color:var(--mint)}
-.s-problem .qs{position:absolute;left:var(--pad);bottom:170px;display:grid;grid-template-columns:repeat(3,420px);gap:30px}
-.s-problem .q{border-top:2px solid #ffffff30;padding-top:24px}
-.s-problem .q span{font-size:22px;color:#ffffff80;letter-spacing:2px;text-transform:uppercase}
-.s-problem .q p{font-size:38px;margin-top:10px;font-weight:550;letter-spacing:-.8px}
-.s-problem .note{position:absolute;left:var(--pad);bottom:110px;font-size:22px;color:#ffffff70}
+/* ============ 00 ТИТУЛ ============ */
+.s-title .shade{position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(7,11,16,.96) 0%,rgba(7,11,16,.86) 34%,rgba(7,11,16,.42) 62%,rgba(7,11,16,.30) 80%,rgba(7,11,16,.55) 100%),linear-gradient(0deg,rgba(7,11,16,.9) 0%,rgba(7,11,16,0) 30%)}
+.s-title .brand,.s-title h1,.s-title .lead{position:relative;z-index:2}
+.s-title .meta,.s-title .cap{z-index:2}
+.brand{display:flex;align-items:center;gap:22px;font-size:46px}
+.brand .mark{width:76px;height:76px;border-radius:20px;background:#0E1621;display:grid;place-items:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 10px 30px rgba(0,0,0,.4)}
+.brand .mark svg{width:76px;height:76px}
+.brand .by{font-weight:500;color:var(--muted);font-size:26px;letter-spacing:0}
+.s-title h1{margin-top:130px;font-size:116px;max-width:1260px}
+.s-title .lead{margin-top:46px;max-width:800px;font-size:34px}
+.s-title .meta{position:absolute;left:var(--pad);bottom:96px;font-size:25px;color:var(--muted);display:flex;flex-direction:column;gap:10px}
+.s-title .meta b{color:var(--ink);font-weight:650}
+.s-title .phone{position:absolute;right:140px;top:170px;width:380px}
+.s-title .cap{position:absolute;right:var(--pad);bottom:60px;font-size:18px;color:var(--faint);letter-spacing:.04em}
 
-/* ============ SLIDE 3: РЕШЕНИЕ / ПРАВИЛО ============ */
+/* ============ 01 ПРОБЛЕМА ============ */
+.s-problem .media{left:820px}
+.s-problem .media img{object-position:50% 40%;-webkit-mask-image:linear-gradient(90deg,transparent 0%,#000 38%);mask-image:linear-gradient(90deg,transparent 0%,#000 38%);opacity:.62}
+.s-problem .shade{position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(10,15,21,1) 0%,rgba(10,15,21,.75) 45%,rgba(10,15,21,.15) 75%,rgba(10,15,21,.35) 100%),linear-gradient(0deg,rgba(10,15,21,.95) 0%,rgba(10,15,21,0) 40%)}
+.s-problem .big,.s-problem h2{position:relative;z-index:2}
+.s-problem .big{margin-top:36px;display:flex;align-items:flex-end;gap:36px}
+.s-problem .big .num{font-size:360px;line-height:.78;letter-spacing:-.06em;font-weight:820;color:var(--gold);text-shadow:0 0 80px rgba(255,194,26,.25)}
+.s-problem .big small{display:block;font-size:44px;line-height:1.15;letter-spacing:-.01em;font-weight:550;color:var(--ink);max-width:360px;padding-bottom:18px}
+.s-problem h2{margin-top:70px;max-width:1100px;font-size:80px}
+.s-problem .qs{position:absolute;left:var(--pad);bottom:170px;display:grid;grid-template-columns:repeat(3,410px);gap:28px;z-index:2}
+.s-problem .q{padding:24px 28px}
+.s-problem .q span{font-size:20px;color:var(--faint);letter-spacing:.16em;text-transform:uppercase;font-weight:650}
+.s-problem .q p{font-size:36px;margin-top:10px;font-weight:600;letter-spacing:-.02em}
+.s-problem .note{position:absolute;left:var(--pad);bottom:110px;font-size:21px;color:var(--faint);z-index:2}
+
+/* ============ 02 РЕШЕНИЕ / ПРАВИЛО ============ */
 .s-rule h2{margin-top:40px;max-width:1500px}
-.s-rule .eq{margin-top:110px}
-.s-rule .eq .budget{height:64px}
-.s-rule .total{display:flex;flex-direction:column;gap:6px;margin-top:64px}
-.s-rule .total strong{font-size:120px;letter-spacing:-5px;font-weight:700}
-.s-rule .total span{font-size:36px;color:var(--muted)}
-.s-rule .out{position:absolute;right:var(--pad);bottom:170px;width:620px;font-size:30px;line-height:1.45;color:var(--muted);border-left:4px solid var(--orange);padding-left:30px}
-.s-rule .out b{color:var(--ink);font-weight:600}
+.s-rule .eq{margin-top:100px}
+.budget{display:flex;gap:8px;height:64px;position:relative}
+.budget>div{border-radius:12px;position:relative}
+.b-there{background:var(--sky);box-shadow:0 0 30px rgba(74,168,255,.35)}
+.b-visit{background:var(--gold);box-shadow:0 0 30px rgba(255,194,26,.35)}
+.b-back{background:#9FB3C8}
+.b-res{background:repeating-linear-gradient(135deg,rgba(242,244,247,.32) 0 8px,rgba(242,244,247,.12) 8px 16px)}
+.b-free{border:2px dashed var(--line-2)}
+.legend{display:flex;gap:8px;margin-top:20px}
+.legend>div{font-size:24px;color:var(--muted)}
+.legend strong{display:block;font-size:46px;color:var(--ink);letter-spacing:-.03em;font-weight:700}
+.s-rule .total{display:flex;flex-direction:column;gap:6px;margin-top:70px}
+.s-rule .total strong{white-space:nowrap;font-size:120px;letter-spacing:-.045em;font-weight:800;line-height:1}
+.s-rule .total strong .gold{color:var(--gold)}
+.s-rule .total>span{font-size:34px;color:var(--muted)}
+.s-rule .out{position:absolute;right:var(--pad);bottom:170px;width:640px;font-size:30px;line-height:1.45;color:var(--muted);padding:34px 38px;border-left:4px solid var(--gold);border-radius:0 26px 26px 0}
+.s-rule .out b{color:var(--ink);font-weight:650}
 
-/* ============ DEMO SLIDES ============ */
-.s-demo{display:grid;grid-template-columns:560px 1fr;gap:80px;align-items:start}
-.s-demo .txt{padding-top:30px}
-.s-demo h2{font-size:70px;letter-spacing:-2.8px;margin-top:30px}
-.s-demo .ask{margin-top:34px;background:#fff;border:1.5px solid var(--line);border-radius:18px;padding:22px 28px;font-size:27px;line-height:1.4}
-.s-demo .ask small{display:block;font-size:20px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
-.s-demo ul{list-style:none;margin-top:30px}
-.s-demo li{font-size:26px;line-height:1.35;padding:22px 0;border-top:1.5px solid var(--line);display:flex;gap:18px}
-.s-demo li b{color:var(--teal);font-weight:700;min-width:44px}
-.s-demo .shot{width:1060px;height:597px;margin-top:150px}
-.s-demo .zoom{position:absolute;right:var(--pad);bottom:150px;display:flex;gap:18px}
+/* ============ 03–05 ДЕМО ============ */
+.s-demo .txt{position:relative;z-index:3;width:600px;padding-top:30px}
+.s-demo h2{font-size:72px;letter-spacing:-.035em;margin-top:30px}
+.s-demo .ask{margin-top:34px;padding:22px 28px;font-size:27px;line-height:1.4;border-radius:20px}
+.s-demo .ask small{display:block;font-size:19px;color:var(--faint);letter-spacing:.16em;text-transform:uppercase;margin-bottom:8px;font-weight:650}
+.s-demo ul{list-style:none;margin-top:28px}
+.s-demo li{font-size:26px;line-height:1.35;padding:21px 0;border-top:1px solid var(--line-2);display:flex;gap:18px;color:var(--muted)}
+.s-demo li b{color:var(--gold);font-weight:750;min-width:58px;font-size:30px;line-height:1.15}
+.s-demo .live{display:inline-flex;align-items:center;gap:12px;margin-top:30px;font-size:22px;font-weight:600;color:var(--ink);text-decoration:none;padding:12px 20px;border-radius:999px;border:1px solid var(--line-2);background:rgba(242,244,247,.05)}
+.s-demo .live i{width:10px;height:10px;border-radius:50%;background:var(--red);box-shadow:0 0 12px var(--red)}
+.p3a{left:790px;top:330px;width:320px}
+.p3b{left:1140px;top:236px;width:350px;z-index:4}
+.p3c{left:1520px;top:330px;width:320px}
+.p2a{left:880px;top:170px;width:430px;z-index:4}
+.p2b{left:1390px;top:250px;width:380px}
 
-/* ============ SLIDE: КАК РАБОТАЕТ ============ */
-.s-how h2{margin-top:36px}
-.pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:22px;margin-top:60px}
-.step{background:#fff;border:1.5px solid var(--line);border-radius:22px;padding:30px 26px;height:450px;position:relative;display:flex;flex-direction:column}
-.step .n{font-size:22px;color:var(--muted);letter-spacing:2px}
-.step h3{font-size:34px;letter-spacing:-1px;margin-top:18px;font-weight:650;line-height:1.1}
-.step p{font-size:22px;line-height:1.4;color:var(--muted);margin-top:14px}
-.step .fig{margin-top:auto;font-size:56px;font-weight:700;letter-spacing:-2.5px;color:var(--ink)}
-.step .fig small{font-size:22px;letter-spacing:0;color:var(--muted);font-weight:500;margin-left:8px}
-.step.ai{background:var(--ink);color:#fff;border-color:var(--ink)}
-.step.ai p,.step.ai .n{color:#ffffffa8}
-.step.ai .fig{color:var(--mint);font-size:38px;letter-spacing:-1px}
-.step:not(:last-child)::after{content:"→";position:absolute;right:-24px;top:50%;transform:translateY(-50%);font-size:30px;color:var(--teal);z-index:2;background:var(--paper);width:26px;text-align:center}
-.stack{display:flex;gap:16px;margin-top:30px;font-size:24px;color:var(--muted);align-items:center}
-.stack span{background:var(--paper-2);border-radius:10px;padding:10px 18px;color:var(--ink);font-weight:550}
+/* ============ 06 КАК РАБОТАЕТ ============ */
+.s-how h2{margin-top:30px;font-size:84px}
+.pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:22px;margin-top:92px;position:relative}
+.rail{position:absolute;left:10%;right:10%;top:-42px;height:2px;background:linear-gradient(90deg,rgba(74,168,255,.6),rgba(255,194,26,.6))}
+.rail i{position:absolute;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:var(--bg);border:2px solid var(--sky)}
+.rail i:nth-child(1){left:0}.rail i:nth-child(2){left:25%}.rail i:nth-child(3){left:50%}.rail i:nth-child(4){left:75%}.rail i:nth-child(5){left:100%;border-color:var(--gold)}
+.rail .pulse{position:absolute;top:50%;left:0;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:var(--gold);box-shadow:0 0 24px 6px rgba(255,194,26,.55);opacity:0}
+.step{padding:30px 26px;height:430px;position:relative;display:flex;flex-direction:column;transition:border-color .5s,box-shadow .5s}
+.step .n{font-size:20px;color:var(--faint);letter-spacing:.14em;font-weight:650}
+.step h3{font-size:33px;letter-spacing:-.02em;margin-top:18px;font-weight:700;line-height:1.1}
+.step p{font-size:21px;line-height:1.4;color:var(--muted);margin-top:14px}
+.step .fig{margin-top:auto;font-size:56px;font-weight:800;letter-spacing:-.04em;color:var(--ink);line-height:1}
+.step .fig small{font-size:21px;letter-spacing:0;color:var(--muted);font-weight:500;margin-left:8px}
+.step .fig.wide{font-size:46px}
+.step .fig.wide small{display:block;margin:8px 0 0}
+.step.lit{border-color:rgba(255,194,26,.55);box-shadow:0 0 0 1px rgba(255,194,26,.25),0 30px 80px -20px rgba(255,194,26,.18)}
+.step.ai{background:linear-gradient(160deg,rgba(71,150,227,.28),rgba(145,119,199,.22) 50%,rgba(202,102,115,.18)),linear-gradient(180deg,#141c27,#0e141c);border-color:rgba(145,119,199,.6)}
+.step.ai .fig{color:var(--gold);font-size:38px;letter-spacing:-.02em}
+.step.ai .spark{position:absolute;right:24px;top:24px;width:46px;height:46px}
+.stack{display:flex;gap:14px;margin-top:30px;font-size:23px;color:var(--muted);align-items:center}
+.stack span{border-radius:999px;padding:9px 18px;color:var(--ink);font-weight:600;background:rgba(242,244,247,.06);border:1px solid var(--line-2)}
 
-/* ============ SLIDE: ДОВЕРИЕ / ПРИВАТНОСТЬ ============ */
-.s-trust{display:grid;grid-template-columns:1fr 760px;gap:90px}
-.s-trust h2{margin-top:30px;font-size:80px}
-.rules{margin-top:36px;display:grid;gap:0}
-.rule{display:grid;grid-template-columns:70px 1fr;gap:20px;padding:18px 0;border-top:1.5px solid var(--line)}
-.rule .ic{width:54px;height:54px;border-radius:14px;background:#E3EEFB;display:grid;place-items:center;font-size:28px;color:var(--teal);font-weight:700}
-.rule h4{font-size:30px;font-weight:650;letter-spacing:-.8px}
+/* ============ 07 GOOGLE-СТЕК ============ */
+.s-google h2{margin-top:26px;font-size:68px;letter-spacing:-.035em;white-space:nowrap}
+.g-table{margin-top:34px}
+.g-row{display:grid;grid-template-columns:48px 400px 1fr 250px;gap:28px;align-items:center;padding:18px 0;border-top:1px solid var(--line)}
+.g-row .ic{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:rgba(242,244,247,.06);border:1px solid var(--line-2)}
+.g-row .ic svg{width:26px;height:26px}
+.g-row b{font-size:29px;font-weight:700;letter-spacing:-.015em}
+.g-row p{font-size:23px;line-height:1.35;color:var(--muted)}
+.g-row code{font:600 20px var(--font);color:var(--sky);text-align:right}
+.g-foot{margin-top:16px;font-size:22px;color:var(--faint)}
+
+/* ============ 08 ДОВЕРИЕ ============ */
+.s-trust .left{position:relative;z-index:3;width:960px}
+.s-trust h2{margin-top:30px;font-size:84px}
+.rules{margin-top:38px}
+.rule{display:grid;grid-template-columns:72px 1fr;gap:22px;padding:19px 0;border-top:1px solid var(--line-2)}
+.rule .ic{width:56px;height:56px;border-radius:16px;background:rgba(255,194,26,.10);border:1px solid rgba(255,194,26,.35);display:grid;place-items:center;font-size:28px;color:var(--gold);font-weight:700}
+.rule h4{font-size:30px;font-weight:700;letter-spacing:-.015em}
 .rule p{font-size:23px;color:var(--muted);margin-top:4px;line-height:1.35}
-.s-trust .shot{margin-top:150px;width:760px;height:600px}
+.s-trust .sheet{position:absolute;right:var(--pad);top:250px;width:700px;height:553px;border-radius:26px;overflow:hidden;z-index:3;box-shadow:0 60px 120px -40px rgba(0,0,0,.9),0 0 0 1px var(--line-2)}
+.s-trust .sheet img{width:100%;height:100%;object-fit:cover;display:block}
+.s-trust .sheet-tag{position:absolute;right:calc(var(--pad) + 30px);top:186px;z-index:4;font-size:20px;font-weight:650;padding:10px 18px;border-radius:999px;background:var(--gold);color:#0E1621}
 
-/* ============ SLIDE: ПРОВЕРКИ И ГРАНИЦЫ ============ */
+/* ============ 09 ПРОВЕРКИ ============ */
 .s-tests{display:grid;grid-template-columns:720px 1fr;gap:110px}
-.s-tests .score{margin-top:130px;font-size:300px;font-weight:800;letter-spacing:-16px;line-height:.85;color:var(--teal)}
-.s-tests .score small{font-size:100px;color:var(--sage);letter-spacing:-4px}
-.s-tests .cap{font-size:34px;color:var(--muted);margin-top:30px;line-height:1.4}
-.s-tests .facts{margin-top:60px;display:grid;grid-template-columns:1fr 1fr;gap:26px}
-.fact{background:#fff;border:1.5px solid var(--line);border-radius:20px;padding:30px}
-.fact strong{font-size:64px;letter-spacing:-2.5px;font-weight:700;display:block}
-.fact span{font-size:24px;color:var(--muted);line-height:1.4;display:block;margin-top:6px}
+.s-tests .score{white-space:nowrap;margin-top:120px;font-size:270px;font-weight:820;letter-spacing:-.06em;line-height:.85;color:var(--gold);text-shadow:0 0 80px rgba(255,194,26,.22)}
+.s-tests .score small{font-size:100px;color:var(--faint);letter-spacing:-.03em}
+.s-tests .bar{margin-top:34px;height:8px;border-radius:4px;background:rgba(242,244,247,.1);overflow:hidden}
+.s-tests .bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--green),#7BE3A6);transform-origin:left center}
+.s-tests .cap{font-size:32px;color:var(--muted);margin-top:26px;line-height:1.4}
+.s-tests .facts{margin-top:50px;display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.fact{padding:30px}
+.fact strong{white-space:nowrap;font-size:64px;letter-spacing:-.04em;font-weight:800;display:block}
+.fact>span{font-size:23px;color:var(--muted);line-height:1.4;display:block;margin-top:6px}
 .limits{margin-top:200px}
-.limits h3{font-size:30px;letter-spacing:2px;text-transform:uppercase;color:var(--orange);font-weight:650}
-.limits li{list-style:none;font-size:31px;line-height:1.4;padding:15px 0;border-top:1.5px solid var(--line)}
-.limits li b{font-weight:650}
+.limits h3{font-size:26px;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);font-weight:700}
+.limits ul{margin-top:12px}
+.limits li{list-style:none;font-size:31px;line-height:1.4;padding:16px 0;border-top:1px solid var(--line-2);color:var(--muted)}
+.limits li b{font-weight:700;color:var(--ink)}
 
-/* ============ SLIDE: ПЛАН РАЗВИТИЯ ============ */
+/* ============ 10 РИСКИ ============ */
+.s-risks h2{margin-top:36px;font-size:80px;white-space:nowrap}
+.risk-list{margin-top:60px;display:grid;grid-template-columns:1fr 1fr;gap:22px 40px}
+.risk{padding:26px 32px 28px;position:relative}
+.risk h4{font-size:34px;letter-spacing:-.02em;font-weight:700;display:flex;align-items:center;gap:16px}
+.risk h4::before{content:"";width:12px;height:12px;border-radius:50%;background:var(--amber);box-shadow:0 0 14px var(--amber);flex:none}
+.risk p{font-size:25px;line-height:1.45;color:var(--muted);margin-top:10px}
+
+/* ============ 11 ЧТО ДАЛЬШЕ ============ */
 .s-next h2{margin-top:36px}
-.road{margin-top:110px;display:grid;grid-template-columns:repeat(3,1fr);gap:0;position:relative}
-.road::before{content:"";position:absolute;top:22px;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--teal),var(--orange))}
+.road{margin-top:120px;display:grid;grid-template-columns:repeat(3,1fr);position:relative}
+.road .line{position:absolute;top:22px;left:0;right:0;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--sky),var(--gold));box-shadow:0 0 20px rgba(255,194,26,.3)}
 .stop{padding-right:70px;position:relative}
-.stop .dot{width:48px;height:48px;border-radius:50%;background:var(--paper);border:5px solid var(--teal);position:relative;z-index:1}
-.stop:nth-child(2) .dot{border-color:var(--sky)}.stop:nth-child(3) .dot{border-color:var(--orange)}
-.stop span{display:block;font-size:22px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-top:36px}
-.stop h3{font-size:46px;letter-spacing:-1.6px;font-weight:650;margin-top:12px;line-height:1.1}
+.stop .dot{width:48px;height:48px;border-radius:50%;background:var(--bg);border:5px solid var(--sky);position:relative;z-index:1}
+.stop:nth-child(3) .dot{border-color:#8FC2F5}.stop:nth-child(4) .dot{border-color:var(--gold)}
+.stop .dot::after{content:"";position:absolute;inset:-14px;border-radius:50%;border:2px solid currentColor;opacity:0}
+.stop span{display:block;font-size:21px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin-top:36px;font-weight:650}
+.stop h3{font-size:46px;letter-spacing:-.03em;font-weight:750;margin-top:12px;line-height:1.1}
 .stop p{font-size:27px;line-height:1.45;color:var(--muted);margin-top:18px}
 
-/* ============ SLIDE: GOOGLE-СТЕК ============ */
-.s-google h2{margin-top:26px;font-size:68px;letter-spacing:-2.5px;max-width:none;white-space:nowrap}
-.g-table{margin-top:36px}
-.g-row{display:grid;grid-template-columns:440px 1fr 260px;gap:40px;align-items:baseline;padding:22px 0;border-top:1.5px solid var(--line)}
-.g-row b{font-size:30px;font-weight:650;letter-spacing:-.6px}
-.g-row p{font-size:23px;line-height:1.35;color:var(--muted)}
-.g-row code{font:500 21px var(--font);color:var(--teal);text-align:right}
-.g-foot{margin-top:18px;font-size:22px;color:var(--muted)}
-
-/* ============ SLIDE: РИСКИ ============ */
-.s-risks h2{margin-top:36px;max-width:1500px}
-.risk-list{margin-top:70px;display:grid;grid-template-columns:1fr 1fr;gap:0 90px}
-.risk{border-top:1.5px solid var(--line);padding:26px 0 30px}
-.risk h4{font-size:36px;letter-spacing:-1px;font-weight:650}
-.risk p{font-size:26px;line-height:1.45;color:var(--muted);margin-top:10px}
-
-/* ============ SLIDE: БИЗНЕС-МОДЕЛЬ ============ */
+/* ============ 12 БИЗНЕС-МОДЕЛЬ ============ */
 .s-biz h2{margin-top:36px;max-width:1550px}
-.biz{margin-top:80px;display:grid;grid-template-columns:repeat(3,1fr);gap:30px}
-.biz-card{background:#fff;border:1.5px solid var(--line);border-radius:22px;padding:40px}
-.biz-card span{font-size:22px;letter-spacing:2px;text-transform:uppercase;color:var(--teal);font-weight:600}
-.biz-card h3{font-size:42px;letter-spacing:-1.4px;font-weight:650;margin-top:14px;line-height:1.1}
+.biz{margin-top:110px;display:grid;grid-template-columns:repeat(3,1fr);gap:30px}
+.biz-card{padding:46px 44px 50px}
+.biz-card span{font-size:21px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);font-weight:700}
+.biz-card h3{font-size:42px;letter-spacing:-.025em;font-weight:750;margin-top:14px;line-height:1.1}
 .biz-card p{font-size:27px;line-height:1.45;color:var(--muted);margin-top:18px}
-.biz-note{margin-top:50px;font-size:26px;color:var(--muted);max-width:1500px}
+.biz-note{margin-top:50px;font-size:27px;color:var(--muted);max-width:1500px}
+.biz-note b{color:var(--ink);font-weight:700}
 
-/* ============ SLIDE: ФИНАЛ ============ */
-.s-end{background:var(--ink);color:#fff}
-.s-end .kicker{color:var(--mint)}
-.s-end h1{margin-top:150px;font-size:170px;color:#fff}
-.s-end h1 em{color:var(--mint)}
-.s-end .link a{color:inherit;text-decoration:none}
-.links{position:absolute;left:var(--pad);right:var(--pad);bottom:170px;display:grid;grid-template-columns:1.6fr 1.45fr .75fr;gap:40px}
-.link{border-top:2px solid #ffffff30;padding-top:24px}
-.link span{font-size:22px;letter-spacing:2px;text-transform:uppercase;color:#ffffff80}
-.link p{font-size:29px;margin-top:10px;font-weight:550;letter-spacing:-.4px;color:var(--mint);white-space:nowrap}
+/* ============ 13 ФИНАЛ ============ */
+.s-end .kicker{color:var(--gold)}
+.s-end .brand{margin-top:110px;font-size:40px}
+.s-end h1{margin-top:40px;font-size:170px;max-width:1300px}
+.s-end a{color:inherit;text-decoration:none}
+.links{position:absolute;left:var(--pad);right:var(--pad);bottom:150px;display:grid;grid-template-columns:1.6fr 1.45fr .75fr;gap:40px;z-index:3}
+.link{border-top:1px solid var(--line-2);padding-top:24px}
+.link span{font-size:21px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-weight:650}
+.link p{font-size:29px;margin-top:10px;font-weight:600;letter-spacing:-.01em;color:var(--gold);white-space:nowrap}
+.s-end .qr{color:#0E1621}
+.qr{position:absolute;right:var(--pad);top:150px;width:360px;padding:26px 26px 22px;border-radius:30px;background:#fff;color:#0E1621;text-align:center;z-index:3;box-shadow:0 40px 100px -30px rgba(0,0,0,.8),0 0 80px -10px rgba(255,194,26,.25)}
+.qr svg{display:block;width:308px;height:308px}
+.qr b{display:block;margin-top:14px;font-size:22px;font-weight:700}
+.qr small{display:block;margin-top:4px;font-size:17px;color:#5B6573}
 
 /* === Управление (вне слайда) === */
-.counter{position:fixed;right:22px;bottom:18px;font:500 13px var(--font);color:#ffffff70;z-index:1000}
-.notes{display:none}
+.counter{position:fixed;right:22px;bottom:16px;font:500 13px var(--font);color:#ffffff60;z-index:1000;pointer-events:none}
+.blackout{position:fixed;inset:0;background:#000;z-index:2000;display:none}
+.blackout.on{display:block}
+.help{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2100;background:#121922;color:#F2F4F7;border:1px solid rgba(242,244,247,.18);border-radius:22px;padding:30px 36px;font:500 17px/1.7 var(--font);display:none;box-shadow:0 40px 100px rgba(0,0,0,.7)}
+.help.on{display:block}
+.help h4{font-size:20px;margin-bottom:10px}
+.help kbd{display:inline-block;min-width:34px;text-align:center;padding:1px 8px;margin-right:10px;border-radius:7px;background:rgba(242,244,247,.1);font:600 15px var(--font)}
+.toast{position:fixed;left:50%;bottom:40px;transform:translateX(-50%);z-index:2200;background:#121922;color:#F2F4F7;border:1px solid rgba(242,244,247,.18);border-radius:999px;padding:10px 22px;font:600 15px var(--font);opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.on{opacity:1}
+.pdf .counter,.pdf .toast,.pdf .help{display:none!important}
+
+@media print{
+  html,body{width:1920px;height:auto;overflow:visible;background:var(--bg)}
+  .deck-viewport{position:static;overflow:visible}
+  .deck-stage{position:static;width:auto;height:auto;transform:none!important}
+  .bg{display:none}
+  .slide{position:relative;display:block!important;visibility:visible!important;opacity:1!important;width:1920px;height:1080px;break-after:page;page-break-after:always;background:var(--bg)}
+  .slide:last-child{break-after:auto;page-break-after:auto}
+  .media video,.counter,.talkbar{display:none!important}
+}
 </style>
 </head>
 <body>
 <div class="deck-viewport">
 <main class="deck-stage" id="deckStage">
 
-<!-- ======================= 1. ТИТУЛ ======================= -->
-<section class="slide s-title active" data-time="0:00">
-  <div class="brand reveal d1"><div class="mark"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="17" r="9" fill="none" stroke="#F5B700" stroke-width="3.6" stroke-linecap="round" stroke-dasharray="45.5 11" transform="rotate(-10 16 17)"/><circle cx="22.4" cy="10.6" r="2.4" fill="#4AA8FF"/></svg></div><span class="wordmark">aidem</span> <span style="font-weight:500;color:var(--muted);font-size:26px;letter-spacing:0">by Ascension</span></div>
-  <h1 class="reveal d2">Прогулка по Астане,<br><em>ровно на ваше время.</em></h1>
-  <p class="lead reveal d3">ИИ-помощник для коротких прогулок по Астане: 1–3 реальных места, которые помещаются в ваше время вместе с дорогой назад.</p>
-  <div class="shot reveal d4"><img src="assets/hero.jpg" alt="Главный экран Aidem с картой Астаны"></div>
-  <div class="meta reveal d5"><span><b>Build with AI 2026</b> · GDG Astana</span><span>Задача НИЦ Smart City · команда Ascension: Азамат, Алишер, Данияр</span></div>
+<div class="bg" id="bg">
+  <div class="orb gold" id="orbGold"></div>
+  <div class="orb sky" id="orbSky"></div>
+  <canvas id="dots" width="1920" height="1080"></canvas>
+  <div class="vignette"></div>
+</div>
+
+<!-- ======================= 00. ТИТУЛ ======================= -->
+<section class="slide s-title active" data-time="0:00" data-title="Обложка" data-bg="0 0 1 0" data-orbs="78 18 12 92">
+  <div class="media"><img src="assets/img/aitu-poster.jpg" alt=""><video src="assets/video/aitu.mp4" muted loop playsinline preload="auto"></video></div>
+  <div class="shade"></div>
+  <div class="brand" data-a="up"><div class="mark"><svg viewBox="0 0 512 512" aria-hidden="true"><g transform="rotate(45 256 256)"><path class="ring" d="M318 139.5A132 132 0 1 1 194 139.5" fill="none" stroke="#F5B700" stroke-width="44" stroke-linecap="round"/><circle class="dot" cx="256" cy="124" r="28" fill="#4AA8FF"/></g></svg></div><span class="wordmark"><span class="ai">ai</span>dem</span><span class="by">by Ascension</span></div>
+  <h1 data-a="words">Прогулка по Астане,<br><em>ровно на ваше время.</em></h1>
+  <p class="lead" data-a="up">ИИ-помощник для коротких прогулок по Астане: 1–3 реальных места, которые помещаются в ваше время вместе с дорогой назад.</p>
+  <div class="phone" data-a="phone"><div class="scr"><img src="assets/img/hero-1.jpg" alt="Главный экран Aidem: «Сколько у вас времени?»"></div></div>
+  <div class="meta" data-a="up"><span><b>Build with AI 2026</b> · GDG Astana</span><span>Задача НИЦ Smart City · команда Ascension: Азамат, Алишер, Данияр</span></div>
+  <div class="cap" data-a="fade">Кадр: вход в AITU, снято командой 20 октября</div>
   <aside class="notes">0:00–0:20. Азамат. Мы Ascension. Айдём отвечает на вопрос «куда сходить прямо сейчас, если времени мало», и всегда считает дорогу обратно.</aside>
 </section>
 
-<!-- ======================= 2. ПРОБЛЕМА ======================= -->
-<section class="slide s-problem dark" data-time="0:20">
-  <div class="kicker reveal d1">01 <b style="color:#ffffff70">/ Проблема</b></div>
-  <div class="big reveal d2">45<small>минут до следующего дела</small></div>
-  <h2 class="reveal d3">Сотни точек на карте. <em>Ни одного ответа</em> «куда мне сейчас».</h2>
+<!-- ======================= 01. ПРОБЛЕМА ======================= -->
+<section class="slide s-problem" data-time="0:20" data-title="Проблема" data-bg="420 60 1.25 .10" data-orbs="20 30 90 80">
+  <div class="media"><img class="kb" src="assets/img/door-phone.jpg" alt=""></div>
+  <div class="shade"></div>
+  <div class="kicker" data-a="up">01 <b>/ Проблема</b></div>
+  <div class="big"><span class="num" data-a="count" data-from="0" data-dur="1.4">45</span><small data-a="up">минут до следующего дела</small></div>
+  <h2 data-a="words">Сотни точек на карте. <em>Ни одного ответа</em> «куда мне сейчас».</h2>
   <div class="qs">
-    <div class="q reveal d4"><span>Где я</span><p>У Mega Silk Way</p></div>
-    <div class="q reveal d5"><span>Чего хочу</span><p>Кофе и передышку</p></div>
-    <div class="q reveal d6"><span>Что ограничивает</span><p>Вернуться к входу D</p></div>
+    <div class="q glass" data-a="up"><span>Где я</span><p>У Mega Silk Way</p></div>
+    <div class="q glass" data-a="up"><span>Чего хочу</span><p>Кофе и передышку</p></div>
+    <div class="q glass" data-a="up"><span>Что ограничивает</span><p>Вернуться к входу D</p></div>
   </div>
-  <div class="note reveal d6">Сценарий команды, не статистика пользователей</div>
+  <div class="note" data-a="fade">Сценарий команды, не статистика пользователей</div>
   <aside class="notes">0:20–0:40. Азамат. Карты показывают всё подряд, но не отвечают, успею ли я сходить и вернуться. Это и есть контекст из критериев: расстояние, время, тип пользователя, часы работы.</aside>
 </section>
 
-<!-- ======================= 3. ПРАВИЛО ======================= -->
-<section class="slide s-rule" data-time="0:40">
-  <div class="crit"><span>Релевантность и полезность</span><span>Контекстуальность</span></div>
-  <div class="kicker reveal d1">02 <b>/ Решение</b></div>
-  <h2 class="reveal d2">Одно правило: прогулка <em>целиком</em> помещается в ваше время.</h2>
+<!-- ======================= 02. ПРАВИЛО ======================= -->
+<section class="slide s-rule" data-time="0:40" data-title="Решение" data-bg="560 200 1.3 .16" data-orbs="85 20 15 85">
+  <div class="crit" data-a="fade"><span>Релевантность и полезность</span><span>Контекстуальность</span></div>
+  <div class="kicker" data-a="up">02 <b>/ Решение</b></div>
+  <h2 data-a="words">Одно правило: прогулка <em>целиком</em> помещается в ваше время.</h2>
   <div class="eq">
-    <div class="budget grow">
-      <div class="b-there" style="flex:10"></div><div class="b-visit" style="flex:15"></div><div class="b-back" style="flex:10"></div><div class="b-res" style="flex:5"></div><div class="b-free" style="flex:20"></div>
+    <div class="budget">
+      <div class="b-there" style="flex:10" data-a="seg"></div><div class="b-visit" style="flex:15" data-a="seg"></div><div class="b-back" style="flex:10" data-a="seg"></div><div class="b-res" style="flex:5" data-a="seg"></div><div class="b-free" style="flex:20" data-a="fade" data-t="0.55"></div>
     </div>
-    <div class="legend reveal d3">
-      <div style="flex:10"><strong>10</strong>туда</div><div style="flex:15"><strong>15</strong>на месте</div><div style="flex:10"><strong>10</strong>обратно</div><div style="flex:5"><strong>5</strong>резерв</div><div style="flex:20;text-align:right"><strong style="color:var(--muted)">60</strong>ваше окно</div>
+    <div class="legend">
+      <div style="flex:10" data-a="up" data-t="0.9"><strong data-a="count" data-t="0.9">10</strong>туда</div><div style="flex:15" data-a="up" data-t="1.25"><strong data-a="count" data-t="1.25">15</strong>на месте</div><div style="flex:10" data-a="up" data-t="1.6"><strong data-a="count" data-t="1.6">10</strong>обратно</div><div style="flex:5" data-a="up" data-t="1.95"><strong data-a="count" data-t="1.95">5</strong>резерв</div><div style="flex:20;text-align:right" data-a="up" data-t="0.6"><strong style="color:var(--muted)">60</strong>ваше окно</div>
     </div>
   </div>
-  <div class="total reveal d4"><strong>40 из 60 минут</strong><span>Сквер, прогулка с ребёнком</span></div>
-  <div class="out reveal d5"><b>На выходе 1–3 места:</b> почему оно подходит, сколько займёт, что там делать и откуда взяты данные.</div>
+  <div class="total" data-a="up" data-t="2.3"><strong><span class="gold" data-a="count" data-t="2.3">40</span> из 60 минут</strong><span>Сквер, прогулка с ребёнком</span></div>
+  <div class="out glass" data-a="up" data-t="2.7"><b>На выходе 1–3 места:</b> почему оно подходит, сколько займёт, что там делать и откуда взяты данные.</div>
   <aside class="notes">0:40–1:05. Азамат. Главное правило продукта. Каждая карточка отдельный вариант, время включает дорогу туда, визит, возвращение и 5 минут запаса.</aside>
 </section>
 
-<!-- ======================= 4. ДЕМО: КОФЕ ======================= -->
-<section class="slide s-demo" data-time="1:05">
-  <div class="crit"><span>UX и понятность демо</span><span>Качество объяснений «почему»</span></div>
+<!-- ======================= 03. ДЕМО: КОФЕ ======================= -->
+<section class="slide s-demo" data-time="1:05" data-title="Демо: кофе за 45 минут" data-bg="-520 40 1.1 .14" data-orbs="70 25 30 90">
+  <div class="crit" data-a="fade"><span>UX и понятность демо</span><span>Качество объяснений «почему»</span></div>
   <div class="txt">
-    <div class="kicker reveal d1">03 <b>/ Демо · сценарий 1</b></div>
-    <h2 class="reveal d2">Кофе за 45 минут</h2>
-    <div class="ask reveal d3"><small>Запрос</small>«Хочу выпить кофе и немного отдохнуть. Нужно вернуться к началу»</div>
+    <div class="kicker" data-a="up">03 <b>/ Демо · сценарий 1</b></div>
+    <h2 data-a="words">Кофе за 45 минут</h2>
+    <div class="ask glass" data-a="up"><small>Запрос</small>«Хочу выпить кофе и немного отдохнуть. Нужно вернуться к началу»</div>
     <ul>
-      <li class="reveal d4"><b>3</b>реальных кафе из OpenStreetMap и Overture</li>
-      <li class="reveal d5"><b>~33</b>минуты вместе с возвращением</li>
-      <li class="reveal d6"><b>✓</b>часы работы проверены на всё время визита</li>
+      <li data-a="up"><b data-a="count">3</b>реальных кафе из OpenStreetMap и Overture</li>
+      <li data-a="up"><b>~<span data-a="count" data-from="0">33</span></b>минуты вместе с возвращением</li>
+      <li data-a="up"><b>✓</b>часы работы проверены на всё время визита</li>
     </ul>
+    <a class="live" data-a="up" href="https://ascension-smartwalk.azamatbreach.workers.dev" target="_blank" rel="noopener"><i></i>Живое демо: клавиша D</a>
   </div>
-  <div class="shot reveal d3"><img src="assets/coffee.jpg" alt="Три карточки кафе с бюджетом времени"></div>
+  <div class="phone p3a" data-a="phone" data-t="0.25"><div class="scr"><img src="assets/img/coffee-1.jpg" alt="Три кафе с бюджетом времени"></div></div>
+  <div class="phone p3b" data-a="phone" data-t="0.4"><div class="scr"><img src="assets/img/coffee-2.jpg" alt="Карточка Degirmen: туда, на месте, обратно, запас"></div></div>
+  <div class="phone p3c" data-a="phone" data-t="0.55"><div class="scr"><img src="assets/img/coffee-3.jpg" alt="Прогулка идёт: таймер до возвращения"></div></div>
   <aside class="notes">1:05–1:56. Азамат. Живое демо на сайте. Показать, что на карточке есть «почему», время по частям и источник. Если интернет подведёт, этот слайд и есть запасной вариант.</aside>
 </section>
 
-<!-- ======================= 5. ДЕМО: РЕБЁНОК ======================= -->
-<section class="slide s-demo" data-time="1:56">
-  <div class="crit"><span>Контекстуальность</span><span>Релевантность и полезность</span></div>
+<!-- ======================= 04. ДЕМО: РЕБЁНОК ======================= -->
+<section class="slide s-demo" data-time="1:56" data-title="Демо: с ребёнком за 60 минут" data-bg="-480 -60 1.2 .14" data-orbs="60 15 25 80">
+  <div class="crit" data-a="fade"><span>Контекстуальность</span><span>Релевантность и полезность</span></div>
   <div class="txt">
-    <div class="kicker reveal d1">04 <b>/ Демо · сценарий 2</b></div>
-    <h2 class="reveal d2">С ребёнком за 60 минут</h2>
-    <div class="ask reveal d3"><small>Условия</small>Окно 60 минут · «С ребёнком» · только парки и площадки рядом</div>
+    <div class="kicker" data-a="up">04 <b>/ Демо · сценарий 2</b></div>
+    <h2 data-a="words">С ребёнком за 60 минут</h2>
+    <div class="ask glass" data-a="up"><small>Условия</small>Окно 60 минут · «С ребёнком» · только парки и площадки рядом</div>
     <ul>
-      <li class="reveal d4"><b>3</b>места для ребёнка, у каждого своё время</li>
-      <li class="reveal d5"><b>40</b>минут из 60 у сквера: 10 + 15 + 10 + 5</li>
-      <li class="reveal d6"><b>?</b>безопасность и оснащённость не придумываем</li>
+      <li data-a="up"><b data-a="count">3</b>места для ребёнка, у каждого своё время</li>
+      <li data-a="up"><b data-a="count">40</b>минут из 60 у сквера: 10 + 15 + 10 + 5</li>
+      <li data-a="up"><b>?</b>безопасность и оснащённость не придумываем</li>
     </ul>
   </div>
-  <div class="shot reveal d3"><img src="assets/child.jpg" alt="Карточка Сквер для прогулки с ребёнком"></div>
+  <div class="phone p2a" data-a="phone" data-t="0.25"><div class="scr"><img src="assets/img/child-1.jpg" alt="Три места для прогулки с ребёнком, Сквер 40 минут"></div></div>
+  <div class="phone p2b back" data-a="phone" data-t="0.45"><div class="scr"><img src="assets/img/child-2.jpg" alt="Карточка Водно-Зелёного бульвара: часы неизвестны, средняя уверенность"></div></div>
   <aside class="notes">1:56–2:21. Данияр. Тип пользователя меняет категории: только парки и площадки. Часы и оснащённость, которых нет в данных, помечены «неизвестно».</aside>
 </section>
 
-<!-- ======================= 6. ДЕМО: НЕИЗВЕСТНО ======================= -->
-<section class="slide s-demo" data-time="2:21">
-  <div class="crit"><span>Этика и приватность</span><span>Креативность и фишки</span></div>
+<!-- ======================= 05. ДЕМО: НЕИЗВЕСТНО ======================= -->
+<section class="slide s-demo" data-time="2:21" data-title="Демо: поздно, нужна розетка" data-bg="-560 120 1.15 .14" data-orbs="75 30 20 70">
+  <div class="crit" data-a="fade"><span>Этика и приватность</span><span>Креативность и фишки</span></div>
   <div class="txt">
-    <div class="kicker reveal d1">05 <b>/ Демо · сценарий 3</b></div>
-    <h2 class="reveal d2">Поздно, нужна розетка</h2>
-    <div class="ask reveal d3"><small>Запрос</small>«Кафе с розеткой поздно вечером, рядом»</div>
+    <div class="kicker" data-a="up">05 <b>/ Демо · сценарий 3</b></div>
+    <h2 data-a="words">Поздно, нужна розетка</h2>
+    <div class="ask glass" data-a="up"><small>Запрос</small>«Кафе с розеткой поздно вечером, рядом»</div>
     <ul>
-      <li class="reveal d4"><b>≠</b>нет тега в данных, значит «неизвестно», а не «да»</li>
-      <li class="reveal d5"><b>≠</b>нет часов работы, значит не «открыто сейчас»</li>
-      <li class="reveal d6"><b>↗</b>у каждого места источник: OSM или Overture</li>
+      <li data-a="up"><b>≠</b>нет тега в данных, значит «неизвестно», а не «да»</li>
+      <li data-a="up"><b>≠</b>нет часов работы, значит не «открыто сейчас»</li>
+      <li data-a="up"><b>↗</b>у каждого места источник: OSM или Overture</li>
     </ul>
   </div>
-  <div class="shot reveal d3"><img src="assets/unknown.jpg" alt="Карточки с пометками о неизвестных данных"></div>
+  <div class="phone p2a" data-a="phone" data-t="0.25"><div class="scr"><img src="assets/img/socket-1.jpg" alt="Источник не подтверждает розетки и тишину"></div></div>
+  <div class="phone p2b back" data-a="phone" data-t="0.45"><div class="scr"><img src="assets/img/evidence-1.jpg" alt="Откуда эти данные: источник, координаты, часы неизвестны"></div></div>
   <aside class="notes">2:21–2:41. Данияр. Обязательные правила кейса: не утверждать «открыто сейчас» без данных, показывать уверенность и источник. Это видно прямо в карточках.</aside>
 </section>
 
-<!-- ======================= 7. КАК РАБОТАЕТ (RAG) ======================= -->
-<section class="slide s-how" data-time="2:41">
-  <div class="crit"><span>Контекстуальность</span><span>Завершённость</span></div>
-  <div class="kicker reveal d1">06 <b>/ Как это работает</b></div>
-  <h2 class="reveal d2">Модель объясняет только то, <em>что нашёл поиск</em>.</h2>
+<!-- ======================= 06. КАК РАБОТАЕТ (RAG) ======================= -->
+<section class="slide s-how" data-time="2:41" data-title="Как это работает" data-hook="rag" data-bg="0 40 .95 .55" data-orbs="50 0 50 100">
+  <div class="crit" data-a="fade"><span>Контекстуальность</span><span>Завершённость</span></div>
+  <div class="kicker" data-a="up">06 <b>/ Как это работает</b></div>
+  <h2 data-a="words">Модель объясняет только то, <em>что нашёл поиск</em>.</h2>
   <div class="pipe">
-    <div class="step reveal d2"><span class="n">01 · ДАННЫЕ</span><h3>OSM + Overture</h3><p>Сбор скриптами, дубли сведены, источник у каждой записи</p><div class="fig">2255<small>мест</small></div></div>
-    <div class="step reveal d3"><span class="n">02 · ПОИСК</span><h3>Отбор кандидатов</h3><p>Смысл запроса через Gemini Embeddings, категория и расстояние, RU/KZ/EN</p><div class="fig">3<small>языка</small></div></div>
-    <div class="step reveal d4"><span class="n">03 · ПРОВЕРКА</span><h3>Время и часы</h3><p>Бюджет прогулки и часы работы на весь визит; непонятный формат часов — «неизвестно», не угадываем</p><div class="fig">145 из 146<small>форматов часов OSM</small></div></div>
-    <div class="step ai reveal d5"><span class="n">04 · GEMINI</span><h3>Объяснение «почему»</h3><p>Видит только найденные записи; ID источников сверяются</p><div class="fig">3.5 Flash-Lite</div></div>
-    <div class="step reveal d6"><span class="n">05 · ОТВЕТ</span><h3>Карточки</h3><p>Факты из данных отдельно от сгенерированного текста</p><div class="fig">1–3<small>места</small></div></div>
+    <div class="rail" data-a="grow" data-t="0.3"><i></i><i></i><i></i><i></i><i></i><span class="pulse"></span></div>
+    <div class="step glass" data-a="up" data-t="0.45"><span class="n">01 · ДАННЫЕ</span><h3>OSM + Overture</h3><p>Сбор скриптами, дубли сведены, источник у каждой записи</p><div class="fig"><span data-a="count" data-t="0.6" data-dur="2.2">2255</span><small>мест</small></div></div>
+    <div class="step glass" data-a="up" data-t="0.6"><span class="n">02 · ПОИСК</span><h3>Отбор кандидатов</h3><p>Смысл запроса через Gemini Embeddings, категория и расстояние, RU/KZ/EN</p><div class="fig"><span data-a="count" data-t="0.8">3</span><small>языка</small></div></div>
+    <div class="step glass" data-a="up" data-t="0.75"><span class="n">03 · ПРОВЕРКА</span><h3>Время и часы</h3><p>Бюджет прогулки и часы работы на весь визит; непонятный формат часов — «неизвестно», не угадываем</p><div class="fig wide"><span data-a="count" data-t="0.95" data-dur="1.8">145</span> из 146<small>форматов часов OSM</small></div></div>
+    <div class="step glass ai" data-a="up" data-t="0.9"><svg class="spark" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="gem" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4796E3"/><stop offset=".55" stop-color="#9177C7"/><stop offset="1" stop-color="#CA6673"/></linearGradient></defs><path d="M12 0C12.6 6.4 17.6 11.4 24 12C17.6 12.6 12.6 17.6 12 24C11.4 17.6 6.4 12.6 0 12C6.4 11.4 11.4 6.4 12 0Z" fill="url(#gem)"/></svg><span class="n">04 · GEMINI</span><h3>Объяснение «почему»</h3><p>Видит только найденные записи; ID источников сверяются</p><div class="fig">3.5 Flash-Lite</div></div>
+    <div class="step glass" data-a="up" data-t="1.05"><span class="n">05 · ОТВЕТ</span><h3>Карточки</h3><p>Факты из данных отдельно от сгенерированного текста</p><div class="fig">1–3<small>места</small></div></div>
   </div>
-  <div class="stack reveal d6">Стек: <span>Gemini API</span><span>OpenStreetMap</span><span>Cloudflare Workers</span><span>Overture Maps</span><span>Open-Meteo</span></div>
+  <div class="stack" data-a="up" data-t="1.4">Стек: <span>Gemini API</span><span>OpenStreetMap</span><span>Cloudflare Workers</span><span>Overture Maps</span><span>Open-Meteo</span></div>
   <aside class="notes">2:41–3:13. Данияр. Высокоуровневая схема RAG из требований кейса. Если Gemini недоступен, поиск и расчёт продолжают работать, интерфейс честно пишет, что текст без генерации.</aside>
 </section>
 
-<!-- ======================= 7б. GOOGLE-СТЕК ======================= -->
-<section class="slide s-google" data-time="3:13">
-  <div class="crit"><span>Контекстуальность</span><span>Креативность и фишки</span></div>
-  <div class="kicker reveal d1">07 <b>/ Google-стек</b></div>
-  <h2 class="reveal d2">Gemini здесь не украшение, <em>а мозг прогулки</em>.</h2>
+<!-- ======================= 07. GOOGLE-СТЕК ======================= -->
+<section class="slide s-google" data-time="3:13" data-title="Google-стек" data-bg="640 0 1.2 .14" data-orbs="88 12 8 70">
+  <div class="crit" data-a="fade"><span>Контекстуальность</span><span>Креативность и фишки</span></div>
+  <div class="kicker" data-a="up">07 <b>/ Google-стек</b></div>
+  <h2 data-a="words">Gemini здесь не украшение, <em>а мозг прогулки</em>.</h2>
   <div class="g-table">
-    <div class="g-row reveal d2"><b>Gemini · function calling</b><p>Сам решает, что проверить: погоду, места, часы, дорогу; шаги видны</p><code>/agent</code></div>
-    <div class="g-row reveal d2"><b>Gemini · объяснения</b><p>«Почему сюда» и «что делать» для каждого места, сервер сверяет факты</p><code>карточки</code></div>
-    <div class="g-row reveal d2"><b>Gemini · embeddings</b><p>Понимает запрос по смыслу: «подышать свежим воздухом» → парк</p><code>поиск мест</code></div>
-    <div class="g-row reveal d3"><b>Gemini · фото</b><p>«Что это за здание?»: фото → место из базы и факты с меткой «идея ИИ»</p><code>/agent, камера</code></div>
-    <div class="g-row reveal d3"><b>Gemini · голос</b><p>Ответ звучит голосом, в том числе по-казахски</p><code>«Озвучить»</code></div>
-    <div class="g-row reveal d4"><b>MCP + Gemini CLI</b><p>Наши инструменты для любого ИИ: gemini extensions install …</p><code>терминал</code></div>
-    <div class="g-row reveal d4"><b>Google ADK</b><p>Готовый агент на наших инструментах, готов к Agent Engine</p><code>integrations/adk</code></div>
-    <div class="g-row reveal d5"><b>Google Maps · Календарь</b><p>Маршрут пешком и прогулка в календаре в одно касание</p><code>у каждого места</code></div>
+    <div class="g-row" data-a="row"><span class="ic"><svg viewBox="0 0 24 24"><use href="#i-spark"/></svg></span><b>Gemini · function calling</b><p>Сам решает, что проверить: погоду, места, часы, дорогу; шаги видны</p><code>/agent</code></div>
+    <div class="g-row" data-a="row"><span class="ic"><svg viewBox="0 0 24 24"><use href="#i-spark"/></svg></span><b>Gemini · объяснения</b><p>«Почему сюда» и «что делать» для каждого места, сервер сверяет факты</p><code>карточки</code></div>
+    <div class="g-row" data-a="row"><span class="ic"><svg viewBox="0 0 24 24"><use href="#i-spark"/></svg></span><b>Gemini · embeddings</b><p>Понимает запрос по смыслу: «подышать свежим воздухом» → парк</p><code>поиск мест</code></div>
+    <div class="g-row" data-a="row"><span class="ic"><svg viewBox="0 0 24 24"><use href="#i-spark"/></svg></span><b>Gemini · фото</b><p>«Что это за здание?»: фото → место из базы и факты с меткой «идея ИИ»</p><code>/agent, камера</code></div>
+    <div class="g-row" data-a="row"><span class="ic"><svg viewBox="0 0 24 24"><use href="#i-spark"/></svg></span><b>Gemini · голос</b><p>Ответ звучит голосом, в том числе по-казахски</p><code>«Озвучить»</code></div>
+    <div class="g-row" data-a="row"><span class="ic"><svg viewBox="0 0 24 24"><use href="#i-term"/></svg></span><b>MCP + Gemini CLI</b><p>Наши инструменты для любого ИИ: gemini extensions install …</p><code>терминал</code></div>
+    <div class="g-row" data-a="row"><span class="ic"><svg viewBox="0 0 24 24"><use href="#i-agent"/></svg></span><b>Google ADK</b><p>Готовый агент на наших инструментах, готов к Agent Engine</p><code>integrations/adk</code></div>
+    <div class="g-row" data-a="row"><span class="ic"><svg viewBox="0 0 24 24"><use href="#i-pin"/></svg></span><b>Google Maps · Календарь</b><p>Маршрут пешком и прогулка в календаре в одно касание</p><code>у каждого места</code></div>
   </div>
-  <p class="g-foot reveal d6">Бесплатный ключ AI Studio, без биллинга Google Cloud. Координаты человека в Gemini не уходят.</p>
+  <p class="g-foot" data-a="fade">Бесплатный ключ AI Studio, без биллинга Google Cloud. Координаты человека в Gemini не уходят.</p>
   <aside class="notes">3:13–3:43. Данияр. «Без Gemini Айдём просто список мест. С Gemini он сам проверяет погоду, часы и дорогу и собирает прогулку ровно на ваше время, а наши инструменты может взять любой ИИ, от Gemini CLI до агентов на ADK.»</aside>
 </section>
 
-<!-- ======================= 8. ДОВЕРИЕ ======================= -->
-<section class="slide s-trust" data-time="3:43">
-  <div class="crit"><span>Этика и приватность</span></div>
-  <div>
-    <div class="kicker reveal d1">08 <b>/ Чему можно верить</b></div>
-    <h2 class="reveal d2">Видно, откуда каждый факт.</h2>
+<!-- ======================= 08. ДОВЕРИЕ ======================= -->
+<section class="slide s-trust" data-time="3:43" data-title="Чему можно верить" data-bg="-560 0 1.2 .12" data-orbs="80 70 10 20">
+  <div class="crit" data-a="fade"><span>Этика и приватность</span></div>
+  <div class="left">
+    <div class="kicker" data-a="up">08 <b>/ Чему можно верить</b></div>
+    <h2 data-a="words">Видно, откуда каждый факт.</h2>
     <div class="rules">
-      <div class="rule reveal d3"><div class="ic">◎</div><div><h4>Точка старта не уходит в модель</h4><p>Gemini получает запрос и публичные места, без координат пользователя</p></div></div>
-      <div class="rule reveal d4"><div class="ic">∅</div><div><h4>Ничего не храним</h4><p>Нет истории запросов и маршрутов; друзья видят вас только на время встречи</p></div></div>
-      <div class="rule reveal d5"><div class="ic">?</div><div><h4>Неизвестное так и называется</h4><p>Часы, розетки, доступность: «нужно проверить», а не догадка</p></div></div>
-      <div class="rule reveal d6"><div class="ic">≤</div><div><h4>Лимиты от злоупотреблений</h4><p>8 запросов в минуту с адреса, 500 в сутки; поиск работает и без ИИ</p></div></div>
+      <div class="rule" data-a="up"><div class="ic">◎</div><div><h4>Точка старта не уходит в модель</h4><p>Gemini получает запрос и публичные места, без координат пользователя</p></div></div>
+      <div class="rule" data-a="up"><div class="ic">∅</div><div><h4>Ничего не храним</h4><p>Нет истории запросов и маршрутов; друзья видят вас только на время встречи</p></div></div>
+      <div class="rule" data-a="up"><div class="ic">?</div><div><h4>Неизвестное так и называется</h4><p>Часы, розетки, доступность: «нужно проверить», а не догадка</p></div></div>
+      <div class="rule" data-a="up"><div class="ic">≤</div><div><h4>Лимиты от злоупотреблений</h4><p>8 запросов в минуту с адреса, 500 в сутки; поиск работает и без ИИ</p></div></div>
     </div>
   </div>
-  <div class="shot reveal d3"><img src="assets/privacy.jpg" alt="Окно о данных и приватности"></div>
+  <div class="sheet" data-a="phone" data-t="0.35"><img src="assets/privacy.jpg" alt="Окно о данных и приватности"></div>
+  <div class="sheet-tag" data-a="pop" data-t="1.1">Окно «Данные и приватность»</div>
   <aside class="notes">3:43–4:07. Данияр. Этика и privacy из требований: приватность локации, недостоверная информация, безопасность.</aside>
 </section>
 
-<!-- ======================= 9. ПРОВЕРКИ И ОГРАНИЧЕНИЯ ======================= -->
-<section class="slide s-tests" data-time="4:07">
-  <div class="crit"><span>Завершённость</span><span>Этика и приватность</span></div>
+<!-- ======================= 09. ПРОВЕРКИ И ОГРАНИЧЕНИЯ ======================= -->
+<section class="slide s-tests" data-time="4:07" data-title="Проверки и ограничения" data-bg="-600 -40 1.1 .12" data-orbs="20 20 85 85">
+  <div class="crit" data-a="fade"><span>Завершённость</span><span>Этика и приватность</span></div>
   <div>
-    <div class="kicker reveal d1">09 <b>/ Проверки</b></div>
-    <div class="score reveal d2">139<small>/139</small></div>
-    <p class="cap reveal d3">автотестов проходят: поиск, часы и погода, друзья и встречи, часы на руке, приватность и лимиты</p>
+    <div class="kicker" data-a="up">09 <b>/ Проверки</b></div>
+    <div class="score" data-a="up"><span data-a="count" data-dur="1.8">145</span><small>/145</small></div>
+    <div class="bar"><i data-a="grow" data-t="0.2" data-dur="1.8"></i></div>
+    <p class="cap" data-a="up">автотестов проходят: поиск, часы и погода, друзья и встречи, часы на руке, приватность и лимиты</p>
     <div class="facts">
-      <div class="fact reveal d4"><strong>2255</strong><span>мест после сведения дублей</span></div>
-      <div class="fact reveal d5"><strong>15/15</strong><span>сценариев протокола приёмки Pass</span></div>
+      <div class="fact glass" data-a="up"><strong data-a="count" data-dur="1.6">2255</strong><span>мест после сведения дублей</span></div>
+      <div class="fact glass" data-a="up"><strong><span data-a="count">15</span>/15</strong><span>сценариев протокола приёмки Pass</span></div>
     </div>
   </div>
   <div class="limits">
-    <h3 class="reveal d2">Честные ограничения</h3>
+    <h3 data-a="up">Честные ограничения</h3>
     <ul>
-      <li class="reveal d3"><b>Время пешком оценочное:</b> расстояние × 1,35 при 4,2 км/ч, без построения маршрута</li>
-      <li class="reveal d4"><b>OSM может быть неполным</b> или устаревшим: часы это запись источника, не факт «открыто»</li>
-      <li class="reveal d5"><b>Бесплатный ключ Gemini:</b> для реального запуска нужен проект с биллингом</li>
+      <li data-a="up"><b>Время пешком оценочное:</b> расстояние × 1,35 при 4,2 км/ч, без построения маршрута</li>
+      <li data-a="up"><b>OSM может быть неполным</b> или устаревшим: часы это запись источника, не факт «открыто»</li>
+      <li data-a="up"><b>Бесплатный ключ Gemini:</b> для реального запуска нужен проект с биллингом</li>
     </ul>
   </div>
   <aside class="notes">4:07–4:24. Алишер. Ограничения, как просит кейс. Не заявлять пользователей или выручку.</aside>
 </section>
 
 <!-- ======================= 10. РИСКИ ======================= -->
-<section class="slide s-risks" data-time="4:24">
-  <div class="crit"><span>Этика и приватность</span><span>Завершённость</span></div>
-  <div class="kicker reveal d1">10 <b>/ Риски</b></div>
-  <h2 class="reveal d2">Что может пойти не так <em>и что мы делаем</em>.</h2>
+<section class="slide s-risks" data-time="4:24" data-title="Риски" data-bg="560 260 1.3 .12" data-orbs="90 40 10 10">
+  <div class="crit" data-a="fade"><span>Этика и приватность</span><span>Завершённость</span></div>
+  <div class="kicker" data-a="up">10 <b>/ Риски</b></div>
+  <h2 data-a="words">Что может пойти не так <em>и что мы делаем</em>.</h2>
   <div class="risk-list">
-    <div class="risk reveal d3"><h4>Устаревшие часы и данные</h4><p>Метка источника и уверенность на карточке; нет данных, значит «неизвестно», а не «открыто»</p></div>
-    <div class="risk reveal d3"><h4>ИИ ошибается</h4><p>Gemini только объясняет; места, время и часы считает и сверяет сервер. Без ИИ ответ всё равно есть</p></div>
-    <div class="risk reveal d4"><h4>Приватность друзей</h4><p>Только по согласию и на время встречи, «перестать делиться» в одно касание, истории нет</p></div>
-    <div class="risk reveal d4"><h4>Зима до −30</h4><p>Погода в подборе: в мороз, снег и дождь обычный запрос уходит под крышу</p></div>
-    <div class="risk reveal d5"><h4>Бесплатные лимиты</h4><p>Gemini и Cloudflare на бесплатных тарифах; при запуске биллинг, поиск работает и без ИИ</p></div>
-    <div class="risk reveal d5"><h4>Мало данных о доступности</h4><p>Фильтр для коляски берёт теги OSM; где тегов нет, так и пишем</p></div>
+    <div class="risk glass" data-a="up"><h4>Устаревшие часы и данные</h4><p>Метка источника и уверенность на карточке; нет данных, значит «неизвестно», а не «открыто»</p></div>
+    <div class="risk glass" data-a="up"><h4>ИИ ошибается</h4><p>Gemini только объясняет; места, время и часы считает и сверяет сервер. Без ИИ ответ всё равно есть</p></div>
+    <div class="risk glass" data-a="up"><h4>Приватность друзей</h4><p>Только по согласию и на время встречи, «перестать делиться» в одно касание, истории нет</p></div>
+    <div class="risk glass" data-a="up"><h4>Зима до −30</h4><p>Погода в подборе: в мороз, снег и дождь обычный запрос уходит под крышу</p></div>
+    <div class="risk glass" data-a="up"><h4>Бесплатные лимиты</h4><p>Gemini и Cloudflare на бесплатных тарифах; при запуске биллинг, поиск работает и без ИИ</p></div>
+    <div class="risk glass" data-a="up"><h4>Мало данных о доступности</h4><p>Фильтр для коляски берёт теги OSM; где тегов нет, так и пишем</p></div>
   </div>
   <aside class="notes">4:24–4:45. Алишер. Риски отдельным слайдом, как просит кейс: каждый риск и что уже сделано.</aside>
 </section>
 
 <!-- ======================= 11. ПЛАН РАЗВИТИЯ ======================= -->
-<section class="slide s-next" data-time="4:45">
-  <div class="crit"><span>Креативность и фишки</span><span>План развития</span></div>
-  <div class="kicker reveal d1">11 <b>/ Что дальше</b></div>
-  <h2 class="reveal d2">Из прогулки в инструмент <em>для города</em>.</h2>
+<section class="slide s-next" data-time="4:45" data-title="Что дальше" data-hook="road" data-bg="0 320 1.5 .18" data-orbs="15 80 85 15">
+  <div class="crit" data-a="fade"><span>Креативность и фишки</span><span>План развития</span></div>
+  <div class="kicker" data-a="up">11 <b>/ Что дальше</b></div>
+  <h2 data-a="words">Из прогулки в инструмент <em>для города</em>.</h2>
   <div class="road">
-    <div class="stop reveal d3"><div class="dot"></div><span>Сейчас</span><h3>Точнее время</h3><p>Пешеходные маршруты вместо оценки по прямой, больше проверенных полей о местах</p></div>
-    <div class="stop reveal d4"><div class="dot"></div><span>Следом</span><h3>Афиша города</h3><p>События сегодняшнего дня прямо в подборе, с той же проверкой времени и дороги назад</p></div>
-    <div class="stop reveal d5"><div class="dot"></div><span>Пилот</span><h3>Карта спроса для НИЦ</h3><p>Обезличенные запросы показывают, каких мест городу не хватает. Пилот с кампусами и гостиницами</p></div>
+    <div class="line" data-a="grow" data-t="0.4" data-dur="1.6"></div>
+    <div class="stop"><div class="dot" data-a="pop" data-t="0.5"></div><div data-a="up" data-t="0.6"><span>Сейчас</span><h3>Точнее время</h3><p>Пешеходные маршруты вместо оценки по прямой, больше проверенных полей о местах</p></div></div>
+    <div class="stop"><div class="dot" data-a="pop" data-t="1.0"></div><div data-a="up" data-t="1.1"><span>Следом</span><h3>Афиша города</h3><p>События сегодняшнего дня прямо в подборе, с той же проверкой времени и дороги назад</p></div></div>
+    <div class="stop"><div class="dot" data-a="pop" data-t="1.5"></div><div data-a="up" data-t="1.6"><span>Пилот</span><h3>Карта спроса для НИЦ</h3><p>Обезличенные запросы показывают, каких мест городу не хватает. Пилот с кампусами и гостиницами</p></div></div>
   </div>
   <aside class="notes">4:45–5:07. Алишер. План развития. Договорённостей с партнёрами не заявлять.</aside>
 </section>
 
 <!-- ======================= 12. БИЗНЕС-МОДЕЛЬ ======================= -->
-<section class="slide s-biz" data-time="5:07">
-  <div class="crit"><span>Релевантность и полезность</span><span>План развития</span></div>
-  <div class="kicker reveal d1">12 <b>/ Бизнес-модель</b></div>
-  <h2 class="reveal d2">Бесплатно для людей. <em>Платит тот, кому нужны данные и гости.</em></h2>
+<section class="slide s-biz" data-time="5:07" data-title="Бизнес-модель" data-bg="-400 280 1.3 .12" data-orbs="70 90 30 10">
+  <div class="crit" data-a="fade"><span>Релевантность и полезность</span><span>План развития</span></div>
+  <div class="kicker" data-a="up">12 <b>/ Бизнес-модель</b></div>
+  <h2 data-a="words">Бесплатно для людей. <em>Платит тот, кому нужны данные и гости.</em></h2>
   <div class="biz">
-    <div class="biz-card reveal d3"><span>Город</span><h3>НИЦ Smart City, акимат</h3><p>Обезличенная карта спроса: что ищут, где и когда не находят. Подписка на аналитику</p></div>
-    <div class="biz-card reveal d4"><span>Гости</span><h3>Отели, кампусы, конференции</h3><p>Aidem под их брендом: «куда сходить за 45 минут» от входа. Плата за подключение</p></div>
-    <div class="biz-card reveal d5"><span>Места</span><h3>Кафе, музеи, ТРЦ</h3><p>Подтверждённые часы и описание. Платят за проверенную карточку, не за место в выдаче</p></div>
+    <div class="biz-card glass" data-a="up"><span>Город</span><h3>НИЦ Smart City, акимат</h3><p>Обезличенная карта спроса: что ищут, где и когда не находят. Подписка на аналитику</p></div>
+    <div class="biz-card glass" data-a="up"><span>Гости</span><h3>Отели, кампусы, конференции</h3><p>Aidem под их брендом: «куда сходить за 45 минут» от входа. Плата за подключение</p></div>
+    <div class="biz-card glass" data-a="up"><span>Места</span><h3>Кафе, музеи, ТРЦ</h3><p>Подтверждённые часы и описание. Платят за проверенную карточку, не за место в выдаче</p></div>
   </div>
-  <p class="biz-note reveal d6">Аудитория: жители и гости Астаны с коротким окном. В 2025 году город принял 1,6 млн туристов, из них больше 380 тыс. иностранных.</p>
+  <p class="biz-note" data-a="up">Аудитория: жители и гости Астаны с коротким окном. В 2025 году город принял <b><span data-a="count" data-dur="1.4">1,6</span> млн</b> туристов, из них больше <b><span data-a="count" data-dur="1.4">380</span> тыс.</b> иностранных.</p>
   <aside class="notes">5:07–5:35. Алишер. Кто платит. Пилотов и договорённостей не заявлять; это модель, а не выручка.</aside>
 </section>
 
 <!-- ======================= 13. ФИНАЛ ======================= -->
-<section class="slide s-end dark" data-time="5:35">
-  <div class="kicker reveal d1">Ascension · Азамат, Алишер, Данияр · Build with AI 2026</div>
-  <h1 class="reveal d2">Попробуйте <em>прямо сейчас.</em></h1>
+<section class="slide s-end" data-time="5:35" data-title="Финал" data-hook="end" data-bg="260 0 1 .42" data-orbs="80 30 20 80">
+  <div class="kicker" data-a="up">Ascension · Азамат, Алишер, Данияр · Build with AI 2026</div>
+  <div class="brand" data-a="up"><div class="mark"><svg viewBox="0 0 512 512" aria-hidden="true"><g transform="rotate(45 256 256)"><path class="ring" d="M318 139.5A132 132 0 1 1 194 139.5" fill="none" stroke="#F5B700" stroke-width="44" stroke-linecap="round"/><circle class="dot" cx="256" cy="124" r="28" fill="#4AA8FF"/></g></svg></div><span class="wordmark"><span class="ai">ai</span>dem</span><span class="by">by Ascension</span></div>
+  <h1 data-a="words">Попробуйте <em>прямо сейчас.</em></h1>
+  <a class="qr" data-a="phone" data-t="0.5" href="https://ascension-smartwalk.azamatbreach.workers.dev" target="_blank" rel="noopener"><svg viewBox="-3 -3 39 39" shape-rendering="crispEdges" aria-label="QR-код на живое демо"><rect x="-3" y="-3" width="39" height="39" fill="#fff"/><path fill="#0E1621" d="M0 0h1v1h-1zM1 0h1v1h-1zM2 0h1v1h-1zM3 0h1v1h-1zM4 0h1v1h-1zM5 0h1v1h-1zM6 0h1v1h-1zM12 0h1v1h-1zM13 0h1v1h-1zM14 0h1v1h-1zM16 0h1v1h-1zM17 0h1v1h-1zM19 0h1v1h-1zM20 0h1v1h-1zM22 0h1v1h-1zM23 0h1v1h-1zM26 0h1v1h-1zM27 0h1v1h-1zM28 0h1v1h-1zM29 0h1v1h-1zM30 0h1v1h-1zM31 0h1v1h-1zM32 0h1v1h-1zM0 1h1v1h-1zM6 1h1v1h-1zM10 1h1v1h-1zM11 1h1v1h-1zM13 1h1v1h-1zM14 1h1v1h-1zM15 1h1v1h-1zM16 1h1v1h-1zM17 1h1v1h-1zM20 1h1v1h-1zM24 1h1v1h-1zM26 1h1v1h-1zM32 1h1v1h-1zM0 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM6 2h1v1h-1zM8 2h1v1h-1zM13 2h1v1h-1zM15 2h1v1h-1zM17 2h1v1h-1zM18 2h1v1h-1zM21 2h1v1h-1zM22 2h1v1h-1zM23 2h1v1h-1zM26 2h1v1h-1zM28 2h1v1h-1zM29 2h1v1h-1zM30 2h1v1h-1zM32 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM6 3h1v1h-1zM8 3h1v1h-1zM9 3h1v1h-1zM10 3h1v1h-1zM11 3h1v1h-1zM12 3h1v1h-1zM14 3h1v1h-1zM15 3h1v1h-1zM16 3h1v1h-1zM22 3h1v1h-1zM23 3h1v1h-1zM24 3h1v1h-1zM26 3h1v1h-1zM28 3h1v1h-1zM29 3h1v1h-1zM30 3h1v1h-1zM32 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM6 4h1v1h-1zM8 4h1v1h-1zM10 4h1v1h-1zM13 4h1v1h-1zM15 4h1v1h-1zM18 4h1v1h-1zM21 4h1v1h-1zM23 4h1v1h-1zM26 4h1v1h-1zM28 4h1v1h-1zM29 4h1v1h-1zM30 4h1v1h-1zM32 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM8 5h1v1h-1zM10 5h1v1h-1zM13 5h1v1h-1zM15 5h1v1h-1zM16 5h1v1h-1zM17 5h1v1h-1zM18 5h1v1h-1zM24 5h1v1h-1zM26 5h1v1h-1zM32 5h1v1h-1zM0 6h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h1v1h-1zM24 6h1v1h-1zM26 6h1v1h-1zM27 6h1v1h-1zM28 6h1v1h-1zM29 6h1v1h-1zM30 6h1v1h-1zM31 6h1v1h-1zM32 6h1v1h-1zM8 7h1v1h-1zM9 7h1v1h-1zM11 7h1v1h-1zM15 7h1v1h-1zM18 7h1v1h-1zM19 7h1v1h-1zM20 7h1v1h-1zM21 7h1v1h-1zM22 7h1v1h-1zM23 7h1v1h-1zM24 7h1v1h-1zM0 8h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM11 8h1v1h-1zM13 8h1v1h-1zM14 8h1v1h-1zM15 8h1v1h-1zM17 8h1v1h-1zM22 8h1v1h-1zM24 8h1v1h-1zM26 8h1v1h-1zM27 8h1v1h-1zM28 8h1v1h-1zM29 8h1v1h-1zM30 8h1v1h-1zM0 9h1v1h-1zM1 9h1v1h-1zM7 9h1v1h-1zM8 9h1v1h-1zM16 9h1v1h-1zM19 9h1v1h-1zM20 9h1v1h-1zM21 9h1v1h-1zM23 9h1v1h-1zM26 9h1v1h-1zM27 9h1v1h-1zM29 9h1v1h-1zM30 9h1v1h-1zM31 9h1v1h-1zM32 9h1v1h-1zM2 10h1v1h-1zM3 10h1v1h-1zM6 10h1v1h-1zM7 10h1v1h-1zM9 10h1v1h-1zM10 10h1v1h-1zM11 10h1v1h-1zM15 10h1v1h-1zM18 10h1v1h-1zM20 10h1v1h-1zM21 10h1v1h-1zM22 10h1v1h-1zM28 10h1v1h-1zM30 10h1v1h-1zM31 10h1v1h-1zM1 11h1v1h-1zM10 11h1v1h-1zM11 11h1v1h-1zM14 11h1v1h-1zM16 11h1v1h-1zM20 11h1v1h-1zM21 11h1v1h-1zM22 11h1v1h-1zM25 11h1v1h-1zM26 11h1v1h-1zM28 11h1v1h-1zM29 11h1v1h-1zM30 11h1v1h-1zM31 11h1v1h-1zM0 12h1v1h-1zM1 12h1v1h-1zM2 12h1v1h-1zM4 12h1v1h-1zM5 12h1v1h-1zM6 12h1v1h-1zM7 12h1v1h-1zM8 12h1v1h-1zM11 12h1v1h-1zM18 12h1v1h-1zM19 12h1v1h-1zM20 12h1v1h-1zM22 12h1v1h-1zM25 12h1v1h-1zM27 12h1v1h-1zM28 12h1v1h-1zM29 12h1v1h-1zM0 13h1v1h-1zM1 13h1v1h-1zM2 13h1v1h-1zM3 13h1v1h-1zM5 13h1v1h-1zM8 13h1v1h-1zM14 13h1v1h-1zM15 13h1v1h-1zM16 13h1v1h-1zM19 13h1v1h-1zM20 13h1v1h-1zM22 13h1v1h-1zM23 13h1v1h-1zM26 13h1v1h-1zM29 13h1v1h-1zM30 13h1v1h-1zM31 13h1v1h-1zM32 13h1v1h-1zM0 14h1v1h-1zM1 14h1v1h-1zM2 14h1v1h-1zM5 14h1v1h-1zM6 14h1v1h-1zM9 14h1v1h-1zM11 14h1v1h-1zM12 14h1v1h-1zM14 14h1v1h-1zM20 14h1v1h-1zM21 14h1v1h-1zM25 14h1v1h-1zM26 14h1v1h-1zM30 14h1v1h-1zM31 14h1v1h-1zM0 15h1v1h-1zM1 15h1v1h-1zM3 15h1v1h-1zM4 15h1v1h-1zM8 15h1v1h-1zM12 15h1v1h-1zM16 15h1v1h-1zM18 15h1v1h-1zM20 15h1v1h-1zM21 15h1v1h-1zM22 15h1v1h-1zM23 15h1v1h-1zM25 15h1v1h-1zM26 15h1v1h-1zM27 15h1v1h-1zM29 15h1v1h-1zM30 15h1v1h-1zM0 16h1v1h-1zM3 16h1v1h-1zM5 16h1v1h-1zM6 16h1v1h-1zM7 16h1v1h-1zM11 16h1v1h-1zM12 16h1v1h-1zM13 16h1v1h-1zM17 16h1v1h-1zM22 16h1v1h-1zM23 16h1v1h-1zM24 16h1v1h-1zM25 16h1v1h-1zM27 16h1v1h-1zM28 16h1v1h-1zM32 16h1v1h-1zM4 17h1v1h-1zM7 17h1v1h-1zM8 17h1v1h-1zM11 17h1v1h-1zM12 17h1v1h-1zM13 17h1v1h-1zM17 17h1v1h-1zM19 17h1v1h-1zM20 17h1v1h-1zM21 17h1v1h-1zM23 17h1v1h-1zM26 17h1v1h-1zM27 17h1v1h-1zM29 17h1v1h-1zM30 17h1v1h-1zM32 17h1v1h-1zM1 18h1v1h-1zM4 18h1v1h-1zM6 18h1v1h-1zM10 18h1v1h-1zM11 18h1v1h-1zM13 18h1v1h-1zM15 18h1v1h-1zM16 18h1v1h-1zM17 18h1v1h-1zM20 18h1v1h-1zM26 18h1v1h-1zM27 18h1v1h-1zM28 18h1v1h-1zM30 18h1v1h-1zM31 18h1v1h-1zM1 19h1v1h-1zM5 19h1v1h-1zM7 19h1v1h-1zM8 19h1v1h-1zM13 19h1v1h-1zM14 19h1v1h-1zM17 19h1v1h-1zM18 19h1v1h-1zM19 19h1v1h-1zM21 19h1v1h-1zM23 19h1v1h-1zM24 19h1v1h-1zM27 19h1v1h-1zM28 19h1v1h-1zM29 19h1v1h-1zM30 19h1v1h-1zM31 19h1v1h-1zM2 20h1v1h-1zM6 20h1v1h-1zM7 20h1v1h-1zM9 20h1v1h-1zM10 20h1v1h-1zM12 20h1v1h-1zM13 20h1v1h-1zM14 20h1v1h-1zM16 20h1v1h-1zM22 20h1v1h-1zM24 20h1v1h-1zM27 20h1v1h-1zM28 20h1v1h-1zM29 20h1v1h-1zM31 20h1v1h-1zM32 20h1v1h-1zM0 21h1v1h-1zM2 21h1v1h-1zM3 21h1v1h-1zM8 21h1v1h-1zM9 21h1v1h-1zM14 21h1v1h-1zM15 21h1v1h-1zM18 21h1v1h-1zM19 21h1v1h-1zM20 21h1v1h-1zM22 21h1v1h-1zM23 21h1v1h-1zM26 21h1v1h-1zM30 21h1v1h-1zM32 21h1v1h-1zM0 22h1v1h-1zM2 22h1v1h-1zM4 22h1v1h-1zM6 22h1v1h-1zM9 22h1v1h-1zM11 22h1v1h-1zM12 22h1v1h-1zM14 22h1v1h-1zM15 22h1v1h-1zM16 22h1v1h-1zM17 22h1v1h-1zM22 22h1v1h-1zM31 22h1v1h-1zM0 23h1v1h-1zM3 23h1v1h-1zM4 23h1v1h-1zM9 23h1v1h-1zM11 23h1v1h-1zM12 23h1v1h-1zM14 23h1v1h-1zM15 23h1v1h-1zM20 23h1v1h-1zM21 23h1v1h-1zM22 23h1v1h-1zM23 23h1v1h-1zM25 23h1v1h-1zM29 23h1v1h-1zM30 23h1v1h-1zM0 24h1v1h-1zM2 24h1v1h-1zM3 24h1v1h-1zM5 24h1v1h-1zM6 24h1v1h-1zM7 24h1v1h-1zM9 24h1v1h-1zM10 24h1v1h-1zM11 24h1v1h-1zM13 24h1v1h-1zM14 24h1v1h-1zM15 24h1v1h-1zM17 24h1v1h-1zM20 24h1v1h-1zM22 24h1v1h-1zM24 24h1v1h-1zM25 24h1v1h-1zM26 24h1v1h-1zM27 24h1v1h-1zM28 24h1v1h-1zM29 24h1v1h-1zM31 24h1v1h-1zM8 25h1v1h-1zM14 25h1v1h-1zM16 25h1v1h-1zM18 25h1v1h-1zM19 25h1v1h-1zM20 25h1v1h-1zM21 25h1v1h-1zM24 25h1v1h-1zM28 25h1v1h-1zM30 25h1v1h-1zM32 25h1v1h-1zM0 26h1v1h-1zM1 26h1v1h-1zM2 26h1v1h-1zM3 26h1v1h-1zM4 26h1v1h-1zM5 26h1v1h-1zM6 26h1v1h-1zM9 26h1v1h-1zM10 26h1v1h-1zM14 26h1v1h-1zM15 26h1v1h-1zM18 26h1v1h-1zM20 26h1v1h-1zM23 26h1v1h-1zM24 26h1v1h-1zM26 26h1v1h-1zM28 26h1v1h-1zM30 26h1v1h-1zM31 26h1v1h-1zM0 27h1v1h-1zM6 27h1v1h-1zM8 27h1v1h-1zM9 27h1v1h-1zM12 27h1v1h-1zM13 27h1v1h-1zM14 27h1v1h-1zM15 27h1v1h-1zM16 27h1v1h-1zM20 27h1v1h-1zM21 27h1v1h-1zM22 27h1v1h-1zM23 27h1v1h-1zM24 27h1v1h-1zM28 27h1v1h-1zM29 27h1v1h-1zM30 27h1v1h-1zM31 27h1v1h-1zM0 28h1v1h-1zM2 28h1v1h-1zM3 28h1v1h-1zM4 28h1v1h-1zM6 28h1v1h-1zM8 28h1v1h-1zM10 28h1v1h-1zM11 28h1v1h-1zM13 28h1v1h-1zM14 28h1v1h-1zM18 28h1v1h-1zM19 28h1v1h-1zM24 28h1v1h-1zM25 28h1v1h-1zM26 28h1v1h-1zM27 28h1v1h-1zM28 28h1v1h-1zM29 28h1v1h-1zM0 29h1v1h-1zM2 29h1v1h-1zM3 29h1v1h-1zM4 29h1v1h-1zM6 29h1v1h-1zM8 29h1v1h-1zM9 29h1v1h-1zM10 29h1v1h-1zM11 29h1v1h-1zM12 29h1v1h-1zM13 29h1v1h-1zM15 29h1v1h-1zM16 29h1v1h-1zM19 29h1v1h-1zM20 29h1v1h-1zM23 29h1v1h-1zM25 29h1v1h-1zM28 29h1v1h-1zM30 29h1v1h-1zM31 29h1v1h-1zM32 29h1v1h-1zM0 30h1v1h-1zM2 30h1v1h-1zM3 30h1v1h-1zM4 30h1v1h-1zM6 30h1v1h-1zM8 30h1v1h-1zM9 30h1v1h-1zM12 30h1v1h-1zM14 30h1v1h-1zM18 30h1v1h-1zM22 30h1v1h-1zM24 30h1v1h-1zM25 30h1v1h-1zM26 30h1v1h-1zM27 30h1v1h-1zM0 31h1v1h-1zM6 31h1v1h-1zM10 31h1v1h-1zM11 31h1v1h-1zM12 31h1v1h-1zM13 31h1v1h-1zM16 31h1v1h-1zM19 31h1v1h-1zM20 31h1v1h-1zM21 31h1v1h-1zM23 31h1v1h-1zM25 31h1v1h-1zM26 31h1v1h-1zM28 31h1v1h-1zM29 31h1v1h-1zM30 31h1v1h-1zM0 32h1v1h-1zM1 32h1v1h-1zM2 32h1v1h-1zM3 32h1v1h-1zM4 32h1v1h-1zM5 32h1v1h-1zM6 32h1v1h-1zM8 32h1v1h-1zM17 32h1v1h-1zM19 32h1v1h-1zM23 32h1v1h-1zM24 32h1v1h-1zM26 32h1v1h-1zM27 32h1v1h-1zM31 32h1v1h-1z"/></svg><b>Живое демо</b><small>без установки, с телефона</small></a>
   <div class="links">
-    <div class="link reveal d3"><span>Демо</span><p><a href="https://ascension-smartwalk.azamatbreach.workers.dev">ascension-smartwalk.azamatbreach.workers.dev</a></p></div>
-    <div class="link reveal d4"><span>Код</span><p><a href="https://github.com/Azalytical/ascension-smartwalk">github.com/Azalytical/ascension-smartwalk</a></p></div>
-    <div class="link reveal d5"><span>Видео</span><p><a href="https://youtu.be/VIDEO_ID_TBD">youtu.be/VIDEO_ID_TBD</a></p></div>
+    <div class="link" data-a="up"><span>Демо</span><p><a href="https://ascension-smartwalk.azamatbreach.workers.dev">ascension-smartwalk.azamatbreach.workers.dev</a></p></div>
+    <div class="link" data-a="up"><span>Код</span><p><a href="https://github.com/Azalytical/ascension-smartwalk">github.com/Azalytical/ascension-smartwalk</a></p></div>
+    <div class="link" data-a="up"><span>Видео</span><p><a href="https://youtu.be/VIDEO_ID_TBD">youtu.be/VIDEO_ID_TBD</a></p></div>
   </div>
   <aside class="notes">5:35–6:00. Алишер. Спасибо. Ссылки на экране, вопросы.</aside>
 </section>
 
+<div class="talkbar" id="talkbar"><div class="track" id="talktrack"></div><span id="talklabel"></span></div>
 </main>
 </div>
-<div class="counter" id="counter"></div>
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="gem2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4796E3"/><stop offset=".55" stop-color="#9177C7"/><stop offset="1" stop-color="#CA6673"/></linearGradient>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 1C12.5 6.9 17.1 11.5 23 12C17.1 12.5 12.5 17.1 12 23C11.5 17.1 6.9 12.5 1 12C6.9 11.5 11.5 6.9 12 1Z" fill="url(#gem2)"/></symbol>
+    <symbol id="i-term" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="3" fill="none" stroke="#4AA8FF" stroke-width="1.8"/><path d="M6 10l3 2-3 2M11 15h6" fill="none" stroke="#F2F4F7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-agent" viewBox="0 0 24 24"><path d="M12 2l8.5 5v10L12 22l-8.5-5V7z" fill="none" stroke="#4AA8FF" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="#FFC21A"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 22s7-6.2 7-12a7 7 0 10-14 0c0 5.8 7 12 7 12z" fill="none" stroke="#4AA8FF" stroke-width="1.8"/><circle cx="12" cy="10" r="2.6" fill="#FFC21A"/></symbol>
+  </defs>
+</svg>
+
+<div class="counter" id="counter"></div>
+<div class="blackout" id="blackout"></div>
+<div class="toast" id="toast"></div>
+<div class="help" id="help"><h4>Клавиши</h4>
+  <div><kbd>→</kbd>пробел, Enter, PageDown, кликер: дальше</div>
+  <div><kbd>←</kbd>Backspace, PageUp: назад</div>
+  <div><kbd>Home</kbd><kbd>End</kbd>первый и последний слайд</div>
+  <div><kbd>F</kbd>полный экран</div>
+  <div><kbd>S</kbd>окно докладчика: заметки, кто говорит, таймер 6:00</div>
+  <div><kbd>D</kbd>открыть живое демо в новой вкладке</div>
+  <div><kbd>B</kbd>чёрный экран</div>
+  <div><kbd>M</kbd>анимации вкл/выкл</div>
+  <div><kbd>H</kbd>эта подсказка</div>
+</div>
+
+<script src="assets/js/gsap.min.js"></script>
+<script src="assets/js/places.js"></script>
 <script>
 /* ===========================================
-   SLIDE CONTROLLER: масштаб сцены, клавиши, свайпы,
-   полоса «бюджета времени» выступления внизу каждого слайда
+   SLIDE CONTROLLER: масштаб сцены, клавиши, анимации появления,
+   фон из точек 2255 мест, окно докладчика, режим PDF (?pdf)
    =========================================== */
-class SlidePresentation{
-  constructor(){
-    this.slides=[...document.querySelectorAll('.slide')];
-    this.i=0; this.stage=document.getElementById('deckStage');
-    this.counter=document.getElementById('counter');
-    this.buildTalkBars(); this.scale(); this.keys(); this.touch(); this.wheel();
-    const h=parseInt(location.hash.slice(1)); this.show(isNaN(h)?0:h-1);
-  }
-  /* Полоса внизу: каждый слайд как отрезок бюджета 7 минут */
-  buildTalkBars(){
-    const toSec=t=>{const[m,s]=t.split(':').map(Number);return m*60+s};
-    const times=this.slides.map(s=>toSec(s.dataset.time||'0:00')); const end=360;
-    this.slides.forEach((s,k)=>{
-      if(k===0) return;
-      const bar=document.createElement('div'); bar.className='talkbar';
-      const tr=document.createElement('div'); tr.className='track';
-      times.forEach((t,j)=>{const i=document.createElement('i');i.style.flex=((times[j+1]??end)-t);i.className=j<k?'':j===k?'now':'left';tr.appendChild(i)});
-      const lab=document.createElement('span'); lab.textContent=String(k+1).padStart(2,'0')+' / '+this.slides.length;
-      bar.append(tr,lab); s.appendChild(bar);
-    });
-  }
-  scale(){
-    const f=()=>{const k=Math.min(innerWidth/1920,innerHeight/1080);this.stage.style.transform=`translate(${(innerWidth-1920*k)/2}px,${(innerHeight-1080*k)/2}px) scale(${k})`};
-    f(); addEventListener('resize',f);
-  }
-  keys(){addEventListener('keydown',e=>{
-    if(['ArrowRight','ArrowDown','PageDown',' ','Enter'].includes(e.key)){e.preventDefault();this.show(this.i+1)}
-    if(['ArrowLeft','ArrowUp','PageUp','Backspace'].includes(e.key)){e.preventDefault();this.show(this.i-1)}
-    if(e.key==='Home')this.show(0); if(e.key==='End')this.show(this.slides.length-1);
-    if(e.key==='f'||e.key==='F')document.documentElement.requestFullscreen?.();
-  })}
-  touch(){let x=0;addEventListener('touchstart',e=>x=e.touches[0].clientX,{passive:true});
-    addEventListener('touchend',e=>{const d=e.changedTouches[0].clientX-x;if(Math.abs(d)>50)this.show(this.i+(d<0?1:-1))})}
-  wheel(){let lock=false;addEventListener('wheel',e=>{if(lock||Math.abs(e.deltaY)<30)return;lock=true;this.show(this.i+(e.deltaY>0?1:-1));setTimeout(()=>lock=false,700)},{passive:true})}
-  show(n){
-    this.i=Math.max(0,Math.min(n,this.slides.length-1));
-    this.slides.forEach((s,k)=>{s.classList.toggle('active',k===this.i);s.classList.toggle('visible',k===this.i)});
-    this.counter.textContent=(this.i+1)+' / '+this.slides.length; history.replaceState(null,'','#'+(this.i+1));
-  }
+(()=>{
+const LIVE='https://ascension-smartwalk.azamatbreach.workers.dev';
+const qs=new URLSearchParams(location.search);
+const PDF=qs.has('pdf');
+const G=window.gsap;
+let motion=!!G&&!PDF&&qs.get('motion')!=='0'&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
+const root=document.documentElement;
+if(PDF)root.classList.add('pdf');
+const stage=document.getElementById('deckStage');
+const slides=[...document.querySelectorAll('.slide')];
+const toSec=t=>{const[m,s]=t.split(':').map(Number);return m*60+s};
+const times=slides.map(s=>toSec(s.dataset.time||'0:00')); const end=360;
+let cur=-1, tl=null, loops=[];
+const CLR='opacity,visibility,transform,filter';
+
+/* --- масштаб 1920×1080 под окно --- */
+const fit=()=>{const k=Math.min(innerWidth/1920,innerHeight/1080);stage.style.transform=PDF?'none':`translate(${(innerWidth-1920*k)/2}px,${(innerHeight-1080*k)/2}px) scale(${k})`};
+fit(); addEventListener('resize',fit);
+
+/* --- слова заголовков в маски --- */
+function splitWords(el){
+  const walk=node=>{[...node.childNodes].forEach(n=>{
+    if(n.nodeType===3){
+      const parts=n.textContent.split(/(\s+)/); const frag=document.createDocumentFragment();
+      parts.forEach(p=>{ if(!p) return; if(/^\s+$/.test(p)){frag.appendChild(document.createTextNode(p));return}
+        const w=document.createElement('span');w.className='w';const i=document.createElement('span');i.className='wi';i.textContent=p;w.appendChild(i);frag.appendChild(w)});
+      n.replaceWith(frag);
+    } else if(n.nodeType===1&&n.tagName!=='BR') walk(n);
+  })};
+  walk(el);
 }
-window.deck=new SlidePresentation();
+if(!PDF) document.querySelectorAll('[data-a="words"]').forEach(splitWords);
+
+/* --- числа: запоминаем финальный текст --- */
+document.querySelectorAll('[data-a="count"]').forEach(el=>{el.dataset.final=el.textContent.trim()});
+const fmt=(v,dec)=>dec?v.toFixed(dec).replace('.',','):String(Math.round(v));
+
+/* --- фон: 2255 мест Астаны --- */
+const cv=document.getElementById('dots'), cx=cv.getContext('2d');
+const P=(window.PLACES||[]);
+const order=P.map((p,i)=>[Math.sin(i*12.9898)*43758.5453%1,i]).sort((a,b)=>a[0]-b[0]).map(a=>a[1]);
+let proj=[];
+(function project(){
+  if(!P.length) return;
+  const lats=P.map(p=>p[0]).sort((a,b)=>a-b), lons=P.map(p=>p[1]).sort((a,b)=>a-b);
+  const q=(a,f)=>a[Math.floor(a.length*f)];
+  const la0=q(lats,.02),la1=q(lats,.98),lo0=q(lons,.02),lo1=q(lons,.98);
+  const kx=Math.cos(51.13*Math.PI/180), w=(lo1-lo0)*kx, h=la1-la0, s=Math.min(1700/w,980/h);
+  const ox=960-(w*s)/2, oy=540-(h*s)/2;
+  const food=/cafe|restaurant|bar|pub|fast_food|ice_cream|bakery|food/;
+  const green=/park|garden|playground|fountain|attraction|museum|monument|viewpoint|artwork|mosque|cathedral|theatre|cinema|zoo/;
+  proj=P.map(p=>[ox+(p[1]-lo0)*kx*s, oy+(la1-p[0])*s, food.test(p[2])?0:green.test(p[2])?1:2]);
+})();
+let dotsShown=1;
+function drawDots(f){
+  dotsShown=f; cx.clearRect(0,0,1920,1080);
+  const n=Math.round(order.length*f), cols=['rgba(255,194,26,.85)','rgba(74,168,255,.9)','rgba(242,244,247,.55)'];
+  for(let c=0;c<3;c++){cx.fillStyle=cols[c];cx.beginPath();
+    for(let j=0;j<n;j++){const p=proj[order[j]];if(p[2]!==c)continue;cx.moveTo(p[0]+1.9,p[1]);cx.arc(p[0],p[1],1.9,0,6.283)}
+    cx.fill()}
+}
+drawDots(1);
+
+const bgOf=s=>{const a=(s.dataset.bg||'0 0 1 .2').split(' ').map(Number);return{x:a[0],y:a[1],scale:a[2],opacity:a[3]}};
+const orbsOf=s=>(s.dataset.orbs||'80 20 20 80').split(' ').map(Number);
+const oG=document.getElementById('orbGold'), oS=document.getElementById('orbSky');
+function setBg(s,anim){
+  const b=bgOf(s), o=orbsOf(s), d=anim?1.6:0;
+  const gp={x:o[0]*19.2,y:o[1]*10.8}, sp={x:o[2]*19.2,y:o[3]*10.8};
+  if(G){ G.to(cv,{...b,duration:d,ease:'power3.inOut',overwrite:true}); G.to(oG,{...gp,duration:d*1.2,ease:'power2.inOut',overwrite:true}); G.to(oS,{...sp,duration:d*1.2,ease:'power2.inOut',overwrite:true}); }
+  else { cv.style.transform=`translate(${b.x}px,${b.y}px) scale(${b.scale})`; cv.style.opacity=b.opacity; oG.style.transform=`translate(${gp.x}px,${gp.y}px)`; oS.style.transform=`translate(${sp.x}px,${sp.y}px)`; }
+}
+
+/* --- полоса времени выступления --- */
+const track=document.getElementById('talktrack'), tlabel=document.getElementById('talklabel'), tbar=document.getElementById('talkbar');
+times.forEach((t,j)=>{const i=document.createElement('i');i.style.flex=((times[j+1]??end)-t);i.appendChild(document.createElement('b'));track.appendChild(i)});
+function setBar(k,anim){
+  tbar.classList.toggle('hidden',k===0);
+  [...track.children].forEach((i,j)=>{i.className=j<k?'':j===k?'now':'left'; const b=i.firstChild;
+    if(G){G.killTweensOf(b); if(j===k&&anim) G.fromTo(b,{scaleX:0},{scaleX:1,duration:1.2,ease:'power2.out',delay:.4}); else G.set(b,{scaleX:j===k?1:0});} else b.style.transform=j===k?'none':'scaleX(0)';});
+  tlabel.textContent=String(k+1).padStart(2,'0')+' / '+slides.length;
+}
+
+/* --- анимации появления --- */
+const FX={
+  up:(el,t)=>tl.fromTo(el,{autoAlpha:0,y:36,filter:'blur(8px)'},{autoAlpha:1,y:0,filter:'blur(0px)',duration:1,ease:'expo.out',clearProps:'filter,transform'},t),
+  fade:(el,t)=>tl.fromTo(el,{autoAlpha:0},{autoAlpha:1,duration:.9,ease:'power2.out'},t),
+  row:(el,t)=>tl.fromTo(el,{autoAlpha:0,x:-40},{autoAlpha:1,x:0,duration:.9,ease:'expo.out',clearProps:'transform'},t),
+  words:(el,t)=>{const w=el.querySelectorAll('.wi'); tl.fromTo(w,{yPercent:118,rotate:2},{yPercent:0,rotate:0,duration:1.1,ease:'expo.out',stagger:.04,clearProps:'transform'},t); return .1+w.length*.04},
+  phone:(el,t)=>{tl.fromTo(el,{autoAlpha:0,y:160,scale:.94},{autoAlpha:1,y:0,scale:1,duration:1.5,ease:'expo.out'},t);
+    tl.add(()=>{loops.push(G.to(el,{y:-12,duration:2.6+Math.random()*1.2,ease:'sine.inOut',yoyo:true,repeat:-1}))},t+1.5)},
+  seg:(el,t)=>tl.fromTo(el,{scaleX:0,transformOrigin:'left center'},{scaleX:1,duration:.55,ease:'power3.out',clearProps:'transform'},t),
+  grow:(el,t)=>tl.fromTo(el,{scaleX:0,transformOrigin:'left center'},{scaleX:1,duration:parseFloat(el.dataset.dur)||1.1,ease:'power3.inOut',clearProps:'transform'},t),
+  pop:(el,t)=>tl.fromTo(el,{autoAlpha:0,scale:.3},{autoAlpha:1,scale:1,duration:.8,ease:'back.out(2.2)',clearProps:'transform'},t),
+  count:(el,t)=>{const fin=el.dataset.final, dec=(fin.split(',')[1]||'').length, to=parseFloat(fin.replace(',','.')), from=parseFloat(el.dataset.from||0);
+    if(isNaN(to)) return; const o={v:from}; const w=el.getBoundingClientRect().width/stageScale(); if(getComputedStyle(el).display==='inline') el.style.display='inline-block'; el.style.minWidth=w+'px'; el.textContent=fmt(from,dec);
+    tl.fromTo(o,{v:from},{v:to,duration:parseFloat(el.dataset.dur)||1.2,ease:'power2.out',onUpdate:()=>{el.textContent=fmt(o.v,dec)},onComplete:()=>{el.textContent=fin}},t);
+    },
+};
+const stageScale=()=>{const m=stage.style.transform.match(/scale\(([\d.]+)\)/);return m?parseFloat(m[1]):1};
+
+function resetSlide(s){
+  if(!G) return;
+  const els=s.querySelectorAll('[data-a],.wi,.step,.pulse,.mark .ring,.mark .dot,.kb');
+  G.killTweensOf(els); G.set(els,{clearProps:CLR});
+  s.querySelectorAll('[data-a="count"]').forEach(el=>{el.textContent=el.dataset.final;el.style.display='';el.style.minWidth=''});
+  s.querySelectorAll('.step.lit').forEach(e=>e.classList.remove('lit'));
+}
+
+function build(s){
+  tl=G.timeline({delay:.18});
+  let t=0;
+  s.querySelectorAll('[data-a]').forEach(el=>{
+    const at=el.dataset.t!=null?parseFloat(el.dataset.t):t;
+    const extra=FX[el.dataset.a]?.(el,at);
+    if(el.dataset.t==null) t=at+(typeof extra==='number'?Math.min(extra,.35):.09);
+  });
+  /* знак: кольцо рисуется, точка появляется */
+  s.querySelectorAll('.mark .ring').forEach(r=>{const L=r.getTotalLength();tl.fromTo(r,{strokeDasharray:L,strokeDashoffset:L},{strokeDashoffset:0,duration:1.4,ease:'power3.inOut'},.1)});
+  s.querySelectorAll('.mark .dot').forEach(d=>tl.fromTo(d,{scale:0,transformOrigin:'50% 50%'},{scale:1,duration:.7,ease:'back.out(3)'},1.1));
+  /* медленный наезд на фото */
+  s.querySelectorAll('.kb').forEach(k=>loops.push(G.fromTo(k,{scale:1.12},{scale:1,duration:16,ease:'none'})));
+  const hook=HOOKS[s.dataset.hook]; if(hook) hook(s);
+}
+
+const HOOKS={
+  rag(s){
+    /* 2255 точек появляются вместе со счётчиком, импульс бежит по этапам */
+    drawDots(0); const o={f:0}; tl.fromTo(o,{f:0},{f:1,duration:2.2,ease:'power2.out',onUpdate:()=>drawDots(o.f)},.6);
+    const steps=[...s.querySelectorAll('.step')], pulse=s.querySelector('.pulse');
+    tl.add(()=>{const run=G.timeline({repeat:-1,repeatDelay:.8});
+      run.set(pulse,{left:'0%',autoAlpha:0}).to(pulse,{autoAlpha:1,duration:.2});
+      steps.forEach((st,i)=>{run.to(pulse,{left:(i*25)+'%',duration:i?0.7:0.01,ease:'power1.inOut'}).add(()=>{steps.forEach(x=>x.classList.remove('lit'));st.classList.add('lit')})});
+      run.to(pulse,{autoAlpha:0,duration:.3,delay:.6}).add(()=>steps.forEach(x=>x.classList.remove('lit')));
+      loops.push(run)},1.6);
+  },
+  end(s){},
+  road(s){}
+};
+
+/* --- переход между слайдами --- */
+function show(n,opts={}){
+  n=Math.max(0,Math.min(n,slides.length-1)); if(n===cur&&!opts.force) return;
+  const prev=slides[cur], next=slides[n], dir=n>cur?1:-1, anim=motion&&!opts.instant&&cur>=0;
+  loops.forEach(l=>l.kill()); loops=[]; if(tl){tl.kill();tl=null}
+  if(prev&&prev!==next){
+    prev.querySelectorAll('video').forEach(v=>v.pause());
+    if(anim){ const p=prev; G.to(p,{autoAlpha:0,scale:.985,x:-40*dir,duration:.55,ease:'power2.inOut',onComplete:()=>{if(slides[cur]!==p){p.classList.remove('active');G.set(p,{clearProps:CLR});resetSlide(p)}}}); }
+    else { prev.classList.remove('active'); if(G){G.set(prev,{clearProps:CLR});} resetSlide(prev); }
+  }
+  slides.forEach((s,k)=>{if(k!==n&&s!==prev)s.classList.remove('active')});
+  cur=n; resetSlide(next); next.classList.add('active');
+  if(dotsShown!==1) drawDots(1);
+  setBg(next,motion&&!opts.instant); setBar(n,motion&&!opts.instant);
+  if(motion&&!opts.instant){
+    G.fromTo(next,{autoAlpha:0,x:30*dir,scale:1.01},{autoAlpha:1,x:0,scale:1,duration:.7,delay:anim?.18:0,ease:'power2.out',clearProps:'transform'});
+    build(next);
+  } else if(G){ G.set(next,{autoAlpha:1}); }
+  if(!PDF) next.querySelectorAll('video').forEach(v=>{v.currentTime=0;v.play().catch(()=>{})});
+  document.getElementById('counter').textContent=(n+1)+' / '+slides.length;
+  if(!PDF) history.replaceState(null,'',location.pathname+location.search+'#'+(n+1));
+  presenterUpdate();
+}
+
+/* --- окно докладчика (S) --- */
+let pw=null, t0=null;
+const notesOf=s=>s.querySelector('.notes')?.textContent.trim()||'';
+const fmtT=x=>{x=Math.max(0,Math.round(x));return Math.floor(x/60)+':'+String(x%60).padStart(2,'0')};
+function presenterOpen(){
+  pw=window.open('','aidem-presenter','width=1000,height=640');
+  if(!pw){toast('Разрешите всплывающее окно для этой страницы');return}
+  pw.document.write(`<!doctype html><meta charset="utf-8"><title>Aidem · докладчик</title><style>body{margin:0;background:#0A0F15;color:#F2F4F7;font:20px/1.5 system-ui,sans-serif;padding:28px 34px}h1{font-size:26px;margin:0 0 6px}#who{display:inline-block;padding:4px 14px;border-radius:999px;background:#FFC21A;color:#0E1621;font-weight:700;margin-right:10px}#notes{font-size:30px;line-height:1.45;margin:18px 0 22px}#next{color:#9aa3ad}#clock{font:700 64px system-ui;letter-spacing:-2px}#plan{color:#9aa3ad;font-size:20px}.late{color:#FF6B6F}.ok{color:#3FD17A}.row{display:flex;justify-content:space-between;align-items:flex-end;border-top:1px solid #ffffff22;padding-top:16px}button{font:600 18px system-ui;padding:10px 18px;border-radius:12px;border:0;margin-left:8px;cursor:pointer}</style><h1><span id="who"></span><span id="title"></span></h1><div id="notes"></div><div id="next"></div><div class="row"><div><div id="clock">0:00</div><div id="plan"></div></div><div><button id="b">← Назад</button><button id="f">Дальше →</button><button id="r">Таймер заново</button></div></div>`);
+  pw.document.close();
+  pw.document.getElementById('b').onclick=()=>show(cur-1); pw.document.getElementById('f').onclick=()=>show(cur+1); pw.document.getElementById('r').onclick=()=>{t0=Date.now()};
+  pw.addEventListener('keydown',onKey);
+  presenterUpdate();
+}
+function presenterUpdate(){
+  if(!pw||pw.closed) return; const d=pw.document, s=slides[cur], txt=notesOf(s);
+  const m=txt.match(/^([\d:–\-]+)\.\s*([^.]+)\.\s*(.*)$/s);
+  d.getElementById('who').textContent=m?m[2]:''; d.getElementById('title').textContent=(cur+1)+' / '+slides.length+' · '+(s.dataset.title||'');
+  d.getElementById('notes').textContent=m?m[3]:txt;
+  const nx=slides[cur+1]; d.getElementById('next').textContent=nx?('Дальше: '+(nx.dataset.title||'')+(notesOf(nx).match(/^[\d:–\-]+\.\s*([^.]+)\./)?' · '+notesOf(nx).match(/^[\d:–\-]+\.\s*([^.]+)\./)[1]:'')):'Последний слайд';
+}
+setInterval(()=>{
+  if(!pw||pw.closed) return; const d=pw.document; const el=t0?(Date.now()-t0)/1000:0;
+  d.getElementById('clock').textContent=fmtT(el);
+  const a=times[cur], b=times[cur+1]??end; const late=el>b+3;
+  d.getElementById('clock').className=t0?(late?'late':'ok'):'';
+  d.getElementById('plan').textContent=`По плану этот слайд ${fmtT(a)}–${fmtT(b)} из 6:00`+(t0&&late?` · отстаём на ${fmtT(el-b)}`:'');
+},500);
+
+/* --- клавиши --- */
+function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>e.classList.remove('on'),1600)}
+function onKey(e){
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  const k=e.key;
+  if(['ArrowRight','ArrowDown','PageDown',' ','Enter'].includes(k)){e.preventDefault();if(!t0&&cur===0)t0=Date.now();show(cur+1)}
+  else if(['ArrowLeft','ArrowUp','PageUp','Backspace'].includes(k)){e.preventDefault();show(cur-1)}
+  else if(k==='Home'){t0=null;show(0,{force:true})} else if(k==='End'){show(slides.length-1)}
+  else if(k==='f'||k==='F'||k==='а'||k==='А'){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen?.()}
+  else if(k==='b'||k==='B'||k==='и'||k==='И'||k==='.'){document.getElementById('blackout').classList.toggle('on')}
+  else if(k==='h'||k==='H'||k==='р'||k==='Р'||k==='?'){document.getElementById('help').classList.toggle('on')}
+  else if(k==='s'||k==='S'||k==='ы'||k==='Ы'){presenterOpen()}
+  else if(k==='d'||k==='D'||k==='в'||k==='В'){window.open(LIVE,'_blank','noopener')}
+  else if((k==='m'||k==='M'||k==='ь'||k==='Ь')&&G){motion=!motion;toast(motion?'Анимации включены':'Анимации выключены');show(cur,{force:true,instant:!motion})}
+  else if(k==='Escape'){document.getElementById('help').classList.remove('on');document.getElementById('blackout').classList.remove('on')}
+}
+addEventListener('keydown',onKey);
+let tx=0;addEventListener('touchstart',e=>tx=e.touches[0].clientX,{passive:true});
+addEventListener('touchend',e=>{const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>50)show(cur+(d<0?1:-1))});
+let lock=false;addEventListener('wheel',e=>{if(lock||Math.abs(e.deltaY)<30)return;lock=true;show(cur+(e.deltaY>0?1:-1));setTimeout(()=>lock=false,900)},{passive:true});
+
+/* --- старт: после загрузки шрифтов, чтобы маски слов легли ровно --- */
+window.deck={show:(n,o)=>show(n,o),get i(){return cur},slides,setMotion:v=>{motion=v}};
+const start=()=>{const h=parseInt(location.hash.slice(1))||parseInt(qs.get('slide'));slides.forEach(s=>s.classList.remove('active'));show(isNaN(h)?0:h-1,{instant:PDF})};
+(document.fonts?.ready||Promise.resolve()).then(start);
+})();
 </script>
 </body>
 </html>
