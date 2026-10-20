@@ -1,6 +1,8 @@
-// Per-device preferences and history. Nothing here leaves the browser.
+// Per-device preferences and history. Nothing here leaves the browser, except the rating key sent with a place rating.
 const KEY = 'seruen:v1';
-const defaults = { lang: null, theme: 'auto', start: null, recentStarts: [], saved: {}, history: [], walk: null, plan: null, onboarded: false };
+const defaults = { lang: null, theme: 'auto', start: null, recentStarts: [], saved: {}, history: [], walk: null, plan: null, onboarded: false,
+  // Place ratings: a random key that identifies this device to /api/ratings (the server stores only its hash) and this device's own stars.
+  rater: null, ratings: {} };
 let state = load();
 
 function load() {

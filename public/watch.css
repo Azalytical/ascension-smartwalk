@@ -61,6 +61,8 @@ p,h1,h2{margin:0}
 .card-back b{color:var(--gold);font-variant-numeric:tabular-nums}
 .card-hours{margin-top:calc(var(--k)*.8);font-size:calc(var(--k)*5.2);color:var(--muted)}
 .card-trust{max-width:100%;margin-top:calc(var(--k)*.6);font-size:calc(var(--k)*4.6);line-height:1.25;color:var(--muted);text-wrap:balance}
+.card-rating{margin-top:calc(var(--k)*.6);font-size:calc(var(--k)*4.6);line-height:1.25;color:var(--muted)}
+.card-star{color:var(--gold)}
 .conf{font-weight:650;color:var(--ink)}
 .conf::before{content:"";display:inline-block;width:calc(var(--k)*3);height:calc(var(--k)*3);margin-right:calc(var(--k)*1.4);border-radius:50%;background:var(--muted);vertical-align:.08em}
 .conf-high::before{background:var(--green)}

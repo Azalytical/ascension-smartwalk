@@ -101,6 +101,13 @@ const ru = {
   'sheet.expand': 'Развернуть панель', 'sheet.collapse': 'Свернуть панель',
   'common.back': 'Назад', 'common.close': 'Закрыть', 'common.cancel': 'Отмена',
   'w.minute': 'минута|минуты|минут', 'w.place': 'место|места|мест',
+  'rating.title': 'Оценки пользователей Aidem', 'rating.summary': '{avg} · {n} {word}', 'rating.few': 'Мало оценок ({n}), среднее покажем от 3',
+  'rating.none': 'Пока нет оценок. Ваша будет первой.', 'rating.yours': 'Ваша оценка', 'rating.rateIt': 'Оцените место', 'rating.star': '{n} из 5',
+  'rating.remove': 'Убрать мою оценку', 'rating.saved': 'Оценка сохранена', 'rating.removed': 'Оценка убрана', 'rating.error': 'Не удалось сохранить оценку. Попробуйте ещё раз.',
+  'rating.unavailable': 'Оценки сейчас недоступны', 'rating.hint': 'Ставят люди, а не открытые данные. Одна оценка с устройства, её можно изменить.',
+  'rating.how': 'Как вам {name}?', 'rating.chip': 'Оценки пользователей Aidem: {avg} · {n} {word}',
+  'place.check.ratings': 'Оценки ставят пользователи Aidem, по одной с устройства, это не открытые данные. Среднее показываем от 3 оценок; от 5 оценок оно немного влияет на порядок вариантов, слабее расстояния и времени.',
+  'w.rating': 'оценка|оценки|оценок',
 };
 
 const en = {
@@ -191,6 +198,13 @@ const en = {
   'weather.wind': 'Strong wind. Find places indoors?', 'weather.yes': 'Indoors', 'weather.now': 'Now {t}°',
   'sheet.expand': 'Expand panel', 'sheet.collapse': 'Collapse panel', 'common.back': 'Back', 'common.close': 'Close', 'common.cancel': 'Cancel',
   'w.minute': 'minute|minutes', 'w.place': 'place|places',
+  'rating.title': 'Aidem user ratings', 'rating.summary': '{avg} · {n} {word}', 'rating.few': 'Too few ratings ({n}); the average shows from 3',
+  'rating.none': 'No ratings yet. Yours will be the first.', 'rating.yours': 'Your rating', 'rating.rateIt': 'Rate this place', 'rating.star': '{n} of 5',
+  'rating.remove': 'Remove my rating', 'rating.saved': 'Rating saved', 'rating.removed': 'Rating removed', 'rating.error': 'Could not save the rating. Please try again.',
+  'rating.unavailable': 'Ratings are unavailable right now', 'rating.hint': 'Given by people, not taken from open data. One rating per device; you can change it.',
+  'rating.how': 'How was {name}?', 'rating.chip': 'Aidem user ratings: {avg} · {n} {word}',
+  'place.check.ratings': 'Ratings come from Aidem users, one per device; they are not open data. The average shows from 3 ratings; from 5 ratings it slightly affects the order of options, less than distance and time.',
+  'w.rating': 'rating|ratings',
 };
 
 const dictionaries = { ru, kk, en };

@@ -5,6 +5,7 @@ import { checkVisit } from './hours.mjs';
 import { placeLinks, mapLinks } from './links.mjs';
 import { astanaWeather } from './weather.mjs';
 import { CITY_EVENTS, cityEventsFor } from './events.mjs';
+import { placeRatings } from './ratings-api.mjs';
 
 export const CATEGORIES = Object.keys(VISIT);
 const DETOUR = 1.35, SPEED_M_PER_MIN = 4200 / 60, RESERVE = 5;
@@ -75,7 +76,7 @@ function brief(poi, extra = {}) {
     openingHours: poi.openingHours || null, dataSource: sourceOf(poi), sourceUrl: poi.sourceUrl, links: mapLinks(poi) };
 }
 
-function planWalk(args, { dataset, now }) {
+function planWalk(args, { dataset, now, ratings = null }) {
   const start = location(args, true);
   const minutes = number(args, 'minutes', { min: 10, max: 180, fallback: 60 });
   const at = visitTime(args);
@@ -84,7 +85,7 @@ function planWalk(args, { dataset, now }) {
   try {
     result = recommend(dataset, { ...start, minutes, query, category: category(args) || 'any', withChild: Boolean(args?.with_child),
       returnToStart: args?.return_to_start !== false, maxWalkMinutes: number(args, 'max_walk_minutes', { min: 1, max: 60, fallback: Math.min(30, Math.max(5, Math.round(minutes / 3))) }),
-      ...(at ? { visitDate: at.toISOString() } : {}) });
+      ...(at ? { visitDate: at.toISOString() } : {}) }, { ratings });
   } catch (error) {
     if (error?.code === 'INVALID_INPUT') throw new ToolError(error.message);
     throw error;
@@ -252,5 +253,7 @@ export async function runTool(name, args, context) {
   const tool = byName.get(name);
   if (!tool) throw new ToolError(`Неизвестный инструмент ${name}.`);
   if (args !== undefined && (typeof args !== 'object' || args === null || Array.isArray(args))) throw new ToolError('Аргументы должны быть объектом.');
-  return tool.run(args ?? {}, { now: new Date(), ...context });
+  // plan_walk ranks with users' ratings like the site does (from 5 ratings a place, a small nudge).
+  const ratings = tool.run === planWalk && context?.env && !context.ratings ? await placeRatings(context.env) : null;
+  return tool.run(args ?? {}, { now: new Date(), ...context, ...(ratings ? { ratings } : {}) });
 }

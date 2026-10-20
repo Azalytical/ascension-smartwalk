@@ -1,5 +1,6 @@
 import { recommend } from './retrieval.mjs';
 import { validateReminder } from './watch-push.mjs';
+import { placeRatings } from './ratings-api.mjs';
 
 // Compact plans for the watch client and voice assistants. Deterministic only: no language model,
 // so a glance on the wrist answers within one request and does not spend the Gemini quota.
@@ -125,7 +126,7 @@ async function handlePush(request, env, url) {
   return new Response(await response.text(), { status: response.status, headers: { ...HEADERS, 'Content-Type': 'application/json; charset=utf-8' } });
 }
 
-export function handleWatch(request, env, pois) {
+export async function handleWatch(request, env, pois) {
   const url = new URL(request.url);
   if (url.pathname.startsWith('/api/watch/push/')) return handlePush(request, env, url);
   if (url.pathname !== '/api/watch/plan') return null;
@@ -142,8 +143,9 @@ export function handleWatch(request, env, pois) {
   const input = { lat: number('lat'), lon: number('lon'), minutes: total, query, category: 'any', returnToStart: true,
     maxWalkMinutes: Number.isFinite(total) ? Math.min(30, Math.max(5, Math.round(total / 3))) : 15,
     withChild: Boolean(MOODS[mood].withChild) || url.searchParams.get('child') === '1' };
+  const ratings = await placeRatings(env);
   let result;
-  try { result = recommend(pois, input); }
+  try { result = recommend(pois, input, { ratings }); }
   catch (error) {
     if (error?.code !== 'INVALID_INPUT') throw error;
     const outside = /Широта|Долгота/.test(error.message);
@@ -157,7 +159,8 @@ export function handleWatch(request, env, pois) {
       returnMinutes: place.returnMinutes, totalMinutes: place.totalMinutes,
       hours: { status: place.hoursCheck?.status || 'no_data', closesAt: place.hoursCheck?.closesAt || null },
       sourceUrl: place.sourceUrl, source: sourceOf(place),
-      confidence: place.confidence ? { level: place.confidence.level, label: place.confidence.label } : null
+      confidence: place.confidence ? { level: place.confidence.level, label: place.confidence.label } : null,
+      ...(place.userRating ? { userRating: { count: place.userRating.count, average: place.userRating.average, state: place.userRating.state } } : {})
     })),
     attribution: ATTRIBUTION, estimate: 'Время пешком — оценка по прямой ×1,35 при 4,2 км/ч, с резервом 5 минут.'
   };

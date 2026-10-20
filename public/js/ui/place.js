@@ -8,6 +8,7 @@ import * as store from '../core/store.js';
 import { timeRing } from './ring.js';
 import { categoryArt, categoryName, hoursStatus, hoursChip, navLinks, share, backTime, confidenceChip, notabilityChip, backButton, watchButton, listenButton } from './common.js';
 import { toast } from './toast.js';
+import { ratingBlock, ratingChip } from './rating.js';
 
 const WHEELCHAIR = { yes: 'place.wheelchair.yes', limited: 'place.wheelchair.limited', no: 'place.wheelchair.no' };
 
@@ -46,6 +47,7 @@ export function placeView({ place, timing, start, serverHours, why, activities =
     place.openingHours ? ['check', 'good', t('place.check.hours')] : ['info', 'muted', t('place.check.noHours')],
     ...(place.confidence?.reasons || []).slice(0, 3).map((reason) => ['info', 'muted', capitalize(reason)]),
     ...(place.notability?.reasons?.length ? [['info', 'muted', t('place.check.notability', { list: place.notability.reasons.join(', ') })]] : []),
+    ['info', 'muted', t('place.check.ratings')],
     ['info', 'muted', t('place.check.live')],
   ];
   const snapshot = formatDate(place.retrievedAt);
@@ -64,7 +66,7 @@ export function placeView({ place, timing, start, serverHours, why, activities =
       h('div', {}, h('h2', { id: 'place-title', class: 'title-2', text: place.name }),
         h('p', { class: 'meta' }, categoryName(place.category), timing.distanceMeters ? h('span', { class: 'meta-sep', 'aria-hidden': 'true' }) : null,
           timing.distanceMeters ? t('place.straight', { d: formatDistance(timing.distanceMeters, lang()) }) : null),
-        h('div', { class: 'place-badges' }, hoursChip(hours), confidenceChip(place.confidence), notabilityChip(place.notability)))),
+        h('div', { class: 'place-badges' }, hoursChip(hours), confidenceChip(place.confidence), notabilityChip(place.notability), ratingChip(place)))),
     h('section', { class: 'time-card' },
       timeRing({ there: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, reserve: timing.safetyReserveMinutes, size: 132, stroke: 13, label: `${total}`, sublabel: t('plan.min', { n: '' }).trim() }),
       h('div', { class: 'time-card-side' }, h('ul', { class: 'legend' }, legend), h('p', { class: 'return-by' }, icon('return'), t('place.returnNow', { time: back })))),
@@ -81,6 +83,7 @@ export function placeView({ place, timing, start, serverHours, why, activities =
       h('span', { class: 'row-text' }, h('strong', { text: pairing.name }), h('small', { text: t('place.pairingValue', { d: formatDistance(pairing.distanceMeters, lang()), n: pairing.extraMinutes }) })))) : null,
     activities.length && !place.aiTodo && !steps.length ? section(t('place.todo'), h('ul', { class: 'bullets' }, activities.map((item) => h('li', { text: item })))) : null,
     facts.length ? section(t('place.info'), h('dl', { class: 'facts' }, facts)) : null,
+    ratingBlock(place),
     // Sources, what was and was not checked, and caveats: one closed line for whoever wants the details.
     h('details', { class: 'disclosure' }, h('summary', {}, icon('info'), t('place.checks')),
       h('ul', { class: 'checks' }, checks.map(([name, tone, text]) => h('li', { class: `check-${tone}` }, icon(name), h('span', { text })))),

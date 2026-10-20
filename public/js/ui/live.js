@@ -7,6 +7,7 @@ import * as store from '../core/store.js';
 import { timeRing } from './ring.js';
 import { navLinks, categoryArt, watchButton } from './common.js';
 import { toast, announce } from './toast.js';
+import { ratingBlock } from './rating.js';
 import { marker, fitPoints, userDot } from '../map/map.js';
 import { showStart, showRoutes, upgradeRoute, hideRoutes, hideStart } from '../map/layers.js';
 
@@ -158,6 +159,7 @@ export function mountLive(container, { onFinished }) {
         h('h2', { class: 'title-1', text: late ? t('live.finished.late', { n: late }) : t('live.finished.title') }),
         h('p', { class: 'lead', text: t('live.finished.text', { n: finished.minutes, plan: walk.plan.total }) }),
         h('div', { class: 'done-place' }, categoryArt(walk.place.category, 40), h('strong', { text: walk.place.name })),
+        ratingBlock(walk.place, { prompt: true }),
         h('button', { class: 'btn btn-primary btn-xl', type: 'button', text: t('live.close'), onclick: () => onFinished?.('done') })));
       return;
     }
