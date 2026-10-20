@@ -20,6 +20,7 @@ import { outbound, personal } from '../core/privacy.js';
 import { mountLive, startWalk } from '../ui/live.js';
 import { readyView } from '../ui/ready.js';
 import { applyTheme } from '../core/theme.js';
+import { understoodLabel, noteTexts, unconfirmedTexts, warningTexts, whyText } from '../ui/server-text.js';
 
 const MINUTES = [30, 45, 60, 90, 120];
 const MAX_WALK = [10, 15, 20, 30];
@@ -589,13 +590,16 @@ function demoBanner(demo) {
 // the general caveats and what all three cards share fold into «Что мы не проверяли».
 const GENERAL_NOTE = /^(?:Расстояние указано по прямой|Каждая карточка|Актуальное открытие)/;
 function notesView(recs, { skip = null } = {}) {
-  const all = (Array.isArray(result?.warnings) ? result.warnings : []).filter((note) => !skip?.test(note));
-  const specific = all.filter((note) => !GENERAL_NOTE.test(note));
-  const unconfirmed = Array.isArray(result?.unconfirmed) && result.unconfirmed.length ? t('results.unconfirmed', { list: result.unconfirmed.join(', ') }) : null;
+  // Sorted by the server's Russian text, shown in the interface language.
+  const shown = noteTexts(result);
+  const notes = (Array.isArray(result?.warnings) ? result.warnings : []).map((note, index) => ({ note, text: shown[index] ?? note })).filter(({ note }) => !skip?.test(note));
+  const specific = notes.filter(({ note }) => !GENERAL_NOTE.test(note)).map(({ text }) => text);
+  const wishes = unconfirmedTexts(result);
+  const unconfirmed = wishes.length ? t('results.unconfirmed', { list: wishes.join(', ') }) : null;
   const lines = [unconfirmed, ...specific].filter(Boolean);
-  const cards = recs.map((place) => (Array.isArray(place.warnings) ? place.warnings : []));
+  const cards = recs.map((place) => warningTexts(place));
   const shared = cards.length > 1 ? cards[0].filter((note) => cards.every((list) => list.includes(note))) : [];
-  const folded = [...new Set([...lines.slice(3), ...all.filter((note) => GENERAL_NOTE.test(note)), ...shared])];
+  const folded = [...new Set([...lines.slice(3), ...notes.filter(({ note }) => GENERAL_NOTE.test(note)).map(({ text }) => text), ...shared])];
   return {
     notices: lines.length ? h('div', { class: 'notices' }, lines.slice(0, 3).map((text) => h('p', { class: 'notice' }, icon('info', 'icon-xs'), h('span', { text })))) : null,
     unchecked: folded.length ? h('details', { class: 'disclosure unchecked' }, h('summary', {}, icon('info'), t('results.unchecked'), h('span', { class: 'count num', text: folded.length })),
@@ -607,7 +611,7 @@ function notesView(recs, { skip = null } = {}) {
 // in that mode the line counts only the person's own list.
 function ownHidden(items) {
   const n = store.hiddenIds().length;
-  return (items || []).map((item) => (item.key !== 'hidden' ? item : n ? { ...item, label: t('understood.hidden', { n, what: plural(n, 'understood.hiddenForms') }) } : null)).filter(Boolean);
+  return (items || []).map((item) => (item.key !== 'hidden' ? item : n ? { ...item, label: t('understood.hidden', { n, what: plural(n, 'understood.hiddenForms') }), params: { n } } : null)).filter(Boolean);
 }
 
 // «Мы учли»: what the server understood from the request (time, categories, child, night, weather, hours).
@@ -616,7 +620,7 @@ function understoodRow(items) {
   if (!shown.length) return null;
   const icons = { hidden: 'close', surprise: 'sparkle', time: 'clock', categories: 'filter', child: 'user', night: 'moon', group: 'friends', accessible: 'accessible', weather: 'cloud', hours: 'clock' };
   return h('div', { class: 'understood' }, h('p', { class: 'understood-title', text: t('results.understood') }),
-    h('div', { class: 'chip-row no-drag' }, shown.map((item) => h('span', { class: 'chip is-static' }, icon(icons[item.key] || 'check', 'icon-xs'), h('span', { class: 'chip-text', text: item.label })))));
+    h('div', { class: 'chip-row no-drag' }, shown.map((item) => h('span', { class: 'chip is-static' }, icon(icons[item.key] || 'check', 'icon-xs'), h('span', { class: 'chip-text', text: understoodLabel(item) })))));
 }
 
 // A three-stop micro-route from the server: stops with clock times, shown on the map on tap.
@@ -760,7 +764,7 @@ function renderPlace() {
   const timing = timingOf(place);
   const url = new URL(shareLink());
   const start = origin();
-  clear(root, placeView({ place, timing, start, serverHours: place.hoursCheck, why: place.why, activities: place.activities || [], warnings: place.warnings || [],
+  clear(root, placeView({ place, timing, start, serverHours: place.hoursCheck, why: whyText(place), activities: place.activities || [], warnings: warningTexts(place),
     backLabel: t('common.back'), onBack: () => { view = 'results'; render(); },
     onStart: () => { voiceTurns = 0; view = 'ready'; render(); }, voice: voiceButton(), onHide: () => hidePlace(place),
     routeInfo: lastRoute?.id === place.id ? lastRoute.route : null, shareUrl: url.href, backAt: backOf(place), spareAt: place.plan?.spareUntil || null }));

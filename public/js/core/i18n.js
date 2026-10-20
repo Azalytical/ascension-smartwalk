@@ -1,6 +1,7 @@
 // Interface strings in Russian, Kazakh and English. Missing keys fall back to Russian.
 import { get, set, emit } from './store.js';
 import kk from './i18n-kk.js';
+import * as server from './i18n-server.js';
 
 const ru = {
   'app.tagline': 'Прогулка по Астане, ровно на ваше время.',
@@ -207,7 +208,7 @@ const en = {
   'w.rating': 'rating|ratings',
 };
 
-const dictionaries = { ru, kk, en };
+const dictionaries = { ru, kk: { ...kk, ...server.kk }, en: { ...en, ...server.en } };
 export const LANGS = [['ru', 'RU'], ['kk', 'ҚАЗ'], ['en', 'EN']];
 const locales = { ru: 'ru-RU', kk: 'kk-KZ', en: 'en-GB' };
 
@@ -221,6 +222,9 @@ let current = detect();
 
 export const lang = () => current;
 export const locale = () => locales[current];
+
+/** True when the current language has its own text for this key (no fallback to Russian). */
+export const has = (key) => Object.hasOwn(dictionaries[current], key);
 
 export function t(key, params = {}) {
   const text = dictionaries[current][key] ?? ru[key] ?? key;

@@ -46,14 +46,16 @@ const STORM = code => code >= 95;
 export function weatherCondition(weather) {
   if (!weather || typeof weather.temperatureC !== 'number') return null;
   const { temperatureC, precipitationMm = 0, snowfallCm = 0, windKmh = null, code = null } = weather;
-  let label = null;
-  if (STORM(code)) label = 'гроза';
-  else if (snowfallCm > 0 || SNOW(code)) label = 'снег';
-  else if (precipitationMm > 0.1 || RAIN(code)) label = 'дождь';
-  else if (temperatureC <= -12) label = 'сильный мороз';
-  else if (windKmh !== null && windKmh >= 45) label = 'сильный ветер';
+  // `kind` names the condition for the app's Kazakh and English; `label` and `text` are the Russian words.
+  let kind = null;
+  if (STORM(code)) kind = 'storm';
+  else if (snowfallCm > 0 || SNOW(code)) kind = 'snow';
+  else if (precipitationMm > 0.1 || RAIN(code)) kind = 'rain';
+  else if (temperatureC <= -12) kind = 'frost';
+  else if (windKmh !== null && windKmh >= 45) kind = 'wind';
+  const label = kind ? { storm: 'гроза', snow: 'снег', rain: 'дождь', frost: 'сильный мороз', wind: 'сильный ветер' }[kind] : null;
   const degrees = `${temperatureC > 0 ? '+' : temperatureC < 0 ? '−' : ''}${Math.abs(Math.round(temperatureC))} °C`;
-  return { bad: Boolean(label), label, text: label ? `${degrees}, ${label}` : `${degrees}, без осадков` };
+  return { bad: Boolean(label), label, kind, degrees, text: label ? `${degrees}, ${label}` : `${degrees}, без осадков` };
 }
 
 // Detailed weather for the agent, MCP tools and /api/weather: feels-like, gusts, sunset and outdoor advice.
