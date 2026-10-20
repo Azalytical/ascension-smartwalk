@@ -37,7 +37,7 @@ PLACE_CATEGORIES = re.compile(r"^(restaurant|cafe|coffee_shop|casual_eatery|fast
                               r"sculpture_statue|public_plaza|public_fountain|bridge|muslim_place_of_worship|"
                               r"christian_place_of_worship|amusement_park|zoo|playground|skating_rink|"
                               r"non_alcoholic_beverage_venue|smoothie_juice_bar|beach|landmark_and_historical_building|"
-                              r"tourist_attraction|books_music_and_video_store)$")
+                              r"tourist_attraction|books_music_and_video_store|bar|dance_club)$")
 LAND_USE = {("park", "park"), ("park", "village_green"), ("park", "dog_park"), ("horticulture", "garden"),
             ("recreation", "playground"), ("recreation", "recreation_ground"), ("recreation", "beach_resort"),
             ("pedestrian", "plaza"), ("entertainment", "theme_park"), ("entertainment", "zoo")}

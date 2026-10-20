@@ -45,6 +45,7 @@ LABELS = {
     "fountain": "Фонтан", "bridge": "Мост", "place_of_worship": "Место богослужения",
     "amusement_park": "Парк развлечений", "theme_park": "Парк развлечений", "zoo": "Зоопарк", "beach": "Пляж",
     "viewpoint": "Обзорная точка", "attraction": "Достопримечательность",
+    "bar": "Бар", "pub": "Паб", "nightclub": "Ночной клуб",
     "toilets": "Общественный туалет", "drinking_water": "Питьевая вода", "bicycle_rental": "Прокат велосипедов",
 }
 # Search words in ru/kk/en per kind, so a query like «мечеть» or «фонтан» finds the place by its kind.
@@ -75,8 +76,11 @@ PLACE_KINDS = {
     "christian_place_of_worship": "place_of_worship", "roman_catholic_place_of_worship": "place_of_worship",
     "jewish_place_of_worship": "place_of_worship", "amusement_park": "amusement_park", "zoo": "zoo",
     "playground": "playground", "beach": "beach",
+    # Evening places: only recommended when a query asks for night or bars (nightlife category in retrieval).
+    "bar": "bar", "cocktail_bar": "bar", "sports_bar": "bar", "beer_bar": "bar", "wine_bar": "bar", "hotel_bar": "bar",
+    "pub": "pub", "irish_pub": "pub", "dance_club": "nightclub", "salsa_club": "nightclub",
 }
-FOOD = {"cafe", "bakery", "dessert", "restaurant", "fast_food"}
+FOOD = {"cafe", "bakery", "dessert", "restaurant", "fast_food", "bar", "pub", "nightclub"}
 MIN_CONFIDENCE = {"food": 0.6, "green": 0.7, "other": 0.5}
 LAND_USE_KINDS = {"park": "park", "village_green": "park", "dog_park": "park", "garden": "garden",
                   "playground": "playground", "recreation_ground": "park", "beach_resort": "beach", "plaza": "plaza",
@@ -211,7 +215,7 @@ def osm_url(record_id):
     return f"osm:{kind}:{match.group(2)}", f"https://www.openstreetmap.org/{kind}/{match.group(2)}", int(match.group(3))
 
 
-FOOD_KINDS = {"cafe", "bakery", "dessert", "restaurant", "fast_food", "ice_cream", "food_court", "bar", "pub"}
+FOOD_KINDS = {"cafe", "bakery", "dessert", "restaurant", "fast_food", "ice_cream", "food_court", "bar", "pub", "nightclub"}
 GROUPS = {"food": FOOD_KINDS, "mall": {"mall"}, "service": {"toilets", "drinking_water", "bicycle_rental"},
           "green": {"park", "garden", "playground", "beach", "nature_reserve"},
           "landmark": {"monument", "memorial", "artwork", "plaza", "fountain", "bridge", "viewpoint", "castle", "ruins",
