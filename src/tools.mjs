@@ -101,6 +101,7 @@ function planWalk(args, { dataset, now }) {
     ...(result.nearestBeyondLimits ? { nearestBeyondLimits: { id: String(result.nearestBeyondLimits.id), name: result.nearestBeyondLimits.name, category: result.nearestBeyondLimits.category,
       walkMinutes: result.nearestBeyondLimits.walkMinutes, neededMinutes: result.nearestBeyondLimits.neededMinutes } } : {}),
     ...(Array.isArray(result.understood) ? { understood: result.understood.map(item => item.label) } : {}),
+    ...(result.unconfirmed?.length ? { unconfirmed: result.unconfirmed } : {}),
     notes: result.warnings, rejected: result.retrieval.rejected, ...SOURCE,
     method: 'Отбор по расстоянию, категории, времени и часам работы из OSM; время пешком — оценка по прямой ×1,35 при 4,2 км/ч, резерв 5 минут.'
   };
