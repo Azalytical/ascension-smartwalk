@@ -55,7 +55,7 @@ npx wrangler deploy
 curl https://<ваш-адрес>.workers.dev/api/status
 ```
 
-В ответе должны быть `"generationAvailable": true` и `"generationProvider": "gemini"` (если ключ задан), `"poiCount"` (записи базы) и `"version"`. Афиша и состояние последнего сбора: `/api/events?days=7` (поле `collection`); этот ответ Worker держит в памяти до 5 минут, поэтому новый сбор виден не сразу.
+В ответе должны быть `"generationAvailable": true` и `"generationProvider": "gemini"` (если ключ задан), `"poiCount": 2058` (места после сведения дублей; сырые записи в `sourceRecords`) и `"version"`. Афиша и состояние последнего сбора: `/api/events?days=7` (поле `collection`); этот ответ Worker держит в памяти до 5 минут, поэтому новый сбор виден не сразу.
 
 ## Google Cloud Run
 
