@@ -33,7 +33,7 @@ const SAFE_SUMMARY = {
     en: 'No places fit these limits. Give the walk more time or change the request.' },
 };
 // The text without a model, in the language of the request.
-const safeSummary = (result, query) => SAFE_SUMMARY[result.recommendations.length ? 'some' : 'none'][answerLanguage(query)];
+const safeSummary = (result, query, preferred) => SAFE_SUMMARY[result.recommendations.length ? 'some' : 'none'][answerLanguage(query, preferred)];
 
 export async function limitedJson(response, maximum = 131072) {
   if (!response.body) throw new Error('EMPTY_RESPONSE');
@@ -62,11 +62,15 @@ const INSTRUCTIONS = 'Ты городской помощник Aidem в Аста
 export const UNSUPPORTED = /(открыт[а-я]* сейчас|работает до|вход бесплат|есть розет|гарантир|абсолютно безопас|сегодня.{0,15}выстав|без очеред|меню|ассортимент|кухн|обеспечива|предлагает|кофейня сети|расположен|находится внутри|open now|free (entry|admission)|\bmenu\b|cuisine|guarantee|completely safe|no queue|қазір ашық|тегін кіру|мәзір)/iu;
 
 // The cards are in Russian, so the model needs the query's language spelled out to answer in it.
-export function answerLanguage(query) {
+// The query's letters decide; the interface language (`preferred`) decides where they cannot: no letters at all
+// (only the time was picked), or Cyrillic without Kazakh letters («кофе») in the Kazakh interface.
+export function answerLanguage(query, preferred) {
   const text = String(query || '');
+  const chosen = ['ru', 'kk', 'en'].includes(preferred) ? preferred : null;
   if (/[әғқңөұүһі]/iu.test(text)) return 'kk';
   if (/[a-z]/i.test(text) && !/[а-яё]/iu.test(text)) return 'en';
-  return 'ru';
+  if (/[а-яё]/iu.test(text)) return chosen === 'kk' ? 'kk' : 'ru';
+  return chosen || 'ru';
 }
 
 export function activeProvider(env = {}) {
@@ -122,10 +126,10 @@ async function callOpenAI(input, provider, env, signal) {
 // A rewrite for a slipped language is asked only while the answer is still quick.
 const LANGUAGE_RETRY_WITHIN_MS = 9000;
 
-async function generate(result, query, env) {
+async function generate(result, query, env, preferred) {
   const startedAt = Date.now();
-  const language = answerLanguage(query);
-  const fallback = { mode: 'fallback', summary: safeSummary(result, query), references: [], origin: 'template', label: 'Текст без модели, по данным POI' };
+  const language = answerLanguage(query, preferred);
+  const fallback = { mode: 'fallback', summary: safeSummary(result, query, preferred), references: [], origin: 'template', label: 'Текст без модели, по данным POI' };
   const provider = activeProvider(env);
   if (!result.recommendations.length || !provider) return fallback;
   // Coordinates and visitor identity are deliberately excluded from model context.
@@ -541,8 +545,8 @@ export async function handleApi(request, env = {}, dataset = []) {
       items: cityEventsFor(events.events, { lat: result.constraints.lat, lon: result.constraints.lon, minutes: result.constraints.minutes,
         maxWalkMinutes: result.constraints.maxWalkMinutes, withChild: result.constraints.withChild, now: visitAt }) } };
     const generation = budget.generationAllowed
-      ? await generate(result, body.query, env)
-      : { mode: 'fallback', summary: safeSummary(result, body.query), references: [], reason: 'request_budget_unavailable' };
+      ? await generate(result, body.query, env, body.lang)
+      : { mode: 'fallback', summary: safeSummary(result, body.query, body.lang), references: [], reason: 'request_budget_unavailable' };
     // Model texts sit next to the computed ones, each labelled, so a card never presents generated text as data.
     // Google Maps, 2GIS and Google Calendar links are plain URLs, opened only when the visitor taps them.
     const label = generation.label;

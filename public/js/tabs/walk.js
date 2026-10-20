@@ -424,7 +424,7 @@ function renderPick() {
 
 // ---------- request ----------
 function buildRequest(surprise = false) {
-  const body = { ...outbound(start), minutes: plan.minutes, maxWalkMinutes: plan.maxWalk, query: plan.query.trim(), withChild: plan.mood === 'kids', category: 'any', returnToStart: true,
+  const body = { ...outbound(start), minutes: plan.minutes, maxWalkMinutes: plan.maxWalk, query: plan.query.trim(), withChild: plan.mood === 'kids', category: 'any', returnToStart: true, lang: lang(),
     reserveMinutes: RESERVES.includes(plan.reserve) ? plan.reserve : defaults.reserve };
   if (plan.when !== 'now') body.visitDate = isoWithOffset(leaveAt());
   const hidden = [...store.hiddenIds(), ...(surprise ? surpriseSeen : [])];
@@ -738,7 +738,9 @@ function renderError(back) {
   speakNext = false;
   voiceTurns = 0;
   const kind = error?.kind;
-  const text = kind === 'offline' ? t('error.offline') : kind === 'timeout' ? t('error.timeout') : error?.message && kind !== 'server' ? error.message : (error?.message || t('error.server'));
+  // The server's own messages are in Russian, so other languages get the interface's text.
+  const text = kind === 'offline' ? t('error.offline') : kind === 'timeout' ? t('error.timeout') : kind === 'limit' ? t('error.limit')
+    : lang() === 'ru' && error?.message ? error.message : t('error.server');
   clear(root, h('section', { class: 'view state-view' }, h('div', { class: 'view-bar' }, back),
     h('div', { class: 'state-icon is-bad', 'aria-hidden': 'true' }, icon('warning')),
     h('h2', { class: 'title-2', text: t('error.title') }), h('p', { class: 'lead', text }),

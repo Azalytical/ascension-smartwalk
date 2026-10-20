@@ -173,6 +173,24 @@ test('the model is told which language to answer in', async () => {
   } finally { globalThis.fetch = original; }
 });
 
+test('without telling letters the interface language picks the answer language', async () => {
+  const { answerLanguage } = await import('../src/api.mjs');
+  assert.equal(answerLanguage('', 'en'), 'en');
+  assert.equal(answerLanguage('', 'kk'), 'kk');
+  assert.equal(answerLanguage('кофе', 'kk'), 'kk');
+  assert.equal(answerLanguage('кофе', 'en'), 'ru');
+  assert.equal(answerLanguage('I want coffee', 'ru'), 'en');
+  assert.equal(answerLanguage('', 'de'), 'ru');
+  const original = globalThis.fetch;
+  let body;
+  globalThis.fetch = async (_u, o) => { body = JSON.parse(o.body); return new Response('{}', { status: 400 }); };
+  try {
+    const response = await handleApi(request({ ...valid, query: '', lang: 'en' }), { GEMINI_API_KEY: 'g', LOCAL_DEVELOPMENT: true }, [poi]);
+    assert.equal(response.status, 200);
+    assert.equal(JSON.parse(body.contents[0].parts[0].text).answerLanguage, 'en');
+  } finally { globalThis.fetch = original; }
+});
+
 test('Gemini writes «почему» and «что делать» per place; a text with an invented number or claim is dropped', async () => {
   const original = globalThis.fetch;
   const second = { ...poi, id: 'node/2', name: 'Сквер', lat: 51.1290, sourceUrl: 'https://www.openstreetmap.org/node/2' };
