@@ -476,6 +476,7 @@ function renderResults() {
   const generation = result.generation || {};
   const llm = generation.mode === 'llm' && generation.summary;
   const leave = leaveAt();
+  const notes = notesView(recs);
   const tip = llm ? aiCard(generation) : h('div', { class: 'ai-card is-quiet' }, h('p', { class: 'fine', text: t('results.fallback') }));
 
   const rows = recs.map((place, index) => {
@@ -497,9 +498,11 @@ function renderResults() {
     h('h2', { id: 'results-title', class: 'title-1', text: t('results.title', { min: request.minutes }) }),
     h('p', { class: 'meta' }, icon('pin', 'icon-xs'), t('results.start', { name: startName() }), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }), t('plan.returnBy', { time: time(leave + request.minutes * 60000) })),
     tip,
+    notes.notices,
     h('div', { class: 'result-list' }, rows),
     understoodRow(result.understood),
-    routeCard(result.route)));
+    routeCard(result.route),
+    notes.unchecked));
   drawResultsMap(recs);
   if (speakNext) {
     // The Gemini tip is read through its own «Слушать» button, so «Стоп» there also ends the conversation.
@@ -507,6 +510,25 @@ function renderResults() {
     if (listen?.play) answer(null, listen.play());
     else answer(t('voice.answer', { n: recs.length, name: recs[0].name, walk: recs[0].walkMinutes, time: backOf(recs[0]) }));
   }
+}
+
+// The server's notes. What it cannot confirm from the request (розетки, тишина…) and the notes about this request
+// («музей не помещается», «дальше нужен транспорт», «исключено N мест») show above the list, at most three lines;
+// the general caveats and what all three cards share fold into «Что мы не проверяли».
+const GENERAL_NOTE = /^(?:Расстояние указано по прямой|Каждая карточка|Актуальное открытие)/;
+function notesView(recs, { skip = null } = {}) {
+  const all = (Array.isArray(result?.warnings) ? result.warnings : []).filter((note) => !skip?.test(note));
+  const specific = all.filter((note) => !GENERAL_NOTE.test(note));
+  const unconfirmed = Array.isArray(result?.unconfirmed) && result.unconfirmed.length ? t('results.unconfirmed', { list: result.unconfirmed.join(', ') }) : null;
+  const lines = [unconfirmed, ...specific].filter(Boolean);
+  const cards = recs.map((place) => (Array.isArray(place.warnings) ? place.warnings : []));
+  const shared = cards.length > 1 ? cards[0].filter((note) => cards.every((list) => list.includes(note))) : [];
+  const folded = [...new Set([...lines.slice(3), ...all.filter((note) => GENERAL_NOTE.test(note)), ...shared])];
+  return {
+    notices: lines.length ? h('div', { class: 'notices' }, lines.slice(0, 3).map((text) => h('p', { class: 'notice' }, icon('info', 'icon-xs'), h('span', { text })))) : null,
+    unchecked: folded.length ? h('details', { class: 'disclosure unchecked' }, h('summary', {}, icon('info'), t('results.unchecked'), h('span', { class: 'count num', text: folded.length })),
+      h('ul', { class: 'bullets fine' }, folded.map((text) => h('li', { text })))) : null,
+  };
 }
 
 // «Мы учли»: what the server understood from the request (time, categories, child, night, weather, hours).
@@ -576,6 +598,8 @@ function drawResultsMap(recs) {
 }
 
 function renderEmpty(back) {
+  // The nearest place and «no options» are already said by the screen itself.
+  const notes = notesView([], { skip: /^(?:Ближе всего подходит|В текущем наборе данных нет)/ });
   const actions = [];
   if (plan.minutes < 180) actions.push(h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { plan.minutes = Math.min(180, plan.minutes + 15); savePlan(); submit(); } }, icon('plus'), t('results.empty.add')));
   if (plan.maxWalk < 30) actions.push(h('button', { class: 'btn btn-quiet', type: 'button', onclick: () => { plan.maxWalk = 30; savePlan(); submit(); } }, icon('walk'), t('results.empty.walk')));
@@ -591,7 +615,9 @@ function renderEmpty(back) {
     h('h2', { class: 'title-2', text: t('results.empty.title') }), h('p', { class: 'lead', text: t('results.empty.text') }),
     nearest ? h('div', { class: 'pairing nearest' }, categoryArt(nearest.category, 36, 'art'), h('span', { class: 'row-text' }, h('small', { text: t('results.nearest') }), h('strong', { text: nearest.name }),
       h('small', { text: t('results.nearestValue', { walk: nearest.walkMinutes, n: nearest.neededMinutes }) }))) : null,
-    h('div', { class: 'stack' }, actions)));
+    notes.notices,
+    h('div', { class: 'stack' }, actions),
+    notes.unchecked));
   layers.hidePins(); layers.hideRoutes(); layers.showReach(start, reachMeters(plan.minutes, plan.maxWalk));
   if (speakNext) answer(`${t('results.empty.title')} ${nearest?.name ? t('voice.nearest', { name: nearest.name, n: nearest.neededMinutes }) : ''}`);
 }

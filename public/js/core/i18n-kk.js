@@ -37,7 +37,7 @@ export default {
   'results.start': 'Бастау: {name}', 'results.aiGemini': 'Gemini кеңесі', 'results.aiMore': 'Толығырақ', 'results.aiLess': 'Жасыру', 'results.ai': 'ЖИ кеңесі',
   'results.aiNote': 'ЖИ мұны тек төмендегі карточкалар бойынша жазды. Уақытты, қашықтықты және жұмыс уақытын модель емес, сервер есептейді.',
   'results.fallback': 'Орындар деректері мен сіздің шарттарыңыз бойынша іріктелді. ЖИ кеңесі қазір қолжетімсіз.',
-  'results.unchecked': 'Нені тексермедік', 'results.source': 'OpenStreetMap және Overture Maps деректері: {count} орын, {date} жағдайы бойынша',
+  'results.unconfirmed': 'Дереккөз растамайды: {list}', 'results.unchecked': 'Нені тексермедік', 'results.source': 'OpenStreetMap және Overture Maps деректері: {count} орын, {date} жағдайы бойынша',
   'results.empty.title': 'Бұл уақытқа әзірге ештеңе жоқ', 'results.empty.text': 'Таңдалған уақыт ішінде барып-қайтуға болатын орын табылмады.',
   'results.understood': 'Ескердік', 'results.route': 'Шағын маршрут: қатарынан {n} орын', 'results.routeMeta': 'жолымен {n} мин, {time} шамасында ораласыз', 'results.routeStop': '{walk} мин жаяу, орында {visit} мин', 'results.routeShow': 'Картадан көрсету', 'results.routeShown': 'Маршрут картада', 'results.empty.take': '{n} минут алу', 'results.nearest': 'Ең жақыны', 'results.nearestValue': '{walk} мин жаяу, қайту жолымен шамамен {n} мин керек',
   'results.empty.add': '15 минут қосу', 'results.empty.walk': '30 минутқа дейін жаяу', 'results.empty.clear': 'Тілекті алып тастау',
