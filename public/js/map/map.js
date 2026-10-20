@@ -178,9 +178,9 @@ function frame({ points, margin, maxZoom }, duration) {
   map.easeTo({ center, zoom, padding, duration, essential: false });
 }
 
-export function flyTo(lngLat, zoom = 15, duration = 700) {
+export function flyTo(lngLat, zoom = 15, duration = 700, { exact = false } = {}) {
   lastFit = null;
-  map?.flyTo({ center: lngLat, zoom: Math.max(map.getZoom(), zoom), padding, duration, essential: false });
+  map?.flyTo({ center: lngLat, zoom: exact ? zoom : Math.max(map.getZoom(), zoom), padding, duration, essential: false });
 }
 
 let tilted = false;

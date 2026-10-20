@@ -129,7 +129,7 @@ registerTab({
       const place = wanted && data.items.find((item) => item.id === wanted);
       if (place) { history.replaceState(null, '', location.pathname); openPlace(place); return; }
       drawMap(filtered()); renderList();
-      mapReady.then(() => { const start = startPoint(); flyTo([start.lon, start.lat], 14.2, 600); });
+      mapReady.then(() => { const start = startPoint(); flyTo([start.lon, start.lat], 14.6, 600, { exact: true }); });
     }).catch(() => { if (listHost) clear(listHost, h('p', { class: 'empty-note', text: t('explore.failed') })); });
   },
   reopen() { if (root) renderBrowse(); },

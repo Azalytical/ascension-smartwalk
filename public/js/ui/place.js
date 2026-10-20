@@ -48,6 +48,7 @@ export function placeView({ place, timing, start, serverHours, why, activities =
     ['info', 'muted', t('place.check.live')],
   ];
   const snapshot = formatDate(place.retrievedAt);
+  const gemini = (key) => h('p', { class: 'origin is-ai' }, h('span', { class: 'ai-chip' }, icon('sparkle', 'icon-xs'), 'Gemini'), place.provenance?.[key]?.label || t('place.byGemini'));
   const origin = (key) => place.provenance?.[key]?.label ? h('p', { class: 'origin' }, icon('info', 'icon-xs'), place.provenance[key].label) : null;
 
   const routeLine = h('p', { class: 'fine', text: routeInfo ? t('place.route', { d: formatDistance(routeInfo.meters, lang()), n: Math.ceil(routeInfo.seconds / 60) }) : t('place.estimate') });
@@ -71,11 +72,13 @@ export function placeView({ place, timing, start, serverHours, why, activities =
     h('button', { class: 'btn btn-gold btn-xl', type: 'button', onclick: onStart }, icon('play'), t('place.start')),
     h('div', { class: 'place-actions' }, watchButton({ place, start, walk: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, minutes: timing.totalMinutes }), friends),
     start ? navLinks(start, place) : null,
-    why ? section(t('place.why'), h('p', { class: 'prose', text: why }), origin('why')) : null,
-    steps.length ? section(t('place.plan'), h('ol', { class: 'plan-steps' }, steps.map((step) => h('li', { text: step }))), origin('plan')) : null,
+    place.aiWhy ? section(t('place.why'), h('p', { class: 'prose', text: place.aiWhy }), gemini('aiWhy'))
+      : why ? section(t('place.why'), h('p', { class: 'prose', text: why }), origin('why')) : null,
+    place.aiTodo || steps.length ? section(t('place.plan'), place.aiTodo ? h('p', { class: 'prose', text: place.aiTodo }) : null, place.aiTodo ? gemini('aiTodo') : null,
+      steps.length ? h('ol', { class: 'plan-steps' }, steps.map((step) => h('li', { text: step }))) : null, steps.length ? origin('plan') : null) : null,
     pairing ? section(t('place.pairing'), h('div', { class: 'pairing' }, categoryArt(pairing.category, 32, 'art'),
       h('span', { class: 'row-text' }, h('strong', { text: pairing.name }), h('small', { text: t('place.pairingValue', { d: formatDistance(pairing.distanceMeters, lang()), n: pairing.extraMinutes }) })))) : null,
-    activities.length ? section(t('place.todo'), h('ul', { class: 'bullets' }, activities.map((item) => h('li', { text: item }))), h('p', { class: 'origin is-idea' }, icon('sparkle', 'icon-xs'), t('place.idea'))) : null,
+    activities.length && !place.aiTodo ? section(t('place.todo'), h('ul', { class: 'bullets' }, activities.map((item) => h('li', { text: item }))), h('p', { class: 'origin is-idea' }, icon('sparkle', 'icon-xs'), t('place.idea'))) : null,
     facts.length ? section(t('place.info'), h('dl', { class: 'facts' }, facts), origin('facts')) : null,
     section(t('place.checks'), h('ul', { class: 'checks' }, checks.map(([name, tone, text]) => h('li', { class: `check-${tone}` }, icon(name), h('span', { text })))),
       h('p', { class: 'fine' }, externalLink(t('place.sourceOf', { source: sourceName }), place.sourceUrl), snapshot ? h('span', { text: ` ${t('place.snapshot', { date: snapshot })}` }) : null)),

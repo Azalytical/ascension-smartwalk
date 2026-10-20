@@ -260,3 +260,20 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .pairing { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--r-lg); background: var(--surface); }
 .origin { display: flex; align-items: center; gap: 6px; font-size: var(--fs-12); color: var(--ink-3); }
 .origin.is-idea { color: var(--sky-ink, var(--sky)); }
+.origin.is-ai { color: var(--ink-3); }
+.ai-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--r-pill); background: var(--gold-soft); color: var(--gold-ink); font-weight: 650; }
+.understood { display: grid; gap: 8px; }
+.understood-title { font-size: var(--fs-13); font-weight: 650; color: var(--ink-3); }
+.understood .chip-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 calc(var(--s-4) * -1); padding: 0 var(--s-4); }
+.understood .chip-row::-webkit-scrollbar { display: none; }
+.chip.is-static { cursor: default; white-space: nowrap; font-size: var(--fs-13); min-height: 32px; gap: 6px; }
+.route-card { display: grid; gap: 12px; padding: 16px; border-radius: var(--r-lg); background: var(--surface); }
+.route-head { display: flex; align-items: center; gap: 12px; }
+.route-head > div { display: grid; gap: 2px; }
+.route-head small { color: var(--ink-3); font-size: var(--fs-13); }
+.route-icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--sky-soft); color: var(--sky-ink); flex: none; }
+.route-stops { display: grid; gap: 10px; }
+.route-stops li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 10px; align-items: start; }
+.route-time { font-weight: 700; color: var(--ink-2); font-size: var(--fs-15); padding-top: 1px; }
+.route-card .btn { justify-self: start; }
+.nearest { text-align: left; width: 100%; }

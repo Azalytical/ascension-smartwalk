@@ -50,7 +50,7 @@ export default {
   'place.check.coords': 'Координаттар дереккөзден', 'place.check.hours': 'Жұмыс уақыты дереккөзден', 'place.check.noHours': 'Жұмыс уақыты белгісіз',
   'place.check.live': 'Дәл қазір ашық па, тексерілмеген', 'place.source': 'OpenStreetMap-те ашу', 'place.snapshot': 'Деректер күні: {date}',
   'place.plan': 'Жоспар', 'place.pairing': 'Жақын жерде тағы', 'place.pairingValue': 'орыннан {d}, серуенге +{n} мин', 'place.idea': 'Сервис идеясы, дереккөздегі мәлімет емес', 'place.friends': 'Достарды шақыру', 'place.address': 'Мекенжай', 'conf.high': 'Жоғары сенім', 'conf.medium': 'Орташа сенім', 'conf.low': 'Төмен сенім',
-  'place.save': 'Сақтау', 'place.saved': 'Сақталды', 'place.share': 'Бөлісу', 'place.watch': 'Сағатқа', 'place.watchText': 'Сілтемені сағаттан ашыңыз: {name}',
+  'place.byGemini': 'Gemini тек табылған орындар бойынша жазды', 'place.save': 'Сақтау', 'place.saved': 'Сақталды', 'place.share': 'Бөлісу', 'place.watch': 'Сағатқа', 'place.watchText': 'Сілтемені сағаттан ашыңыз: {name}',
   'me.watch': 'Seruen сағатта', 'me.watchText': 'Apple Watch және Wear OS: бір рет басасыз, сағат жол көрсетеді және қайту уақытын ескертеді.', 'me.watchOpen': 'Ашу',
   'place.estimate': 'Бағалау: түзу сызық × 1,35, жылдамдық 4,2 км/сағ.', 'place.route': 'Жаяу маршрут: {d}, бір жаққа шамамен {n} мин',
   'place.walkTo': 'Осында бару', 'place.warnings': 'Ескертулер',

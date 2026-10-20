@@ -39,12 +39,15 @@ const data=${JSON.stringify(data)};
 prepareDataset(data);
 prepareApi(data);
 const cacheFor=path=>path==='/'||path.endsWith('.html')||path==='/watch'||path==='/friends'||path==='/sw.js'?'no-cache':path.startsWith('/vendor/')||path.startsWith('/assets/')?'public,max-age=86400':'public,max-age=120';
+// Bodies are decoded once per isolate and reused, which keeps each request well under the CPU limit.
+const decoded=new Map();
+const bytesOf=(path,asset)=>{let bytes=decoded.get(path);if(!bytes){if(asset.encoding==='base64'){const text=atob(asset.body);bytes=new Uint8Array(text.length);for(let i=0;i<text.length;i++)bytes[i]=text.charCodeAt(i);}else bytes=new TextEncoder().encode(asset.body);decoded.set(path,bytes);}return bytes;};
 export default {async fetch(request,env,ctx){
   const api=await handleApi(request,env,data);if(api)return api;
   const url=new URL(request.url);const asset=assets[url.pathname];
   if(!asset)return new Response('Not found',{status:404});
   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
-  const body=request.method==='HEAD'?null:asset.encoding==='base64'?Uint8Array.from(atob(asset.body),character=>character.charCodeAt(0)):asset.body;
+  const body=request.method==='HEAD'?null:bytesOf(url.pathname,asset);
   return new Response(body,{headers:{'Content-Type':asset.type,'X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','Cache-Control':cacheFor(url.pathname)}});
 }};`;
 await mkdir(resolve(root, 'dist/server'), { recursive: true });

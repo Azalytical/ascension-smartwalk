@@ -347,9 +347,9 @@ function renderResults() {
     h('div', { class: 'view-bar' }, back, h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: 'Seruen', text: t('results.title', { min: request.minutes }), url: shareLink() }) }, icon('share'))),
     h('h2', { id: 'results-title', class: 'title-1', text: t('results.title', { min: request.minutes }) }),
     h('p', { class: 'meta' }, icon('pin', 'icon-xs'), t('results.start', { name: startName() }), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }), t('plan.returnBy', { time: time(leave + request.minutes * 60000) })),
-    understoodRow(result.understood),
     llm ? aiCard(generation) : h('div', { class: 'ai-card is-quiet' }, h('p', { class: 'fine', text: t('results.fallback') })),
     h('div', { class: 'result-list' }, rows),
+    understoodRow(result.understood),
     routeCard(result.route),
     unchecked.length ? h('details', { class: 'disclosure' }, h('summary', {}, icon('info'), t('results.unchecked'), h('span', { class: 'count num', text: unchecked.length })), h('ul', { class: 'bullets fine' }, unchecked.map((w) => h('li', { text: w })))) : null,
     h('p', { class: 'fine data-line' }, icon('map'), t('results.source', { count: number(result.dataset?.poiCount || 0), date: formatDate(result.dataset?.updatedAt) || '—' }))));
