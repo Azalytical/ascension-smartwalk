@@ -57,7 +57,7 @@ export function weatherCondition(weather) {
 }
 
 // Detailed weather for the agent, MCP tools and /api/weather: feels-like, gusts, sunset and outdoor advice.
-// Coordinates are rounded to about 5 km before the request, so a visitor's exact position never leaves Seruen.
+// Coordinates are rounded to about 5 km before the request, so a visitor's exact position never leaves Ulger.
 
 const CODES = {
   0: 'ясно', 1: 'почти ясно', 2: 'переменная облачность', 3: 'пасмурно', 45: 'туман', 48: 'туман с изморозью',
@@ -103,8 +103,11 @@ export async function astanaWeather({ lat = ASTANA.lat, lon = ASTANA.lon } = {},
     + '&daily=sunrise,sunset&forecast_days=1&wind_speed_unit=ms&timezone=auto';
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 4000);
+  const request = () => fetchImpl(url, { signal: controller.signal, headers: { 'User-Agent': 'Ulger/2.0 (ascension-smartwalk.azamatbreach.workers.dev)' } });
   try {
-    const response = await fetchImpl(url, { signal: controller.signal, headers: { 'User-Agent': 'Seruen/2.0 (ascension-smartwalk.azamatbreach.workers.dev)' } });
+    let response = await request();
+    // Open-Meteo answers an occasional 503; one quick retry usually gets through.
+    if (response.status >= 500) { await new Promise(resolve => setTimeout(resolve, 300)); response = await request(); }
     if (!response.ok) throw new Error(`weather_${response.status}`);
     const body = await response.json();
     const c = body.current || {};

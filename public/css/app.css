@@ -1,4 +1,4 @@
-/* Seruen layout: full-bleed map, bottom sheet on phones, side panel on desktop. */
+/* Ulger layout: full-bleed map, bottom sheet on phones, side panel on desktop. */
 :root { --tabbar-h: calc(60px + var(--safe-bottom)); --sheet-visible: 50vh; }
 html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .app { position: fixed; inset: 0; overflow: hidden; }

@@ -7,6 +7,8 @@ import { checkVisit } from './hours.mjs';
 import { localClock } from './intent.mjs';
 
 const POOL = 10;
+// Places to eat and drink, as in retrieval: two of them in one short route read as «two cafes in a row».
+const FOOD = ['cafe', 'restaurant', 'nightlife'];
 const MAX_HOURS_CHECKS = 60;
 
 /**
@@ -25,7 +27,9 @@ export function microRoute(candidates, constraints, reference, walk) {
     for (const candidate of candidates) {
       // A stop needs a name to walk to, and a second record of the same kind a few steps away is usually the same place.
       if (used.has(candidate) || candidate.poi.nameIsGenerated || names.has(candidate.name)
-        || pool.some(other => other.poi.category === candidate.poi.category && walk(other.poi, candidate.poi) <= 2)) continue;
+        || pool.some(other => other.poi.category === candidate.poi.category && walk(other.poi, candidate.poi) <= 2)
+        // Cafes score high for most requests; capping them leaves room in the pool for a park or a sight to walk to.
+        || (!constraints.foodFocus && FOOD.includes(candidate.poi.category) && pool.filter(other => FOOD.includes(other.poi.category)).length >= 3)) continue;
       if (!best || candidate.score > best.score || (candidate.score === best.score && candidate.walkMinutes < best.walkMinutes)) best = candidate;
     }
     if (!best) break;
@@ -51,6 +55,9 @@ export function microRoute(candidates, constraints, reference, walk) {
         if (total > constraints.minutes) continue;
         // Variety is a bonus, not a rule: a request for sights may well be three sights.
         const variety = 6 * (new Set([a.poi.category, b.poi.category, c.poi.category]).size - 1);
+        // One stop to eat is part of a walk; a second one only when food is what the visitor asked for, a third only on an explicit route request.
+        const food = [a, b, c].filter(stop => FOOD.includes(stop.poi.category)).length;
+        if (food > (constraints.foodFocus ? (constraints.routeAsked ? 3 : 2) : 1)) continue;
         options.push({ stops: [a, b, c], legs, walking, total, value: a.score + b.score + c.score + variety - 0.8 * walking });
       }
     }

@@ -1,5 +1,6 @@
 // Pieces shared by the walk, nearby and saved screens: category art, opening-hours status, navigation links, sharing.
 import { h, icon } from '../core/dom.js';
+import { speakText, stopSpeaking, unlockAudio } from '../core/media.js';
 import { t, time, lang } from '../core/i18n.js';
 import { checkVisit } from '../lib/hours.mjs';
 import { toast } from './toast.js';
@@ -64,7 +65,7 @@ export function watchUrl({ place, start, walk, visit, back, minutes }) {
 }
 
 export function watchButton(options) {
-  return h('button', { class: 'btn btn-quiet btn-sm watch-btn', type: 'button', onclick: () => share({ title: 'Seruen', text: t('place.watchText', { name: options.place.name }), url: watchUrl(options) }) }, icon('watch'), t('place.watch'));
+  return h('button', { class: 'btn btn-quiet btn-sm watch-btn', type: 'button', onclick: () => share({ title: 'Ulger', text: t('place.watchText', { name: options.place.name }), url: watchUrl(options) }) }, icon('watch'), t('place.watch'));
 }
 
 /** «Слушать»: Gemini reads the text aloud; a second tap stops it. */
@@ -72,8 +73,8 @@ export function listenButton(getText) {
   const button = h('button', { class: 'btn btn-quiet btn-sm listen-btn', type: 'button', 'aria-pressed': 'false' }, icon('speaker'), h('span', { text: t('common.listen') }));
   const label = button.querySelector('span');
   button.addEventListener('click', async () => {
-    const { speakText, stopSpeaking } = await import('../core/media.js');
     if (button.getAttribute('aria-pressed') === 'true') { stopSpeaking(); return; }
+    unlockAudio();
     button.setAttribute('aria-pressed', 'true'); label.textContent = t('common.stop');
     try { await speakText(typeof getText === 'function' ? getText() : getText); }
     finally { button.setAttribute('aria-pressed', 'false'); label.textContent = t('common.listen'); }

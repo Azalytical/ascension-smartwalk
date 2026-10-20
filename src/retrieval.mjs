@@ -300,7 +300,10 @@ function warningsFor(poi, constraints, hours) {
   if (poi.source?.id && poi.source.id !== 'osm') {
     warnings.push(`Место из ${poi.source.label ?? 'внешнего источника'}: координаты и актуальность взяты из страниц бизнеса, режим работы неизвестен.`);
   }
-  if (poi.nameIsGenerated) warnings.push('Название в источнике не указано; ориентируйтесь по точке на карте.');
+  if (poi.nameIsGenerated) {
+    warnings.push(poi.landmark ? `Название в источнике не указано; подписали по ближайшему месту «${poi.landmark.name}» (${poi.landmark.distanceMeters} м), ориентируйтесь по точке на карте.`
+      : 'Название в источнике не указано; ориентируйтесь по точке на карте.');
+  }
   if (constraints.withChild) warnings.push('Категория подходит для поиска прогулки с ребёнком; безопасность, возрастные ограничения и доступность не проверены.');
   if (/розет|socket|outlet|қуат|заряд/i.test(constraints.query)) warnings.push('Наличие доступных посетителю розеток не подтверждено.');
   if (/тих|quiet|тыныш|спокой/i.test(constraints.query)) warnings.push('Тишина и текущий уровень шума не подтверждены.');
@@ -396,7 +399,7 @@ function intentCategories(requested, intents, child) {
 }
 
 function intentScore(poi, kind, hours, intents, wheelchair) {
-  let points = poi.nameIsGenerated ? -12 : 0;
+  let points = poi.nameIsGenerated ? -20 : 0;
   const tags = poi.tags && !Array.isArray(poi.tags) ? poi.tags : {};
   // Overture lists KFC or Hardee's as restaurants; the cuisine tag still marks them as fast food.
   const fastFood = kind === 'fast_food' || ['burger', 'chicken', 'fast_food', 'hot_dog', 'shawarma'].includes(normalize(tags.cuisine).trim());
@@ -408,6 +411,29 @@ function intentScore(poi, kind, hours, intents, wheelchair) {
   if (intents.group) points += fastFood ? -10 : GROUP.includes(poi.category) ? 5 : 0;
   if (intents.accessible) points += { yes: 30, limited: 15 }[wheelchair] ?? 0;
   return points;
+}
+
+const CUISINES = { coffee_shop: 'кофейня', burger: 'бургеры', italian: 'итальянская кухня', pizza: 'пицца', asian: 'азиатская кухня', chicken: 'курица',
+  regional: 'местная кухня', chinese: 'китайская кухня', sushi: 'суши', breakfast: 'завтраки', turkish: 'турецкая кухня', japanese: 'японская кухня',
+  korean: 'корейская кухня', russian: 'русская кухня', european: 'европейская кухня', oriental: 'восточная кухня', georgian: 'грузинская кухня',
+  french: 'французская кухня', barbecue: 'гриль', bar_and_grill: 'гриль', cake: 'десерты', pastry: 'выпечка', kazakh: 'казахская кухня', uzbek: 'узбекская кухня',
+  local: 'местная кухня', kebab: 'кебаб', steak_house: 'стейки', thai: 'тайская кухня', mediterranean: 'средиземноморская кухня', brunch: 'бранчи' };
+
+/** Up to three concrete facts from the record itself (cuisine, Wi-Fi, terrace, takeaway, halal), for the computed «why». */
+function factsFor(poi) {
+  const tags = poi.tags && !Array.isArray(poi.tags) ? poi.tags : {};
+  const features = poi.features && typeof poi.features === 'object' ? poi.features : {};
+  const facts = [];
+  for (const code of String(tags.cuisine ?? '').split(';').map(item => item.trim()).filter(Boolean)) {
+    const label = CUISINES[code];
+    if (label && !facts.includes(label)) facts.push(label);
+    if (facts.length === 2) break;
+  }
+  if (features.wifi || ['wlan', 'yes', 'wifi'].includes(normalize(tags.internet_access).trim())) facts.push('есть Wi-Fi');
+  if (features.outdoorSeating || tags.outdoor_seating === 'yes') facts.push('есть места на улице');
+  if (features.takeaway || tags.takeaway === 'yes') facts.push('можно взять с собой');
+  if (features.halal || /halal/.test(String(tags['diet:halal'] ?? tags.cuisine ?? ''))) facts.push('халяль');
+  return facts.slice(0, 3);
 }
 
 /** Short «why» that leads with the part of the request the place answers, then the time it takes. */
@@ -424,11 +450,25 @@ function whyFor(pick, constraints, intents, reference) {
   else if (intents.unusual && UNUSUAL.includes(poi.category)) match = `${label} — под запрос «что-то необычное»: не сетевое заведение`;
   else match = `${label} рядом с выбранной точкой`;
   if (intents.accessible && wheelchairOf(poi) === 'yes') match += ', в источнике отмечен доступ для коляски';
+  const facts = factsFor(poi);
+  if (facts.length) match += `; по данным источника: ${facts.join(', ')}`;
   const time = `примерно ${walkMinutes} мин в одну сторону, ${totalMinutes} мин ${constraints.returnToStart ? 'с возвращением' : 'без возвращения'} и резервом ${RESERVE} мин`
     + ` из ваших ${constraints.minutes}`;
   const open = hours?.status === 'open' ? `; по режиму работы из источника открыто ${hours.closesAt ? `до ${hours.closesAt}` : 'круглосуточно'}` : '';
   const back = reference ? `; ${constraints.returnToStart ? 'вернётесь' : 'закончите'} примерно к ${localClock(new Date(reference.getTime() + (totalMinutes - RESERVE) * 60000))}` : '';
   return `${match}; ${time}${open}${back}.`;
+}
+
+/** The nearest named place within 250 m, so a nameless «Фонтан» or «Детская площадка» can be told apart and found. */
+function landmarkFor(poi, prepared) {
+  let best = null;
+  for (const { poi: other } of prepared.unique) {
+    if (other.nameIsGenerated || other.id === poi.id) continue;
+    if (Math.abs(other.lat - poi.lat) > 0.0025 || Math.abs(other.lon - poi.lon) > 0.004) continue;
+    const meters = haversineMeters(poi.lat, poi.lon, other.lat, other.lon);
+    if (meters <= 250 && (!best || meters < best.meters)) best = { other, meters };
+  }
+  return best ? { id: best.other.id, name: best.other.name, distanceMeters: Math.ceil(best.meters) } : null;
 }
 
 /** The closest named place of a complementary kind that still fits the remaining time. */
@@ -511,6 +551,7 @@ export function recommend(dataset, input, context = {}) {
     closedByHours: 0, unknownHoursAtNight: 0, notAccessible: 0 };
   // The nearest place that matched the request but not the time limits, offered when nothing fits.
   let nearest = null;
+  const nearestByCategory = new Map();
   // Hours are checked against the requested visit time, or against now when no time was given.
   // A date without a time cannot be checked; minutes are dropped so equal requests give equal answers.
   // A night request in the daytime is checked against tonight, 22:00.
@@ -542,6 +583,8 @@ export function recommend(dataset, input, context = {}) {
         && !(intents.night && NEEDS_HOURS.includes(category) && !poi.openingHours) && (!nearest || walkMinutes < nearest.walkMinutes)) {
         nearest = { poi, walkMinutes, totalMinutes };
       }
+      if (named.includes(category) && !poi.nameIsGenerated && !(intents.accessible && wheelchair === 'no')
+        && (nearestByCategory.get(category)?.walkMinutes ?? Infinity) > walkMinutes) nearestByCategory.set(category, { poi, walkMinutes, totalMinutes });
       continue;
     }
     if (intents.accessible && wheelchair === 'no') { counters.notAccessible++; continue; }
@@ -581,9 +624,16 @@ export function recommend(dataset, input, context = {}) {
   const picks = [];
   const taken = new Set();
   const nameOf = c => c.name;
+  // Two records of one kind within 80 m that share a long word («Әнші субұрқақтар» and «Ән салатын субұрқақтар»), or where one has no name,
+  // are usually one place mapped twice; different cafes in one mall share neither.
+  const words = c => new Set(normalize(c.poi.name).split(/[^\p{L}\p{N}]+/u).filter(word => word.length >= 5));
+  const sameSpot = (a, b) => a.poi.category === b.poi.category && haversineMeters(a.poi.lat, a.poi.lon, b.poi.lat, b.poi.lon) < 80
+    && (a.poi.nameIsGenerated || b.poi.nameIsGenerated || [...words(a)].some(word => words(b).has(word)));
   while (picks.length < 3 && picks.length < candidates.length) {
     const adjusted = c => c.score - (picks.some(pick => pick.poi.category === c.poi.category) ? 8 : 0)
-      - (picks.some(pick => nameOf(pick) === nameOf(c)) ? 15 : 0);
+      - (picks.some(pick => nameOf(pick) === nameOf(c)) ? 15 : 0)
+      - (picks.some(pick => sameSpot(pick, c)) ? 30 : 0)
+      + (named.includes(c.poi.category) && !picks.some(pick => pick.poi.category === c.poi.category) ? 6 : 0);
     let best = null;
     for (const candidate of candidates) {
       if (taken.has(candidate)) continue;
@@ -596,10 +646,13 @@ export function recommend(dataset, input, context = {}) {
   }
   const pickedIds = new Set(picks.map(pick => pick.poi.id));
   const recommendations = picks.map(pick => {
-    const { poi, directDistance, walkMinutes, returnMinutes, visitMinutes, totalMinutes, hours, matchedTerms, scoreBreakdown, score } = pick;
+    const { directDistance, walkMinutes, returnMinutes, visitMinutes, totalMinutes, hours, matchedTerms, scoreBreakdown, score } = pick;
+    // A nameless record is shown with the nearest named place, as in «Фонтан у «Mega Silk Way»».
+    const landmark = pick.poi.nameIsGenerated ? landmarkFor(pick.poi, prepared) : null;
+    const poi = landmark ? { ...pick.poi, name: `${pick.poi.name} у «${landmark.name}»`, landmark } : pick.poi;
     const { category, sourceUrl } = poi;
     const evidence = [
-      { field: 'name', label: 'Название из источника', value: poi.name, sourceUrl, retrievedAt: poi.retrievedAt ?? null },
+      { field: 'name', label: landmark ? 'Название по типу места и ближайшему месту из источника' : 'Название из источника', value: poi.name, sourceUrl, retrievedAt: poi.retrievedAt ?? null },
       { field: 'category', label: 'Категория из данных POI', value: category, sourceUrl, retrievedAt: poi.retrievedAt ?? null },
       { field: 'coordinates', label: 'Координаты из источника', value: `${poi.lat}, ${poi.lon}`, sourceUrl, retrievedAt: poi.retrievedAt ?? null },
     ];
@@ -616,12 +669,12 @@ export function recommend(dataset, input, context = {}) {
     return { ...poi, kind: pick.kind, distanceMeters: Math.ceil(directDistance), estimatedWalkDistanceMeters: Math.ceil(directDistance * DETOUR),
       walkMinutes, visitMinutes, returnMinutes, safetyReserveMinutes: RESERVE, totalMinutes,
       why: whyFor({ ...pick, weather }, constraints, intents, reference), activities: activitiesFor(category), activitiesAreSuggestions: true,
-      plan: planFor(pick, constraints, reference, pairing), pairing,
+      plan: planFor({ ...pick, poi }, constraints, reference, pairing), pairing,
       confidence: confidenceFor(poi, hours, constraints), provenance: provenanceFor(poi), wheelchair: wheelchairOf(poi),
       warnings: warningsFor(poi, constraints, hours), evidence, score, scoreBreakdown, matchedTerms,
       hoursCheck: hours ?? { status: poi.openingHours ? 'not_checked' : 'no_data' } };
   });
-  const route = microRoute(candidates, constraints, reference, walkBetween);
+  const route = microRoute(candidates, { ...constraints, foodFocus: requested.length > 0 && requested.every(category => FOOD.includes(category)), routeAsked: intents.route === true }, reference, walkBetween);
   const warnings = [
     'Расстояние указано по прямой. Время пешком — оценка: расстояние × 1,35 при 4,2 км/ч; переходы, ограждения, входы и погода не проверены.',
     'Каждая карточка — отдельный вариант прогулки. В суммарное время входят путь, посещение, выбранный возврат и резерв 5 минут.',
@@ -644,12 +697,26 @@ export function recommend(dataset, input, context = {}) {
   const nearestBeyondLimits = !recommendations.length && nearest ? { id: nearest.poi.id, name: nearest.poi.name, category: nearest.poi.category,
     walkMinutes: nearest.walkMinutes, neededMinutes: nearest.totalMinutes, sourceUrl: nearest.poi.sourceUrl, lat: nearest.poi.lat, lon: nearest.poi.lon,
     hoursChecked: false } : null;
+  if (!recommendations.length) warnings.unshift('В текущем наборе данных нет подтверждённых вариантов под все ограничения. Увеличьте время или измените категорию и точку старта.');
   if (nearestBeyondLimits) {
     warnings.unshift(`Ближе всего подходит «${nearestBeyondLimits.name}» (${LABELS[nearestBeyondLimits.category]}): около ${nearestBeyondLimits.walkMinutes} мин пешком в одну сторону, `
-      + `нужно примерно ${nearestBeyondLimits.neededMinutes} мин${constraints.returnToStart ? ' с возвращением' : ''}. Режим работы для него не проверялся.`);
+      + `нужно примерно ${nearestBeyondLimits.neededMinutes} мин${constraints.returnToStart ? ' с возвращением' : ''}. Режим работы для него не проверялся. `
+      + `${[nearestBeyondLimits.neededMinutes > constraints.minutes ? `Увеличьте время до ${nearestBeyondLimits.neededMinutes} мин` : '',
+        nearestBeyondLimits.walkMinutes > constraints.maxWalkMinutes ? `разрешите до ${nearestBeyondLimits.walkMinutes} мин пешком в одну сторону` : '']
+        .filter(Boolean).join(' и ').replace(/^р/, 'Р')} или измените точку старта.`);
   }
-  if (!recommendations.length) warnings.unshift('В текущем наборе данных нет подтверждённых вариантов под все ограничения. Увеличьте время или измените категорию и точку старта.');
-  return { recommendations, route, nearestBeyondLimits, constraints, warnings,
+  // A category the visitor named but no card covers: say where the nearest one is and how much time it needs.
+  const nearestMissing = recommendations.length ? named
+    .filter(category => requested.includes(category) && nearestByCategory.has(category) && !recommendations.some(rec => rec.category === category))
+    .map(category => {
+      const { poi, walkMinutes, totalMinutes } = nearestByCategory.get(category);
+      return { category, id: poi.id, name: poi.name, walkMinutes, neededMinutes: totalMinutes, sourceUrl: poi.sourceUrl, lat: poi.lat, lon: poi.lon, hoursChecked: false };
+    }) : [];
+  for (const missing of [...nearestMissing].reverse()) {
+    warnings.unshift(`${capitalize(LABELS[missing.category])} в ваше время не помещается: ближайший вариант «${missing.name}», около ${missing.walkMinutes} мин пешком в одну сторону, `
+      + `нужно примерно ${missing.neededMinutes} мин${constraints.returnToStart ? ' с возвращением' : ''}. Режим работы для него не проверялся.`);
+  }
+  return { recommendations, route, nearestBeyondLimits, nearestMissing, constraints, warnings,
     intents: Object.keys(intents).filter(key => intents[key] === true),
     understood: understoodFor(constraints, requested, excluded, intents, reference, nightShift, weather, weatherRoof),
     weather: weather ? { ...context.weather, condition: weather.label, text: weather.text, roofOnly: weatherRoof } : null,

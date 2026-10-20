@@ -1,7 +1,7 @@
 // The main tab: plan a walk, see the options, open a place, walk with the return countdown.
 import { registerTab } from '../shell.js';
 import { h, icon, clear, isDesktop } from '../core/dom.js';
-import { t, pick, plural, lang, time, date as formatDate, number } from '../core/i18n.js';
+import { t, pick, plural, lang, time } from '../core/i18n.js';
 import * as store from '../core/store.js';
 import { PRESETS, inAstana, reachMeters, estimate } from '../core/geo.js';
 import * as api from '../core/api.js';
@@ -12,6 +12,8 @@ import { toast, announce } from '../ui/toast.js';
 import { timeRing } from '../ui/ring.js';
 import { art, categoryArt, categoryName, hoursStatus, hoursChip, share, returnBy, backButton, listenButton } from '../ui/common.js';
 import { placeView } from '../ui/place.js';
+import { understand, canListen, startListening } from '../core/voice.js';
+import { speakText, stopSpeaking, unlockAudio } from '../core/media.js';
 import { mountLive, startWalk } from '../ui/live.js';
 
 const MINUTES = [30, 45, 60, 90, 120];
@@ -19,11 +21,6 @@ const MAX_WALK = [10, 15, 20, 30];
 const MOODS = [
   ['coffee', 'coffee'], ['food', 'food'], ['park', 'park'], ['water', 'waterfront'],
   ['kids', 'family'], ['culture', 'museum'], ['sights', 'landmark'], ['indoor', 'indoor'],
-];
-const IDEAS = [
-  { id: 'coffee', art: 'coffee', start: 'mega', minutes: 45, maxWalk: 15, mood: 'coffee' },
-  { id: 'kids', art: 'family', start: 'baiterek', minutes: 60, maxWalk: 10, mood: 'kids' },
-  { id: 'water', art: 'waterfront', start: 'embankment', minutes: 45, maxWalk: 15, mood: 'water' },
 ];
 
 const defaults = { minutes: 45, maxWalk: 15, query: '', mood: null, when: 'now' };
@@ -38,6 +35,13 @@ let inflight = null;
 let root = null;
 let liveCleanup = null;
 let lastRoute = null;
+// Where the walk starts: the real location by default. A start the person picked by hand is kept for three hours.
+let locating = false;
+let locationNote = null;
+let autoLocated = false;
+// A search started by voice is answered aloud: the Gemini tip, or a short line when there is none.
+let speakNext = false;
+const MANUAL_START_MS = 3 * 3600000;
 
 function presetStart(id) {
   const preset = PRESETS.find((item) => item.id === id) || PRESETS[0];
@@ -45,7 +49,36 @@ function presetStart(id) {
 }
 const startName = () => (start.names ? pick(start.names) : start.kind === 'gps' ? t('start.gps') : start.kind === 'map' ? t('start.picked') : start.name);
 function savePlan() { store.set('plan', plan); }
-function setStart(next) { start = next; store.set('start', next); store.rememberStart(next); }
+function setStart(next, manual = true) { start = next; store.set('start', next); store.set('startManual', manual ? Date.now() : 0); store.rememberStart(next); }
+
+function autoLocate() {
+  if (autoLocated || !navigator.geolocation) return;
+  autoLocated = true;
+  if (Date.now() - (store.get('startManual') || 0) < MANUAL_START_MS) return;
+  locating = true;
+  refreshStart();
+  navigator.geolocation.getCurrentPosition((position) => {
+    const { latitude: lat, longitude: lon } = position.coords;
+    locating = false;
+    if (inAstana(lat, lon)) { locationNote = null; setStart({ kind: 'gps', name: t('start.gps'), lat, lon }, false); }
+    else locationNote = 'outside';
+    refreshStart();
+  }, (failure) => { locating = false; locationNote = failure.code === 1 ? 'denied' : 'failed'; refreshStart(); },
+  { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
+}
+// Only the start row and the map change, so a half-typed request stays as it is.
+function refreshStart() {
+  if (view !== 'plan' || !root) return;
+  root.querySelector('.start-row')?.replaceWith(startRowView());
+  if (getMap()) drawPlanMap();
+  root.querySelector('.cta')?.dispatchEvent(new CustomEvent('refresh'));
+}
+function startRowView() {
+  const note = locating ? t('start.locating') : start.kind === 'gps' ? null : locationNote ? t(`start.note.${locationNote}`) : null;
+  return h('button', { class: 'row-button start-row', type: 'button', onclick: () => { view = 'start'; render(); } },
+    h('span', { class: 'row-icon start-icon', 'aria-hidden': 'true' }, icon(start.kind === 'gps' ? 'locate' : 'pin')),
+    h('span', { class: 'row-text' }, h('small', { text: t('plan.from') }), h('strong', { text: startName() }), note ? h('small', { class: 'start-note', text: note }) : null), icon('chevron', 'row-chevron'));
+}
 
 function leaveAt() {
   if (plan.when === 'in1h') return Date.now() + 3600000;
@@ -86,7 +119,7 @@ function renderPlan() {
     placeholder: t('plan.queryPlaceholder'), value: plan.query, 'aria-label': t('plan.queryLabel') });
   query.addEventListener('input', () => { plan.query = query.value; plan.mood = MOODS.find(([id]) => t(`moodQuery.${id}`) === query.value)?.[0] || null; savePlan(); syncMoods(); });
   query.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); query.blur(); submit(); } });
-  const mic = voiceButton(query);
+  const mic = voiceButton(query, () => { query.blur(); submit({ spoken: true }); });
 
   const moods = h('div', { class: 'chip-row no-drag', role: 'group', 'aria-label': t('plan.queryLabel') },
     MOODS.map(([id, file]) => h('button', { type: 'button', class: 'chip', dataset: { mood: id }, 'aria-pressed': String(plan.mood === id),
@@ -94,9 +127,7 @@ function renderPlan() {
     art(file, 22, 'chip-art'), t(`mood.${id}`))));
   function syncMoods() { moods.querySelectorAll('.chip').forEach((chip) => chip.setAttribute('aria-pressed', String(chip.dataset.mood === plan.mood))); }
 
-  const startRow = h('button', { class: 'row-button', type: 'button', onclick: () => { view = 'start'; render(); } },
-    h('span', { class: 'row-icon start-icon', 'aria-hidden': 'true' }, icon(start.kind === 'gps' ? 'locate' : 'pin')),
-    h('span', { class: 'row-text' }, h('small', { text: t('plan.from') }), h('strong', { text: startName() })), icon('chevron', 'row-chevron'));
+  const startRow = startRowView();
 
   const walkGroup = h('div', { class: 'segmented segmented-sm', role: 'radiogroup', 'aria-label': t('plan.maxWalk') },
     MAX_WALK.map((value) => h('button', { type: 'button', role: 'radio', class: 'seg', 'aria-checked': String(plan.maxWalk === value),
@@ -112,14 +143,13 @@ function renderPlan() {
 
   const returnLine = h('span', { class: 'cta-sub num' });
   const cta = h('button', { class: 'btn btn-gold btn-xl cta', type: 'button', onclick: submit }, h('span', { class: 'cta-main' }, icon('sparkle'), t('plan.submit')), returnLine);
+  cta.addEventListener('refresh', () => updatePlanLive());
   function updatePlanLive() {
     returnLine.textContent = t('plan.returnBy', { time: time(leaveAt() + plan.minutes * 60000) });
     layers.updateReach(start, reachMeters(plan.minutes, plan.maxWalk));
   }
 
   const weatherHost = h('div');
-  const ideas = h('div', { class: 'ideas no-drag' }, IDEAS.map((idea) => h('button', { class: 'idea', type: 'button', onclick: () => runIdea(idea) },
-    art(idea.art, 44, 'idea-art'), h('span', { class: 'idea-text' }, h('strong', { text: t(`idea.${idea.id}.title`) }), h('small', { text: t(`idea.${idea.id}.sub`) })))));
 
   clear(root, h('section', { class: 'view plan-view', 'aria-labelledby': 'plan-title' },
     h('div', { class: 'plan-top' }, h('p', { class: 'eyebrowless', text: greeting() }), weatherHost),
@@ -129,23 +159,10 @@ function renderPlan() {
     moods,
     startRow,
     more,
-    cta,
-    h('h2', { class: 'block-title', text: t('plan.ideas') }),
-    ideas,
-    dataFooter()));
+    cta));
   updatePlanLive();
   renderWeather(weatherHost, () => { plan.mood = 'indoor'; plan.query = t('moodQuery.indoor'); query.value = plan.query; savePlan(); syncMoods(); });
   drawPlanMap();
-}
-
-function dataFooter() {
-  const line = h('p', { class: 'fine data-line' });
-  api.status().then((status) => {
-    if (!status) return;
-    const day = formatDate(status.updatedAt);
-    line.replaceChildren(icon('map'), t('results.source', { count: number(status.poiCount), date: day || '—' }));
-  });
-  return line;
 }
 
 async function renderWeather(host, onIndoor) {
@@ -163,28 +180,33 @@ async function renderWeather(host, onIndoor) {
   }
 }
 
-function voiceButton(input) {
-  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+// The mic: say "час, кофе и парк" and the walk is planned right away; the time is taken out of the phrase.
+function voiceButton(input, onDone) {
   const button = h('button', { class: 'icon-btn mic', type: 'button', 'aria-label': t('plan.voice') }, icon('mic'));
-  if (!Recognition) { button.hidden = true; return button; }
-  let active = null;
-  button.addEventListener('click', () => {
-    if (active) { active.stop(); return; }
-    const recognition = new Recognition();
-    recognition.lang = { ru: 'ru-RU', kk: 'kk-KZ', en: 'en-US' }[lang()];
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-    active = recognition;
-    button.classList.add('is-listening');
-    input.placeholder = t('plan.voiceListening');
-    recognition.onresult = (event) => {
-      input.value = [...event.results].map((item) => item[0].transcript).join(' ');
-      plan.query = input.value; plan.mood = null; savePlan();
+  if (!canListen()) { button.hidden = true; return button; }
+  let session = null;
+  const setState = (state) => {
+    button.classList.toggle('is-listening', state === 'listening');
+    button.classList.toggle('is-thinking', state === 'thinking');
+    button.setAttribute('aria-label', t(state === 'listening' ? 'plan.voiceStop' : 'plan.voice'));
+    input.placeholder = t(state === 'listening' ? 'plan.voiceListening' : state === 'thinking' ? 'plan.voiceThinking' : 'plan.queryPlaceholder');
+  };
+  button.addEventListener('click', async () => {
+    if (session) { session.stop(); return; }
+    stopSpeaking();
+    unlockAudio();
+    input.value = '';
+    session = startListening({ onState: setState, onText: (text) => { input.value = text; } });
+    try {
+      const text = (await session.promise).trim();
+      if (!text) { toast(t('plan.voiceNothing'), { iconName: 'mic' }); return; }
+      input.value = text;
+      plan.query = text; plan.mood = null; savePlan();
       root?.querySelectorAll('.chip[data-mood]').forEach((chip) => chip.setAttribute('aria-pressed', 'false'));
-    };
-    recognition.onend = () => { active = null; button.classList.remove('is-listening'); input.placeholder = t('plan.queryPlaceholder'); };
-    recognition.onerror = () => recognition.onend();
-    try { recognition.start(); } catch { recognition.onend(); }
+      onDone();
+    } catch (failure) {
+      toast(failure?.message === 'unsupported' ? t('plan.voiceUnsupported') : failure?.name === 'NotAllowedError' ? t('plan.voiceDenied') : t('plan.voiceFailed'), { iconName: 'warning' });
+    } finally { session = null; }
   });
   return button;
 }
@@ -226,7 +248,9 @@ function locate(message, choose) {
   navigator.geolocation.getCurrentPosition((position) => {
     const { latitude: lat, longitude: lon } = position.coords;
     if (!inAstana(lat, lon)) { show(t('start.outside')); return; }
-    choose({ kind: 'gps', name: t('start.gps'), lat, lon });
+    locationNote = null;
+    setStart({ kind: 'gps', name: t('start.gps'), lat, lon }, false);
+    view = 'plan'; render();
     toast(t('toast.locationShared'), { iconName: 'locate' });
   }, (failure) => show(failure.code === 1 ? t('start.denied') : t('start.failed')), { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
 }
@@ -261,7 +285,10 @@ function buildRequest() {
   return body;
 }
 
-async function submit() {
+async function submit(options) {
+  speakNext = options?.spoken === true;
+  const said = understand(plan.query);
+  if (said.minutes) { plan.minutes = said.minutes; plan.query = said.query; plan.mood = null; savePlan(); }
   inflight?.abort();
   const controller = new AbortController();
   inflight = controller;
@@ -281,13 +308,6 @@ async function submit() {
     view = 'results';
   } finally { if (inflight === controller) inflight = null; }
   render();
-}
-
-function runIdea(idea) {
-  setStart(presetStart(idea.start));
-  plan = { ...plan, minutes: idea.minutes, maxWalk: idea.maxWalk, mood: idea.mood, query: t(`moodQuery.${idea.mood}`), when: 'now' };
-  savePlan();
-  submit();
 }
 
 function renderLoading() {
@@ -326,9 +346,7 @@ function renderResults() {
   const generation = result.generation || {};
   const llm = generation.mode === 'llm' && generation.summary;
   const leave = leaveAt();
-  const cardWarnings = recs.map((place) => (Array.isArray(place.warnings) ? place.warnings : []));
-  const shared = recs.length > 1 ? cardWarnings[0].filter((w) => cardWarnings.every((list) => list.includes(w))) : [];
-  const unchecked = [...new Set([...(result.warnings || []), ...shared])];
+  const tip = llm ? aiCard(generation) : h('div', { class: 'ai-card is-quiet' }, h('p', { class: 'fine', text: t('results.fallback') }));
 
   const rows = recs.map((place, index) => {
     const status = hoursStatus(place, place.walkMinutes, place.visitMinutes, place.hoursCheck);
@@ -344,16 +362,19 @@ function renderResults() {
   });
 
   clear(root, h('section', { class: 'view results-view', 'aria-labelledby': 'results-title' },
-    h('div', { class: 'view-bar' }, back, h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: 'Seruen', text: t('results.title', { min: request.minutes }), url: shareLink() }) }, icon('share'))),
+    h('div', { class: 'view-bar' }, back, h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: 'Ulger', text: t('results.title', { min: request.minutes }), url: shareLink() }) }, icon('share'))),
     h('h2', { id: 'results-title', class: 'title-1', text: t('results.title', { min: request.minutes }) }),
     h('p', { class: 'meta' }, icon('pin', 'icon-xs'), t('results.start', { name: startName() }), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }), t('plan.returnBy', { time: time(leave + request.minutes * 60000) })),
-    llm ? aiCard(generation) : h('div', { class: 'ai-card is-quiet' }, h('p', { class: 'fine', text: t('results.fallback') })),
+    tip,
     h('div', { class: 'result-list' }, rows),
     understoodRow(result.understood),
-    routeCard(result.route),
-    unchecked.length ? h('details', { class: 'disclosure' }, h('summary', {}, icon('info'), t('results.unchecked'), h('span', { class: 'count num', text: unchecked.length })), h('ul', { class: 'bullets fine' }, unchecked.map((w) => h('li', { text: w })))) : null,
-    h('p', { class: 'fine data-line' }, icon('map'), t('results.source', { count: number(result.dataset?.poiCount || 0), date: formatDate(result.dataset?.updatedAt) || '—' }))));
+    routeCard(result.route)));
   drawResultsMap(recs);
+  if (speakNext) {
+    speakNext = false;
+    if (llm) tip.querySelector('.listen-btn')?.click();
+    else speakText(t('voice.answer', { n: recs.length, name: recs[0].name, walk: recs[0].walkMinutes, time: time(leave + recs[0].totalMinutes * 60000) }));
+  }
 }
 
 // «Мы учли»: what the server understood from the request (time, categories, child, night, weather, hours).
@@ -393,7 +414,7 @@ function aiCard(generation) {
   const note = h('p', { class: 'fine', text: t('results.aiNote'), hidden: true });
   const more = h('button', { class: 'ai-more', type: 'button', 'aria-expanded': 'false', text: t('results.aiMore') });
   const card = h('div', { class: 'ai-card' }, h('p', { class: 'ai-label' }, icon('sparkle'), t(generation.provider === 'gemini' ? 'results.aiGemini' : 'results.ai')),
-    h('p', { class: 'ai-text', text: generation.summary }), generation.label ? h('p', { class: 'origin', text: generation.label }) : null, note,
+    h('p', { class: 'ai-text', text: generation.summary }), note,
     h('div', { class: 'ai-actions' }, more, listenButton(generation.summary)));
   more.addEventListener('click', () => {
     const open = !card.classList.contains('is-open');
@@ -440,9 +461,11 @@ function renderEmpty(back) {
       h('small', { text: t('results.nearestValue', { walk: nearest.walkMinutes, n: nearest.neededMinutes }) }))) : null,
     h('div', { class: 'stack' }, actions)));
   layers.hidePins(); layers.hideRoutes(); layers.showReach(start, reachMeters(plan.minutes, plan.maxWalk));
+  if (speakNext) { speakNext = false; speakText(`${t('results.empty.title')} ${nearest?.name ? t('voice.nearest', { name: nearest.name, n: nearest.neededMinutes }) : ''}`); }
 }
 
 function renderError(back) {
+  speakNext = false;
   const kind = error?.kind;
   const text = kind === 'offline' ? t('error.offline') : kind === 'timeout' ? t('error.timeout') : error?.message && kind !== 'server' ? error.message : (error?.message || t('error.server'));
   clear(root, h('section', { class: 'view state-view' }, h('div', { class: 'view-bar' }, back),
@@ -500,6 +523,7 @@ function applyUrl() {
   if (params.get('from') && PRESETS.some((item) => item.id === params.get('from'))) setStart(presetStart(params.get('from')));
   const lat = Number(params.get('lat')); const lon = Number(params.get('lon'));
   if (params.has('lat') && inAstana(lat, lon)) setStart({ kind: 'map', name: t('start.picked'), lat, lon });
+  if (params.get('from') || params.has('lat')) autoLocated = true;
   savePlan();
   history.replaceState(null, '', location.pathname);
   return params.get('go') === '1';
@@ -512,6 +536,7 @@ registerTab({
     if (store.get('walk')) view = 'live';
     if (view === 'pick') view = 'start';
     if (applyUrl() && view !== 'live') { submit(); return; }
+    autoLocate();
     if (view === 'loading' && !inflight) view = result ? 'results' : 'plan';
     render();
     mapReady.then(() => { if (root === container && root.isConnected) render(); });
