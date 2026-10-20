@@ -270,10 +270,14 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .origin.is-idea { color: var(--sky-ink, var(--sky)); }
 .origin.is-ai { color: var(--ink-3); }
 .ai-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--r-pill); background: var(--gold-soft); color: var(--gold-ink); font-weight: 650; }
-.understood { display: grid; gap: 8px; }
+.understood { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
 .understood-title { font-size: var(--fs-13); font-weight: 650; color: var(--ink-3); }
-.understood .chip-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 calc(var(--s-4) * -1); padding: 0 var(--s-4); }
-.understood .chip-row::-webkit-scrollbar { display: none; }
+/* «Мы учли» is information, not a picker: the chips wrap onto new lines (long ones wrap inside) instead of scrolling off the edge. */
+.understood .chip-row { flex-wrap: wrap; overflow: visible; margin: 0; padding: 0; gap: 6px; touch-action: auto; -webkit-mask-image: none; mask-image: none; }
+.understood .chip { flex: 0 1 auto; max-width: 100%; min-height: 32px; padding: 5px 12px; gap: 6px; border-radius: 16px; font-size: var(--fs-13); font-weight: 500; line-height: 1.3; }
+.understood .chip .icon-xs { flex: none; }
+.understood .chip-text { flex: 0 1 auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.understood .chip:active { transform: none; }
 .chip.is-static { cursor: default; white-space: nowrap; font-size: var(--fs-13); min-height: 32px; gap: 6px; }
 .route-card { display: grid; gap: 12px; padding: 16px; border-radius: var(--r-lg); background: var(--surface); }
 .route-head { display: flex; align-items: center; gap: 12px; }
