@@ -22,7 +22,7 @@ async function post(path, body, timeout = 45000) {
   } finally { clearTimeout(timer); }
 }
 
-export const identify = ({ image, lat, lon }) => post('/api/vision', { image, lat, lon });
+export const identify = ({ image, lat, lon }) => post('/api/vision', { image, lat, lon, lang: lang() });
 
 let playing = null;
 let audio = null;

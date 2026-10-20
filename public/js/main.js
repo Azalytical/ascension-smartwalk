@@ -58,6 +58,7 @@ function labelControls() {
   $('#fab-zoom-out').setAttribute('aria-label', t('fab.zoomOut'));
   $('#map').setAttribute('aria-label', t('map.label'));
   $('#sheet').setAttribute('aria-label', t('app.tagline'));
+  $('.brand-city').textContent = t('app.city');
 }
 labelControls();
 on('lang', labelControls);

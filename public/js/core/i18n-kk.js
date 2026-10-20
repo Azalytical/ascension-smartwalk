@@ -43,7 +43,7 @@ export default {
   'results.understood': 'Ескердік', 'results.route': 'Шағын маршрут: қатарынан {n} орын', 'results.routeMeta': 'жолымен {n} мин, {time} шамасында ораласыз', 'results.routeStop': '{walk} мин жаяу, орында {visit} мин', 'results.routeShow': 'Картадан көрсету', 'results.routeShown': 'Маршрут картада', 'results.empty.take': '{n} минут алу', 'results.nearest': 'Ең жақыны', 'results.nearestValue': '{walk} мин жаяу, қайту жолымен шамамен {n} мин керек',
   'results.empty.add': '15 минут қосу', 'results.empty.walk': '30 минутқа дейін жаяу', 'results.empty.clear': 'Тілекті алып тастау',
   'error.title': 'Іріктеу мүмкін болмады', 'error.offline': 'Интернет жоқ. Баптауларыңыз сақталды, желі пайда болғанда қайталап көріңіз.',
-  'error.timeout': 'Іріктеу бір минуттан асып кетті. Қайталап көріңіз.', 'error.server': 'Қызмет қатемен жауап берді. Қайталап көріңіз.',
+  'error.timeout': 'Іріктеу бір минуттан асып кетті. Қайталап көріңіз.', 'error.server': 'Қызмет қатемен жауап берді. Қайталап көріңіз.', 'error.limit': 'Демо сұраныстарының лимиті таусылды. Бір минуттан кейін қайталап көріңіз.',
   'error.retry': 'Қайталап көру',
   'place.total': 'барлығы', 'place.there': 'Бару', 'place.visit': 'Орында', 'place.back': 'Қайту', 'place.reserve': 'Қор',
   'place.returnNow': 'Сағат {time} шамасында ораласыз', 'place.start': 'Серуенді бастау', 'place.routeIn': 'Маршрутты ашу',

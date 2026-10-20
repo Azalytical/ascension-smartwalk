@@ -146,7 +146,7 @@ function renderVision() {
   if (status === 'loading') {
     body.push(h('p', { class: 'lead vision-wait' }, h('span', { class: 'spinner', 'aria-hidden': 'true' }), t('vision.loading')));
   } else if (status === 'error') {
-    body.push(h('p', { class: 'banner is-bad' }, icon('warning'), vision.error || t('vision.fail')), again);
+    body.push(h('p', { class: 'banner is-bad' }, icon('warning'), (lang() === 'ru' && vision.error) || t('vision.fail')), again);
   } else {
     const found = data.place;
     if (found) {
