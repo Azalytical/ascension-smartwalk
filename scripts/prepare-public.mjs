@@ -1,9 +1,10 @@
 // Generated files the browser app needs next to public/: vendored MapLibre and fonts, the compact place list,
-// and the opening-hours parser shared with the server. Used by both build.mjs and dev.mjs; outputs are gitignored.
+// the opening-hours parser shared with the server, and the offline demo answers. Used by both build.mjs and dev.mjs; outputs are gitignored.
 import { readFile, writeFile, mkdir, copyFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { preparedPlaces } from '../src/retrieval.mjs';
+import { demoAnswers } from './demo-answers.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const pub = resolve(root, 'public');
@@ -38,11 +39,13 @@ export async function preparePublic() {
   await mkdir(resolve(pub, 'data'), { recursive: true });
   const body = JSON.stringify(places);
   await writeFile(resolve(pub, 'data/places.json'), body);
+  // Saved answers for the key scenarios, for when there is no internet.
+  await writeFile(resolve(pub, 'data/demo-answers.json'), JSON.stringify(demoAnswers(dataset)));
 
   // The service worker's cache name changes with every build so a deploy replaces the old shell.
   const buildId = createHash('sha256').update(body + Date.now()).digest('hex').slice(0, 10);
   const sw = await readFile(resolve(pub, 'sw.template.js'), 'utf8');
-  await writeFile(resolve(pub, 'sw.js'), sw.replace('__BUILD_ID__', buildId));
+  await writeFile(resolve(pub, 'sw.js'), sw.replaceAll('__BUILD_ID__', buildId));
   return { buildId, placeCount: rows.length };
 }
 

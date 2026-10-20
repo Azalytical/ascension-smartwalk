@@ -1,12 +1,13 @@
 // Aidem service worker. Build __BUILD_ID__.
 // The app shell is network-first (a fresh deploy always wins) with the cache as the offline fallback;
 // vendored libraries and fonts are cache-first, icons and map tiles stale-while-revalidate; the API is never cached.
+// Offline, the app answers from /data/demo-answers.json: saved answers for the key scenarios, labelled as a demo.
 const VERSION = '__BUILD_ID__';
 const SHELL = `seruen-shell-${VERSION}`;
 const STATIC = 'seruen-static-v1';
 const TILES = 'seruen-tiles-v1';
 const PRECACHE = ['/', '/css/tokens.css', '/css/components.css', '/css/app.css', '/js/main.js', '/manifest.webmanifest',
-  '/assets/icons/seruen.svg', '/assets/brand/seruen/mark.svg', '/data/places.json'];
+  '/assets/icons/seruen.svg', '/assets/brand/seruen/mark.svg', '/data/places.json', '/data/demo-answers.json'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(SHELL).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting()));

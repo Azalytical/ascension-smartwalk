@@ -12,7 +12,7 @@ import { ratingBlock, ratingChip } from './rating.js';
 
 const WHEELCHAIR = { yes: 'place.wheelchair.yes', limited: 'place.wheelchair.limited', no: 'place.wheelchair.no' };
 
-export function placeView({ place, timing, start, serverHours, why, activities = [], warnings = [], onBack, backLabel, onStart, routeInfo, shareUrl, voice = null, backAt = null }) {
+export function placeView({ place, timing, start, serverHours, why, activities = [], warnings = [], onBack, backLabel, onStart, routeInfo, shareUrl, voice = null, backAt = null, onHide = null }) {
   const back = backAt || backTime(timing);
   const hours = hoursStatus(place, timing.walkMinutes, timing.visitMinutes, serverHours);
   const saved = store.isSaved(place.id);
@@ -73,7 +73,9 @@ export function placeView({ place, timing, start, serverHours, why, activities =
     routeLine,
     h('button', { class: 'btn btn-gold btn-xl', type: 'button', onclick: onStart }, icon('play'), t('place.start')),
     h('div', { class: 'place-actions' }, watchButton({ place, start, walk: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, minutes: timing.totalMinutes }), friends,
-      safeUrl(place.links?.googleCalendar) ? h('a', { class: 'btn btn-quiet btn-sm', href: safeUrl(place.links.googleCalendar), target: '_blank', rel: 'noopener noreferrer' }, icon('calendar'), t('place.calendar')) : null),
+      safeUrl(place.links?.googleCalendar) ? h('a', { class: 'btn btn-quiet btn-sm', href: safeUrl(place.links.googleCalendar), target: '_blank', rel: 'noopener noreferrer' }, icon('calendar'), t('place.calendar')) : null,
+      // «Больше не предлагать»: the place leaves these results and the next searches; «Моё» can bring it back.
+      onHide ? h('button', { class: 'btn btn-quiet btn-sm place-hide', type: 'button', onclick: onHide }, icon('close'), t('place.hide')) : null),
     start ? navLinks(start, place, place.links) : null,
     place.aiWhy ? section(t('place.why'), h('p', { class: 'prose', text: place.aiWhy }), gemini(), listenButton(() => [place.aiWhy, place.aiTodo].filter(Boolean).join(' ')))
       : why ? section(t('place.why'), h('p', { class: 'prose', text: why })) : null,

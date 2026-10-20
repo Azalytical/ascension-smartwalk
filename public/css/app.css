@@ -341,3 +341,54 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .event-row .row-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
 .event-row small { color: var(--ink-2); }
 .event-pin { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--surface); color: var(--ink); border: 2px solid var(--gold); box-shadow: 0 2px 6px rgba(0, 0, 0, .25); }
+
+/* Plan top: «На улице» next to the weather */
+.plan-top-side { display: flex; align-items: center; gap: 8px; }
+.outdoor-toggle { min-height: 32px; padding: 0 12px; font-size: var(--fs-13); font-weight: 600; }
+.outdoor-toggle .icon { width: 16px; height: 16px; }
+.setting-label { display: grid; gap: 2px; }
+.setting-label small { font-size: var(--fs-13); font-weight: 400; color: var(--ink-3); line-height: 1.4; }
+.setting .btn-sm { justify-self: start; }
+
+/* «Перед выходом» */
+.ready-place { display: flex; align-items: center; gap: 10px; font-size: var(--fs-17); min-width: 0; }
+.ready-place strong { min-width: 0; overflow-wrap: anywhere; }
+.ready-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ready-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: var(--r-md); background: var(--surface); }
+.ready-item .row-text strong { white-space: normal; }
+.ready-item .row-text small { display: block; line-height: 1.4; margin-top: 2px; }
+.ready-icon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--surface-3); color: var(--ink-2); }
+.ready-icon .icon { width: 18px; height: 18px; }
+.ready-item.is-good .ready-icon { background: var(--green-soft); color: var(--green); }
+.ready-item.is-warn .ready-icon { background: var(--amber-soft); color: var(--amber); }
+.ready-item.is-bad .ready-icon { background: var(--red-soft); color: var(--red); }
+.ready-note { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-size: var(--fs-13); line-height: 1.45; color: var(--ink-2); text-wrap: pretty; }
+.ready-note .icon { flex: none; margin-top: 2px; }
+
+/* Offline demo answer */
+.demo-banner { display: grid; gap: 6px; padding: 12px 14px; border-radius: var(--r-md); background: var(--amber-soft); border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent); }
+.demo-title { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 700; font-size: var(--fs-15); }
+.demo-title .icon { flex: none; color: var(--amber); }
+.demo-text { margin: 0; font-size: var(--fs-13); line-height: 1.45; color: var(--ink-2); }
+.demo-banner .chip-row { margin-inline: -14px; padding-inline: 14px; }
+.demo-banner .chip { min-height: 34px; font-size: var(--fs-13); }
+
+/* Режим «На улице»: bigger type and targets, stronger contrast, fewer small details. */
+:root[data-outdoor] {
+  --fs-11: .8125rem; --fs-12: .875rem; --fs-13: .9375rem; --fs-15: 1.0625rem; --fs-16: 1.125rem; --fs-17: 1.1875rem; --fs-20: 1.375rem;
+  --ink-2: #1F2937; --ink-3: #3B4656; --line: rgba(14, 22, 33, .18); --line-strong: rgba(14, 22, 33, .32);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-outdoor]:not([data-theme="light"]) { --ink-2: #E4E8EE; --ink-3: #C6CDD7; --line: rgba(255, 255, 255, .18); --line-strong: rgba(255, 255, 255, .34); }
+}
+:root[data-outdoor][data-theme="dark"] { --ink-2: #E4E8EE; --ink-3: #C6CDD7; --line: rgba(255, 255, 255, .18); --line-strong: rgba(255, 255, 255, .34); }
+:root[data-outdoor] .btn { --btn-h: 54px; font-weight: 700; }
+:root[data-outdoor] .btn-sm { --btn-h: 46px; }
+:root[data-outdoor] .btn-xl { --btn-h: 64px; }
+:root[data-outdoor] .btn-quiet { box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+:root[data-outdoor] .icon-btn { width: 50px; height: 50px; }
+:root[data-outdoor] .chip { min-height: 46px; border-width: 1.5px; }
+:root[data-outdoor] .outdoor-toggle { min-height: 36px; }
+:root[data-outdoor] .seg { min-height: 58px; }
+:root[data-outdoor] :is(.result-badges .confidence, .user-rating-chip, .notability, .chip-art, .understood, .brand-foot) { display: none; }
+:root[data-outdoor] .result-name { white-space: normal; }
