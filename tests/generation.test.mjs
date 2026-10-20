@@ -20,38 +20,38 @@ async function withFetch(handler, fn) {
   try { return await fn(); } finally { globalThis.fetch = original; }
 }
 
-test('the walk text asks for minimal thinking and reports each attempt without the key or the prompt', async () => {
+test('the walk text asks for low thinking and reports each attempt without the key or the prompt', async () => {
   resetGenerationState();
   const bodies = [];
   const data = await withFetch(async (url, init) => { bodies.push(JSON.parse(init.body)); return geminiReply(ok); },
     async () => (await handleApi(request(valid), env, [poi])).json());
   assert.equal(data.generation.mode, 'llm');
-  assert.deepEqual(bodies[0].generationConfig.thinkingConfig, { thinkingLevel: 'minimal' });
+  assert.deepEqual(bodies[0].generationConfig.thinkingConfig, { thinkingLevel: 'low' });
   const { diagnostics } = data.generation;
   assert.equal(diagnostics.attempts.length, 1);
-  assert.deepEqual({ ...diagnostics.attempts[0], ms: 0 }, { provider: 'gemini', model: 'gemini-3.8-flash', thinking: 'minimal', ms: 0, status: 200, finishReason: 'STOP', error: null });
+  assert.deepEqual({ ...diagnostics.attempts[0], ms: 0 }, { provider: 'gemini', model: 'gemini-3.8-flash', thinking: 'low', ms: 0, status: 200, finishReason: 'STOP', error: null });
   assert.ok(Number.isFinite(diagnostics.totalMs) && diagnostics.budgetMs <= 9500);
   const shown = JSON.stringify(diagnostics);
   assert.ok(!shown.includes('g-secret-key') && !shown.includes('Прогулка') && !shown.includes('Ты городской'), 'no key, query or prompt in the diagnostics');
 });
 
-test('a model that refuses a thinking level is asked again at once with the next one; other 400s are not', async () => {
+test('a model that refuses the thinking level is asked again at once without it; other 400s are not', async () => {
   resetGenerationState();
   const levels = [];
-  const refuse = () => new Response(JSON.stringify({ error: { code: 400, message: 'Thinking level MINIMAL is not supported for this model.' } }), { status: 400 });
+  const refuse = () => new Response(JSON.stringify({ error: { code: 400, message: 'Thinking level LOW is not supported for this model.' } }), { status: 400 });
   let data = await withFetch(async (url, init) => {
     const level = JSON.parse(init.body).generationConfig.thinkingConfig?.thinkingLevel ?? 'off';
     levels.push(level);
-    return level === 'minimal' ? refuse() : geminiReply(ok);
+    return level === 'low' ? refuse() : geminiReply(ok);
   }, async () => (await handleApi(request(valid), env, [poi])).json());
   assert.equal(data.generation.mode, 'llm');
-  assert.deepEqual(levels, ['minimal', 'low']);
-  assert.equal(data.generation.diagnostics.attempts[0].thinking, 'low');
+  assert.deepEqual(levels, ['low', 'off']);
+  assert.equal(data.generation.diagnostics.attempts[0].thinking, 'off');
   // Remembered for the isolate: the next request starts at the accepted level.
   levels.length = 0;
   await withFetch(async (url, init) => { levels.push(JSON.parse(init.body).generationConfig.thinkingConfig?.thinkingLevel ?? 'off'); return geminiReply(ok); },
     () => handleApi(request(valid), env, [poi]));
-  assert.deepEqual(levels, ['low']);
+  assert.deepEqual(levels, ['off']);
 
   resetGenerationState();
   levels.length = 0;
@@ -59,7 +59,7 @@ test('a model that refuses a thinking level is asked again at once with the next
     levels.push(JSON.parse(init.body).generationConfig.thinkingConfig?.thinkingLevel ?? 'off');
     return new Response(JSON.stringify({ error: { code: 400, message: 'API key not valid.' } }), { status: 400 });
   }, async () => (await handleApi(request(valid), env, [poi])).json());
-  assert.deepEqual(levels, ['minimal']);
+  assert.deepEqual(levels, ['low']);
   assert.equal(data.generation.reason, 'provider_400');
   assert.deepEqual(data.generation.diagnostics.attempts.map(item => [item.status, item.error]), [[400, 'http']]);
 });
@@ -78,18 +78,32 @@ test('a model call that runs out of time is not asked again, and the answer from
   assert.equal(data.recommendations.length, 1);
 });
 
-test('out of quota, the spare model writes the text; a cut-off answer is named as such', async () => {
+test('a busy or out-of-quota model hands the walk text to the spare one within the budget, and is skipped for a while', async () => {
+  for (const status of [503, 429]) {
+    resetGenerationState();
+    const models = [];
+    const modelOf = url => String(url).match(/models\/([^:]+)/)[1];
+    const busyPrimary = async url => { const model = modelOf(url); models.push(model); return model === 'gemini-3.5-flash-lite' ? new Response('{}', { status }) : geminiReply(ok); };
+    const live = { ...env, GEMINI_MODEL: 'gemini-3.5-flash-lite' };
+    let data = await withFetch(busyPrimary, async () => (await handleApi(request(valid), live, [poi])).json());
+    assert.equal(data.generation.mode, 'llm', `status ${status}`);
+    assert.equal(data.generation.model, 'gemini-3.1-flash-lite');
+    assert.deepEqual(models, ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite']);
+    assert.deepEqual(data.generation.diagnostics.attempts.map(item => [item.model, item.status]), [['gemini-3.5-flash-lite', status], ['gemini-3.1-flash-lite', 200]]);
+    // The next request goes straight to the spare model.
+    models.length = 0;
+    data = await withFetch(busyPrimary, async () => (await handleApi(request(valid), live, [poi])).json());
+    assert.deepEqual(models, ['gemini-3.1-flash-lite']);
+  }
+  // Both busy: three quick tries, then the answer from the data, well within the budget.
   resetGenerationState();
-  const models = [];
-  let data = await withFetch(async url => {
-    const model = String(url).match(/models\/([^:]+)/)[1];
-    models.push(model);
-    return model === 'gemini-3.8-flash' ? new Response('{}', { status: 429 }) : geminiReply(ok);
-  }, async () => (await handleApi(request(valid), env, [poi])).json());
-  assert.equal(data.generation.mode, 'llm');
-  assert.equal(data.generation.model, 'gemini-3.1-flash-lite');
-  assert.deepEqual(models, ['gemini-3.8-flash', 'gemini-3.8-flash', 'gemini-3.1-flash-lite']);
+  const began = Date.now();
+  let data = await withFetch(async () => new Response('{}', { status: 503 }), async () => (await handleApi(request(valid), { ...env, GEMINI_MODEL: 'gemini-3.5-flash-lite' }, [poi])).json());
+  assert.equal(data.generation.reason, 'provider_503');
+  assert.deepEqual(data.generation.diagnostics.attempts.map(item => item.model), ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.5-flash-lite']);
+  assert.ok(Date.now() - began < 2000);
 
+  resetGenerationState();
   data = await withFetch(async () => geminiReply(ok, 'MAX_TOKENS'), async () => (await handleApi(request(valid), { ...env, GEMINI_MODEL: 'm' }, [poi])).json());
   assert.equal(data.generation.reason, 'provider_truncated');
   assert.deepEqual(data.generation.diagnostics.attempts.map(item => [item.finishReason, item.error]), [['MAX_TOKENS', 'max_tokens']]);
@@ -113,7 +127,7 @@ test('the embedding call reports what happened next to the model line', async ()
   resetSemanticCache();
 });
 
-test('speech and photo answers ask for minimal thinking; speech synthesis is left as it is', async () => {
+test('speech and photo answers ask for low thinking; speech synthesis is left as it is', async () => {
   resetMediaState();
   const configs = [];
   const data = await withFetch(async (url, init) => {
@@ -129,6 +143,6 @@ test('speech and photo answers ask for minimal thinking; speech synthesis is lef
     return heard;
   });
   assert.equal(data.text, 'час, кофе и парк');
-  assert.deepEqual(configs[0][1], 'minimal');
+  assert.deepEqual(configs[0][1], 'low');
   assert.ok(configs.slice(1).every(([, level]) => level === 'off'), 'the voice model gets no thinking setting');
 });
