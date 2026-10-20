@@ -4,6 +4,7 @@
  * secret token header, 30-minute in-memory session) come from the Ascension HackAlem bot.
  */
 import { recommend } from './retrieval.mjs';
+import { coarse } from './privacy.mjs';
 
 const SESSION_TTL_MS = 30 * 60 * 1000;
 const MAX_SESSIONS = 2000;
@@ -88,7 +89,8 @@ export async function handleTelegram(request, env, pois, generate, now = Date.no
     const { latitude: lat, longitude: lon } = message.location;
     try { recommend([], { lat, lon }); }
     catch { return reply(chatId, 'Эта точка вне Астаны. Сейчас я работаю только по Астане.'); }
-    remember(chatId, lat, lon, now);
+    // Telegram hands over the exact point; only the rounded cell is kept for the 30 minutes.
+    remember(chatId, coarse(lat), coarse(lon), now);
     return reply(chatId, 'Точка получена. Что хотите и сколько у вас времени? Например: «кофе, есть час» или «с ребёнком на 2 часа».');
   }
   const text = typeof message.text === 'string' ? message.text.trim().slice(0, 500) : '';

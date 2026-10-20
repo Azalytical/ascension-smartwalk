@@ -7,6 +7,7 @@ import * as api from '../core/api.js';
 import { categoryArt, categoryName } from '../ui/common.js';
 import { applyTheme } from '../core/theme.js';
 import { installState, promptInstall } from '../core/install.js';
+import { outbound } from '../core/privacy.js';
 
 let root = null;
 
@@ -71,7 +72,8 @@ function repeat(item) {
   url.searchParams.set('t', item.plan?.minutes || 45);
   if (item.plan?.query) url.searchParams.set('q', item.plan.query);
   if (item.start?.kind === 'preset') url.searchParams.set('from', item.start.id);
-  else if (item.start) { url.searchParams.set('lat', item.start.lat); url.searchParams.set('lon', item.start.lon); }
+  // The address bar can be reloaded or copied, so the person's own point goes into it rounded.
+  else if (item.start) { const point = outbound(item.start); url.searchParams.set('lat', point.lat); url.searchParams.set('lon', point.lon); }
   url.searchParams.set('go', '1');
   history.replaceState(null, '', url);
   openTab('walk');

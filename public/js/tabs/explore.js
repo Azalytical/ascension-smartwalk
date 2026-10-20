@@ -14,6 +14,7 @@ import { placeView } from '../ui/place.js';
 import { startWalk } from '../ui/live.js';
 import { askPhoto } from '../ui/vision.js';
 import { identify } from '../core/media.js';
+import { outbound } from '../core/privacy.js';
 
 const FILTERS = [['all', null], ['cafe', ['cafe']], ['restaurant', ['restaurant']], ['park', ['park', 'playground']], ['family', ['family', 'playground']], ['culture', ['museum', 'culture']], ['attraction', ['attraction']], ['nightlife', ['nightlife']], ['mall', ['mall']]];
 const PAGE = 40;
@@ -127,7 +128,7 @@ function startVision(image) {
   const start = startPoint();
   vision = { image, status: 'loading' };
   renderVision();
-  identify({ image, lat: start.lat, lon: start.lon })
+  identify({ image, ...outbound(start) })
     .then((data) => { if (vision?.image === image) { vision = { image, status: 'done', data }; renderVision(); } })
     .catch((error) => { if (vision?.image === image) { vision = { image, status: 'error', error: error.message }; renderVision(); } });
 }

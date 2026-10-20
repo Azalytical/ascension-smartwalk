@@ -2,6 +2,7 @@
 // meetups with friends and city events. Built from the shell's tokens and components (btn, chip).
 import * as social from './service.js';
 import { createSocialLayer, CATEGORY_EMOJI } from './map-layer.js';
+import { coarse } from '../core/privacy.js';
 
 const EMOJIS = ['🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐸', '🐵', '🦄', '🐙', '🦉', '🐧', '🐳', '🦋', '🌻', '🌵', '🍀', '⚡', '🔥', '🌙', '⭐', '🎧', '🎨', '⚽', '🚲', '☕', '📚', '🏔'];
 const KINDS = [['any', 'Любое'], ['coffee', '☕ Кофе'], ['food', '🍽 Поесть'], ['park', '🌳 Парк'], ['indoor', '🏬 Под крышей']];
@@ -423,7 +424,7 @@ export function mountSocial(root, ctx = {}) {
     async function find() {
       results.replaceChildren(h('p', { class: 'sx-hint' }, 'Считаем, кому сколько идти…'));
       const here = data().share?.hasPoint ? null : await social.currentPosition();
-      const result = await run(() => social.api('meeting-point', { userIds: [...selected], kind, ...(here ? { me: { lat: here.lat, lon: here.lon } } : {}) }));
+      const result = await run(() => social.api('meeting-point', { userIds: [...selected], kind, ...(here ? { me: { lat: coarse(here.lat), lon: coarse(here.lon) } } : {}) }));
       if (!result) { results.replaceChildren(); return; }
       const people = result.participants.map(person => {
         if (person.self) { const point = here || myPoint(); return { ...person, ...(point ? { lat: point.lat, lon: point.lon } : {}) }; }

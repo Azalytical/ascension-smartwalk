@@ -2,9 +2,12 @@
 // Voice uses the app's engine: tap once, speak, hear the answer, then ask a follow-up without touching the screen.
 import { converse, understand } from '/js/core/voice.js';
 import { speakText, stopSpeaking } from '/js/core/media.js';
+import { coarse } from '/js/core/privacy.js';
 
 const $ = id => document.getElementById(id);
-const state = { lat: 51.1283, lon: 71.4304, minutes: 60 };
+const state = { lat: 51.1283, lon: 71.4304, minutes: 60, here: false };
+// «Моё место» is sent rounded to about 100 m (core/privacy.js); a landmark from the list goes as it is.
+const sentPoint = () => (state.here ? { lat: coarse(state.lat), lon: coarse(state.lon) } : { lat: state.lat, lon: state.lon });
 const CATEGORY = { park: 'парк', cafe: 'кафе', museum: 'музей', playground: 'детская площадка', attraction: 'достопримечательность',
   restaurant: 'где поесть', mall: 'торговый центр', culture: 'культура' };
 const ICON = { get_weather: '☁', plan_walk: '🧭', search_places: '🔎', place_details: '📍', build_route: '🗺', check: '✓', give_answer: '✦' };
@@ -37,6 +40,7 @@ $('starts').addEventListener('click', event => {
   if (!button) return;
   if (button.dataset.start !== 'me') {
     [state.lat, state.lon] = button.dataset.start.split(',').map(Number);
+    state.here = false;
     press($('starts'), button);
     return;
   }
@@ -46,7 +50,7 @@ $('starts').addEventListener('click', event => {
     button.textContent = 'Моё место';
     const { latitude, longitude } = position.coords;
     if (!inAstana(latitude, longitude)) { button.textContent = 'Вы не в Астане'; return; }
-    Object.assign(state, { lat: latitude, lon: longitude });
+    Object.assign(state, { lat: latitude, lon: longitude, here: true });
     press($('starts'), button);
   }, () => { button.textContent = 'Нет доступа к месту'; }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
 });
@@ -101,8 +105,16 @@ function placeNode(place) {
 function routeNode(route) {
   const node = el('div', { class: 'route' }, el('b', { text: `Мини-маршрут: ${route.stops.map(stop => stop.name).join(' → ')}` }),
     el('p', { text: `Всего ≈${route.totalMinutes} мин (ходьба ${route.walkMinutes}, на местах ${route.visitMinutes}, запас 5) — ${route.fits ? 'помещается в ваше время' : 'не помещается, сократите маршрут'}.` }));
-  if (route.googleMapsRoute) node.append(el('div', { class: 'links' }, el('a', { href: route.googleMapsRoute, target: '_blank', rel: 'noopener', text: 'Весь маршрут в Google Maps' })));
+  if (route.googleMapsRoute) node.append(el('div', { class: 'links' }, el('a', { href: routeLink(route.googleMapsRoute), target: '_blank', rel: 'noopener', text: 'Весь маршрут в Google Maps' })));
   return node;
+}
+
+// The server knew only the rounded cell, so the way back in the link ends there; on this device it ends where the person really is.
+function routeLink(href) {
+  if (!state.here) return href;
+  const url = new URL(href);
+  if (url.searchParams.get('destination') === `${coarse(state.lat)},${coarse(state.lon)}`) url.searchParams.set('destination', `${state.lat},${state.lon}`);
+  return url.href;
 }
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -119,7 +131,7 @@ async function ask(query, extra = {}) {
   $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
   try {
     const response = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, lat: state.lat, lon: state.lon, minutes: state.minutes, withChild: $('child').checked, ...extra }) });
+      body: JSON.stringify({ query, ...sentPoint(), minutes: state.minutes, withChild: $('child').checked, ...extra }) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Не получилось');
     steps.replaceChildren();
@@ -221,7 +233,7 @@ $('photo').addEventListener('change', async () => {
   try {
     const image = await shrink(file);
     out.replaceChildren(el('img', { src: image, alt: 'Ваше фото' }), el('p', { text: 'Gemini сравнивает фото с местами рядом…' }));
-    const response = await fetch('/api/vision', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image, lat: state.lat, lon: state.lon }) });
+    const response = await fetch('/api/vision', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image, ...sentPoint() }) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
     const parts = [el('img', { src: image, alt: 'Ваше фото' })];

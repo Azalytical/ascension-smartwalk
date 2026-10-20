@@ -1,5 +1,6 @@
 // Social state for the whole page: profile token, polling, and the location share that keeps running
 // while the person uses other tabs. Screens subscribe with onChange(); nothing here touches the DOM.
+import { coarse } from '../core/privacy.js';
 
 const TOKEN_KEY = 'seruen.social.token';
 const FAST_POLL = 10_000;
@@ -163,7 +164,10 @@ function publish(point, force = false) {
   if (!force && now - lastPublish < PUBLISH_EVERY) return;
   lastPublish = now;
   const { lat, lon, accuracy } = pendingPoint;
-  api('publishLocation', { lat, lon, accuracy }).then(result => {
+  // «Примерно» is rounded here, so the exact point never leaves the phone; only «Точно», chosen by the person, sends it as is.
+  const approximate = state.data?.share?.mode !== 'precise';
+  const sent = approximate ? { lat: coarse(lat), lon: coarse(lon), accuracy: Math.max(150, accuracy || 0) } : { lat, lon, accuracy };
+  api('publishLocation', sent).then(result => {
     if (state.data) state.data.share = result.share;
     emit('share');
   }).catch(error => {
