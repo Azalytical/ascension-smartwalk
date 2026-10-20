@@ -1,11 +1,11 @@
-// Service worker for Seruen watch reminders (scope /watch). It only shows pushed reminders; it does not cache pages.
+// Service worker for Ulger watch reminders (scope /watch). It only shows pushed reminders; it does not cache pages.
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
 self.addEventListener('push', (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { /* empty or plain-text push */ }
-  event.waitUntil(self.registration.showNotification(data.title || 'Seruen', {
+  event.waitUntil(self.registration.showNotification(data.title || 'Ulger', {
     body: data.body || 'Пора обратно.',
     tag: data.tag || 'seruen-back',
     renotify: true,

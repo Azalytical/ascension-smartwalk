@@ -72,7 +72,7 @@ async function handlePush(request, env, url) {
   if (!action) return null;
   if (request.method !== 'POST') return failure('Метод не поддерживается', 405, false);
   const origin = request.headers.get('Origin');
-  if (origin && origin !== url.origin) return failure('Запрос должен исходить с сайта Seruen', 403, false);
+  if (origin && origin !== url.origin) return failure('Запрос должен исходить с сайта Ulger', 403, false);
   if (!env.LOCAL_DEVELOPMENT && !allowed(clientIp(request))) return failure('Слишком много запросов. Попробуйте через минуту.', 429, false);
   if (Number(request.headers.get('Content-Length')) > 4096) return failure('Запрос слишком большой', 413, false);
   let body;
@@ -111,7 +111,7 @@ export function handleWatch(request, env, pois) {
   catch (error) {
     if (error?.code !== 'INVALID_INPUT') throw error;
     const outside = /Широта|Долгота/.test(error.message);
-    return failure(outside ? 'Seruen пока подбирает прогулки только в Астане.' : error.message, 400, text);
+    return failure(outside ? 'Ulger пока подбирает прогулки только в Астане.' : error.message, 400, text);
   }
   const plan = {
     start: { lat: input.lat, lon: input.lon }, minutes: total, mood, query,

@@ -1,5 +1,5 @@
-// Seruen reminders on the wrist: Web Push to this phone or computer; a paired watch or band mirrors the notification.
-// Usage from any Seruen page: SeruenRemind.schedule([{ at, title, body, tag }]) from a tap, then SeruenRemind.cancel(id).
+// Ulger reminders on the wrist: Web Push to this phone or computer; a paired watch or band mirrors the notification.
+// Usage from any Ulger page (the global keeps its original name): SeruenRemind.schedule([{ at, title, body, tag }]) from a tap, then SeruenRemind.cancel(id).
 (() => {
   'use strict';
 

@@ -135,14 +135,14 @@
       const query = new URLSearchParams({ lat: start.lat.toFixed(6), lon: start.lon.toFixed(6), minutes: String(state.minutes), mood });
       const response = await fetch(`/api/watch/plan?${query}`, { signal: controller.signal });
       let data;
-      try { data = await response.json(); } catch { throw new Error('Seruen ответил неожиданно. Попробуйте ещё раз.'); }
+      try { data = await response.json(); } catch { throw new Error('Ulger ответил неожиданно. Попробуйте ещё раз.'); }
       if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Не получилось подобрать места.');
       state.plan = { places: data.places, query: data.query, start, minutes: state.minutes, at: Date.now() };
       renderResults();
       show('results');
     } catch (error) {
       showError(error.name === 'AbortError' ? 'Сеть отвечает слишком долго. Попробуйте ещё раз.'
-        : error instanceof TypeError ? 'Нет связи с Seruen. Проверьте интернет на часах или телефоне.' : error.message);
+        : error instanceof TypeError ? 'Нет связи с Ulger. Проверьте интернет на часах или телефоне.' : error.message);
     } finally { clearTimeout(timer); }
   }
 
@@ -491,7 +491,7 @@
     tick();
   }
 
-  // Meetups and friends come from the Seruen account on the phone. The watch is linked once with a 6-digit code
+  // Meetups and friends come from the Ulger account on the phone. The watch is linked once with a 6-digit code
   // (phone: Профиль → Связать часы) and then keeps its own token.
   const SOCIAL_KEY = 'seruen-watch-social';
   const MEMBER_STATUS = { arrived: 'на месте', on_way: 'в пути', going: 'придёт', maybe: 'может быть', invited: 'приглашён', declined: 'не придёт' };
@@ -521,7 +521,7 @@
       return data;
     } catch (error) {
       if (error.name === 'AbortError') throw new Error('Сеть отвечает слишком долго. Попробуйте ещё раз.');
-      if (error instanceof TypeError) throw new Error('Нет связи с Seruen. Проверьте интернет на часах или телефоне.');
+      if (error instanceof TypeError) throw new Error('Нет связи с Ulger. Проверьте интернет на часах или телефоне.');
       throw error;
     } finally { clearTimeout(timer); }
   }
@@ -549,7 +549,7 @@
   }
 
   function showLink(message) {
-    $('link-text').textContent = message || 'На телефоне: Seruen → Профиль → Связать часы';
+    $('link-text').textContent = message || 'На телефоне: Ulger → Профиль → ⌚ Связать часы';
     $('link-text').classList.toggle('error', Boolean(message));
     show('link');
   }
@@ -644,8 +644,8 @@
     if (located.length) list.append(friendsCard(located));
     if (!meetups.length && !located.length) {
       const card = element('article', 'card');
-      card.append(element('p', 'card-top', state.me ? `${state.me.emoji} ${state.me.name}` : 'Seruen'), element('p', 'card-name', 'Пока нет встреч'),
-        element('p', 'card-hours', 'Позовите друзей на встречу в Seruen на телефоне, и она появится здесь.'));
+      card.append(element('p', 'card-top', state.me ? `${state.me.emoji} ${state.me.name}` : 'Ulger'), element('p', 'card-name', 'Пока нет встреч'),
+        element('p', 'card-hours', 'Позовите друзей на встречу в Ulger на телефоне, и она появится здесь.'));
       list.append(card);
     }
     if (start.note) list.firstChild.append(element('p', 'card-hours', start.note));
