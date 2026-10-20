@@ -9,7 +9,7 @@ OUT = ROOT / 'deliverables' / 'ascension-smartwalk-submission.zip'
 files = [ROOT / name for name in ['README.md', 'LICENSE', 'package.json', 'package-lock.json', '.env.example', '.gitattributes']]
 for folder in ['public', 'src', 'data', 'tests', 'scripts', 'drizzle']:
     files += [p for p in (ROOT / folder).rglob('*') if p.is_file() and '__pycache__' not in p.parts]
-for name in ['ascension-smartwalk-presentation.pptx', 'ascension-smartwalk-presentation.pdf',
+for name in ['ascension-smartwalk-presentation.pdf',
              'ascension-smartwalk-tests-and-limitations.pdf', 'START-HERE.txt']:
     files.append(ROOT / 'deliverables' / name)
 for name in ['concept.md', 'ethics.md', 'integrations.md', 'watch.md', 'test-protocol.md', 'test-protocol.json', 'runtime-verification.json']:

@@ -6,6 +6,8 @@ Aidem (ранее SmartWalk). Название от «айда» и «идём»
 
 [Открыть работающее демо](https://ascension-smartwalk.azamatbreach.workers.dev) · [Видеообзор на YouTube](https://youtu.be/6RCol9jsG4w) · [Исходный код](https://github.com/Azalytical/ascension-smartwalk)
 
+[Презентация (PDF)](deliverables/ascension-smartwalk-presentation.pdf) · [Тестовые сценарии и ограничения (PDF)](deliverables/ascension-smartwalk-tests-and-limitations.pdf) · [START-HERE](deliverables/START-HERE.txt)
+
 Городской RAG-помощник для прогулок по Астане. Пользователь выбирает точку старта, доступное время и предпочтения. Система извлекает подходящие POI из автоматически собранной базы (2255 мест из OpenStreetMap и Overture Maps), проверяет время и формирует короткое объяснение по найденным данным.
 
 Каждая карточка представляет **отдельный вариант** прогулки. Время включает дорогу туда, посещение, возвращение и запас 5 минут. Если времени хватает, отдельно предлагается **мини-маршрут из трёх мест** подряд; в нём не больше одного места, где поесть, если запрос не про еду.
