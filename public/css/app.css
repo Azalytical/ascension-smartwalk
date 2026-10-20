@@ -350,6 +350,12 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .setting-label small { font-size: var(--fs-13); font-weight: 400; color: var(--ink-3); line-height: 1.4; }
 .setting .btn-sm { justify-self: start; }
 
+/* «Удиви меня» */
+.surprise-btn { width: 100%; }
+.surprise-btn .icon { color: var(--gold-ink); }
+.surprise-note { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-size: var(--fs-13); line-height: 1.45; color: var(--ink-2); }
+.surprise-note .icon { flex: none; margin-top: 2px; color: var(--gold-ink); }
+
 /* «Перед выходом» */
 .ready-place { display: flex; align-items: center; gap: 10px; font-size: var(--fs-17); min-width: 0; }
 .ready-place strong { min-width: 0; overflow-wrap: anywhere; }

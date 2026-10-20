@@ -28,8 +28,8 @@ export function estimate(start, place) {
 }
 
 /** How far one can go and still come back: the radius of the reach ring on the map. */
-export function reachMeters(minutes, maxWalk) {
-  const oneWay = Math.max(0, Math.min(maxWalk, Math.floor((minutes - RESERVE - 15) / 2)));
+export function reachMeters(minutes, maxWalk, reserve = RESERVE) {
+  const oneWay = Math.max(0, Math.min(maxWalk, Math.floor((minutes - reserve - 15) / 2)));
   return oneWay * METERS_PER_MINUTE / DETOUR;
 }
 
