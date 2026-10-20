@@ -321,12 +321,54 @@ test('listen: Gemini writes down a spoken request, OpenAI is the fallback', with
   const ask = (extra) => handleApi(new Request('https://demo.example/api/listen', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ audio, mimeType: 'audio/wav;codecs=1', lang: 'ru' }) }), { ...env, ...extra }, pois);
   globalThis.__geminiDown = false;
-  assert.deepEqual(await (await ask({ GEMINI_API_KEY: 'test' })).json(), { text: 'час, кофе и парк', provider: 'gemini' });
+  assert.deepEqual(await (await ask({ GEMINI_API_KEY: 'test' })).json(), { text: 'час, кофе и парк', lang: 'ru', provider: 'gemini', model: 'gemini-3.5-flash-lite' });
   globalThis.__geminiDown = true;
-  assert.deepEqual(await (await ask({ GEMINI_API_KEY: 'test', OPENAI_API_KEY: 'test' })).json(), { text: 'кофе у воды', provider: 'openai' });
+  assert.deepEqual(await (await ask({ GEMINI_API_KEY: 'test', OPENAI_API_KEY: 'test' })).json(), { text: 'кофе у воды', lang: 'ru', provider: 'openai' });
   assert.equal((await ask({ GEMINI_API_KEY: 'test' })).status, 502);
   assert.equal((await ask({})).status, 503);
   const video = await handleApi(new Request('https://demo.example/api/listen', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ audio, mimeType: 'video/mp4' }) }), { ...env, GEMINI_API_KEY: 'test' }, pois);
   assert.equal(video.status, 400);
+}));
+
+test('listen: the spoken language comes back, and a model out of quota hands over to the next', withFetch(async (url, init) => {
+  const model = String(url).match(/models\/([^:]+)/)[1];
+  globalThis.__listenModels.push(model);
+  const body = JSON.parse(init.body);
+  assert.match(body.contents[0].parts[1].text, /hint: kk/);
+  assert.deepEqual(body.generationConfig.responseSchema.properties.lang.enum, ['ru', 'kk', 'en']);
+  if (model === 'gemini-3.5-flash-lite') return new Response('{"error":{"code":429}}', { status: 429 });
+  return jsonResponse({ candidates: [{ content: { parts: [{ text: JSON.stringify({ text: 'Бір сағат, кофе және саябақ', lang: 'kk' }) }] } }] });
+}, async () => {
+  globalThis.__listenModels = [];
+  const response = await handleApi(new Request('https://demo.example/api/listen', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ audio: 'UklGR'.padEnd(400, 'A'), mimeType: 'audio/wav', lang: 'kk' }) }), { ...env, GEMINI_API_KEY: 'test' }, pois);
+  const data = await response.json();
+  assert.equal(response.status, 200);
+  assert.deepEqual(globalThis.__listenModels, ['gemini-3.5-flash-lite', 'gemini-3.8-flash']);
+  assert.equal(data.lang, 'kk');
+  assert.equal(data.text, 'Бір сағат, кофе және саябақ');
+}));
+
+test('agent: a spoken follow-up carries the previous turn and the spoken language', withFetch(async (url, init) => {
+  if (String(url).includes('open-meteo')) return jsonResponse(weatherBody);
+  const body = JSON.parse(init.body);
+  globalThis.__requests.push(body);
+  const turn = body.contents.filter(content => content.role === 'model').length;
+  if (turn === 0) return jsonResponse({ candidates: [{ content: { role: 'model', parts: [{ functionCall: { name: 'plan_walk', args: { query: 'жақынырақ' } }, thoughtSignature: 's' }] } }] });
+  return jsonResponse({ candidates: [{ content: { role: 'model', parts: [{ functionCall: { name: 'give_answer', args: { summary: 'Кофейня у Байтерека: 2 минут жаяу.', place_ids: ['node/1'] } } }] } }] });
+}, async () => {
+  globalThis.__requests = [];
+  const response = await handleApi(new Request('https://demo.example/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: 'Жақынырақ бар ма?', ...START, lang: 'kk', previous: { query: 'Бір сағат, кофе', summary: 'Ниже отдельные варианты.' + ' x'.repeat(400) } }) }),
+    { ...env, GEMINI_API_KEY: 'test' }, pois);
+  const data = await response.json();
+  assert.equal(data.mode, 'agent');
+  const first = JSON.parse(globalThis.__requests[0].contents[0].parts[0].text);
+  assert.equal(first.answerLanguage, 'kk');
+  assert.equal(first.previousTurn.query, 'Бір сағат, кофе');
+  assert.ok(first.previousTurn.answer.length <= 500);
+  const plain = await handleApi(new Request('https://demo.example/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: 'кофе', ...START, previous: 'not an object' }) }), env, pois);
+  assert.equal(plain.status, 200);
 }));

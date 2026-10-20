@@ -83,3 +83,19 @@ legend{font-size:13px;font-weight:650;color:var(--muted);margin-bottom:6px;paddi
 .foot{max-width:720px;margin:0 auto;padding:0 16px 32px}
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.step{opacity:1;transform:none}}
+
+/* Hands-free voice: one round button, its state in words next to it. */
+.voice{display:flex;align-items:center;gap:14px;padding:12px;margin-bottom:12px;border-radius:18px;background:var(--surface-2)}
+.voice-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.voice-text b{font-size:16px}
+.voice-text span{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.mic{flex:none;display:grid;place-items:center;width:64px;height:64px;border:0;border-radius:50%;background:var(--gold);color:#0E1621;cursor:pointer;transition:transform 140ms var(--ease-out)}
+.mic:active{transform:scale(.95)}
+.mic svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.mic svg rect{fill:currentColor}
+.mic[data-state="listening"]{background:var(--red);color:#fff;animation:mic-pulse 1.4s var(--ease-out) infinite}
+.mic[data-state="thinking"]{background:var(--ink);color:var(--bg)}
+.mic[data-state="speaking"]{background:var(--sky);color:#0E1621}
+@keyframes mic-pulse{0%{box-shadow:0 0 0 0 rgba(229,72,77,.45)}100%{box-shadow:0 0 0 18px rgba(229,72,77,0)}}
+@media (prefers-reduced-motion:reduce){.mic[data-state="listening"]{animation:none;outline:4px solid rgba(229,72,77,.4)}}
+.you{margin:0 0 10px;font-size:14px;color:var(--muted)}
