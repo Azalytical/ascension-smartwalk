@@ -107,6 +107,23 @@ export function notabilityChip(notability) {
   return h('span', { class: 'notability', title: t('notability.hint'), 'aria-label': `${label}. ${t('notability.hint')}` }, label);
 }
 
+// «Почему это, а не другое»: one line per option from the server (versus), built only from confirmed data.
+// Gemini's line (aiVersus) is already in the asker's language; versus.text is Russian, so kk/en are put together from its reasons.
+const VERSUS = ['closer', 'shorter', 'roof', 'outdoor', 'hoursConfirmed', 'wheelchair', 'named', 'requestMatch', 'rated', 'longerVisit', 'otherKind', 'only', 'surprise', 'similar'];
+export function versusText(place) {
+  if (typeof place?.aiVersus === 'string' && place.aiVersus.trim()) return place.aiVersus.trim();
+  const versus = place?.versus;
+  if (!versus || typeof versus !== 'object') return null;
+  if (lang() === 'ru' && versus.text) return versus.text;
+  const parts = (Array.isArray(versus.reasons) ? versus.reasons : []).filter((reason) => VERSUS.includes(reason?.key)).map(({ key, params = {} }) => {
+    if (key === 'hoursConfirmed' && !params.closesAt) return t('vs.hoursConfirmedPlain');
+    if (key === 'rated') return t('vs.rated', { average: Number(params.average).toLocaleString(lang() === 'en' ? 'en-GB' : 'ru-RU', { maximumFractionDigits: 1 }) });
+    return t(`vs.${key}`, { ...params, category: params.category ? categoryName(params.category).toLocaleLowerCase() : '' });
+  });
+  if (!parts.length) return versus.text || null;
+  return parts.map((part, i) => (i ? part.charAt(0).toLocaleLowerCase() + part.slice(1) : part)).join('; ');
+}
+
 export function backButton(label, onClick) {
   return h('button', { class: 'btn btn-quiet btn-sm back-btn', type: 'button', onclick: onClick }, icon('back'), label);
 }

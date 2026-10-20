@@ -6,14 +6,15 @@ import { formatDistance } from '../core/geo.js';
 import { lang } from '../core/i18n.js';
 import * as store from '../core/store.js';
 import { timeRing } from './ring.js';
-import { categoryArt, categoryName, hoursStatus, hoursChip, navLinks, share, backTime, confidenceChip, notabilityChip, backButton, watchButton, listenButton } from './common.js';
+import { categoryArt, categoryName, hoursStatus, hoursChip, navLinks, share, backTime, confidenceChip, notabilityChip, versusText, backButton, watchButton, listenButton } from './common.js';
 import { toast } from './toast.js';
 import { ratingBlock, ratingChip } from './rating.js';
 
 const WHEELCHAIR = { yes: 'place.wheelchair.yes', limited: 'place.wheelchair.limited', no: 'place.wheelchair.no' };
 
-export function placeView({ place, timing, start, serverHours, why, activities = [], warnings = [], onBack, backLabel, onStart, routeInfo, shareUrl, voice = null, backAt = null }) {
+export function placeView({ place, timing, start, serverHours, why, activities = [], warnings = [], onBack, backLabel, onStart, routeInfo, shareUrl, voice = null, backAt = null, spareAt = null, onHide = null }) {
   const back = backAt || backTime(timing);
+  const versus = versusText(place);
   const hours = hoursStatus(place, timing.walkMinutes, timing.visitMinutes, serverHours);
   const saved = store.isSaved(place.id);
   const saveButton = h('button', { class: `icon-btn${saved ? ' is-on' : ''}`, type: 'button', 'aria-pressed': String(saved), 'aria-label': t(saved ? 'place.saved' : 'place.save') }, icon(saved ? 'heart-fill' : 'heart'));
@@ -69,11 +70,15 @@ export function placeView({ place, timing, start, serverHours, why, activities =
         h('div', { class: 'place-badges' }, hoursChip(hours), confidenceChip(place.confidence), notabilityChip(place.notability), ratingChip(place)))),
     h('section', { class: 'time-card' },
       timeRing({ there: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, reserve: timing.safetyReserveMinutes, size: 132, stroke: 13, label: `${total}`, sublabel: t('plan.min', { n: '' }).trim() }),
-      h('div', { class: 'time-card-side' }, h('ul', { class: 'legend' }, legend), h('p', { class: 'return-by' }, icon('return'), t('place.returnNow', { time: back })))),
+      h('div', { class: 'time-card-side' }, h('ul', { class: 'legend' }, legend), h('p', { class: 'return-by' }, icon('return'), t('place.returnNow', { time: back })),
+        spareAt ? h('p', { class: 'spare-by', text: t('live.spareBy', { time: spareAt }) }) : null)),
     routeLine,
+    versus ? h('p', { class: 'versus-line' }, icon('check', 'icon-xs'), h('span', {}, h('strong', { text: `${t('place.versus')} ` }), versus)) : null,
     h('button', { class: 'btn btn-gold btn-xl', type: 'button', onclick: onStart }, icon('play'), t('place.start')),
     h('div', { class: 'place-actions' }, watchButton({ place, start, walk: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, minutes: timing.totalMinutes }), friends,
-      safeUrl(place.links?.googleCalendar) ? h('a', { class: 'btn btn-quiet btn-sm', href: safeUrl(place.links.googleCalendar), target: '_blank', rel: 'noopener noreferrer' }, icon('calendar'), t('place.calendar')) : null),
+      safeUrl(place.links?.googleCalendar) ? h('a', { class: 'btn btn-quiet btn-sm', href: safeUrl(place.links.googleCalendar), target: '_blank', rel: 'noopener noreferrer' }, icon('calendar'), t('place.calendar')) : null,
+      // «Больше не предлагать»: the place leaves these results and the next searches; «Моё» can bring it back.
+      onHide ? h('button', { class: 'btn btn-quiet btn-sm place-hide', type: 'button', onclick: onHide }, icon('close'), t('place.hide')) : null),
     start ? navLinks(start, place, place.links) : null,
     place.aiWhy ? section(t('place.why'), h('p', { class: 'prose', text: place.aiWhy }), gemini(), listenButton(() => [place.aiWhy, place.aiTodo].filter(Boolean).join(' ')))
       : why ? section(t('place.why'), h('p', { class: 'prose', text: why })) : null,

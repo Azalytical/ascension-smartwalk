@@ -1,4 +1,4 @@
-// "Me": saved places, recent walks, language, theme, install, about and privacy.
+// "Me": saved places, recent walks, language, theme, «На улице», hidden places, install, about and privacy.
 import { registerTab, openTab } from '../shell.js';
 import { h, icon, clear } from '../core/dom.js';
 import { t, LANGS, lang, setLang, date as formatDate, number, time } from '../core/i18n.js';
@@ -8,6 +8,7 @@ import { categoryArt, categoryName } from '../ui/common.js';
 import { applyTheme } from '../core/theme.js';
 import { installState, promptInstall } from '../core/install.js';
 import { outbound } from '../core/privacy.js';
+import { toast } from '../ui/toast.js';
 
 let root = null;
 
@@ -22,6 +23,7 @@ function render() {
   const saved = Object.values(store.get('saved') || {}).sort((a, b) => b.savedAt - a.savedAt);
   const walks = store.get('history') || [];
   const install = installState();
+  const hidden = Object.values(store.get('hidden') || {}).sort((a, b) => b.at - a.at);
   const dataLine = h('span', { class: 'num' });
   api.status().then((status) => { if (status) dataLine.textContent = t('me.dataValue', { count: number(status.poiCount), date: formatDate(status.updatedAt) || '—' }); });
 
@@ -41,7 +43,13 @@ function render() {
     h('h2', { class: 'block-title', text: t('me.settings') }),
     h('div', { class: 'settings' },
       h('div', { class: 'setting' }, h('span', { text: t('me.lang') }), segmented(t('me.lang'), LANGS, lang(), (id) => setLang(id))),
-      h('div', { class: 'setting' }, h('span', { text: t('me.theme') }), segmented(t('me.theme'), [['auto', t('me.theme.auto')], ['light', t('me.theme.light')], ['dark', t('me.theme.dark')]], store.get('theme') || 'auto', (id) => { store.set('theme', id); applyTheme(); }))),
+      h('div', { class: 'setting' }, h('span', { text: t('me.theme') }), segmented(t('me.theme'), [['auto', t('me.theme.auto')], ['light', t('me.theme.light')], ['dark', t('me.theme.dark')]], store.get('theme') || 'auto', (id) => { store.set('theme', id); applyTheme(); })),
+      h('div', { class: 'setting' }, h('span', { class: 'setting-label' }, t('me.outdoor'), h('small', { text: t('me.outdoorHint') })),
+        segmented(t('me.outdoor'), [['off', t('me.off')], ['on', t('me.on')]], store.get('outdoor') ? 'on' : 'off', (id) => { store.set('outdoor', id === 'on'); applyTheme(); })),
+      // «Больше не предлагать»: the list lives on this device; clearing it brings the places back into the searches.
+      h('div', { class: 'setting' }, h('span', { class: 'setting-label' }, t('me.hidden'),
+        h('small', { text: hidden.length ? t('me.hiddenList', { list: hidden.slice(0, 3).map((item) => item.name).join(', '), n: hidden.length }) : t('me.hiddenEmpty') })),
+        hidden.length ? h('button', { class: 'btn btn-quiet btn-sm', type: 'button', onclick: () => { store.set('hidden', {}); toast(t('me.hiddenCleared'), { iconName: 'check' }); render(); } }, icon('return'), t('me.hiddenClear')) : null)),
     install === 'installed' ? h('p', { class: 'banner is-good' }, icon('check'), t('me.installed'))
       : h('div', { class: 'install-card' }, h('img', { src: '/assets/brand/seruen/icon-192.png', alt: '', width: 52, height: 52 }),
         h('div', {}, h('strong', { text: t('me.install') }), h('p', { class: 'fine', text: install === 'ios' ? t('me.installIos') : t('me.installText') })),
