@@ -91,6 +91,15 @@ CONCERT_NAME = re.compile(r"концерт|филармон|concert|hall|хол�
 GREEN_NAME = re.compile(r"парк|сквер|сад|саябақ|бақ|park|garden|аллея|аллеясы|бульвар|роща|орман", re.I)
 JUNK_NAME = re.compile(r"^\W*\d|^(ул\.|улица\s|пр\.|проспект\s|мкр|микрорайон\s)|көшесі\s*\d|\d+/\d+|\bжк\b|квартир|аренд|"
                        r"доставк|delivery|parking|парковоч|fashion|караоке|karaoke|кальян|hookah", re.I)
+# Betting shops mapped as bars and pet shops mapped as zoos: not somewhere to walk to.
+NOT_A_VENUE = re.compile(r"fair\s*play|букмекер|bookmaker|\bбк\b|betting|olimpbet|fonbet|1xbet|parimatch|казино|casino|"
+                         r"зоомагазин|зоотовар|зоосалон|zoo\.kz|pet\s*shop", re.I)
+NOT_A_VENUE_TAGS = {("shop", "bookmaker"), ("shop", "lottery"), ("shop", "pet"), ("amenity", "gambling"),
+                    ("amenity", "casino"), ("leisure", "adult_gaming_centre")}
+
+
+def not_a_venue(name, tags=None):
+    return bool(NOT_A_VENUE.search(name or "")) or any((k, v) in NOT_A_VENUE_TAGS for k, v in (tags or {}).items())
 OTHER_CITY = re.compile(r"алматы|almaty|кокшетау|kokshetau|караганд|karaganda|шымкент|shymkent|павлодар|pavlodar|"
                         r"актобе|aktobe|костанай|kostanay|щучинск|бурабай|borovoe|боровое|turkey|türkiye|istanbul", re.I)
 STOP = {"кафе", "cafe", "café", "coffee", "кофейня", "кофе", "ресторан", "restaurant", "бар", "bar", "тц", "трц", "тд",
@@ -450,6 +459,8 @@ def main():
     raw_ids = {f"osm:{e['type']}:{e['id']}" for e in raw["elements"]}
 
     records, index, rejected, enriched, added = [], Index(), Counter(), Counter(), Counter()
+    # Rejected OSM records stay indexed so an Overture copy of the same betting shop can't slip back in.
+    blocked = Index()
 
     def accept(record, origin):
         records.append(record)
@@ -457,7 +468,12 @@ def main():
         added[origin] += 1
 
     for poi in read("pois.json"):
-        accept(from_osm_poi(poi), "osm_import")
+        record = from_osm_poi(poi)
+        if not_a_venue(record["name"], record.get("tags")):
+            rejected["osm_import:not_a_venue"] += 1
+            blocked.add(record)
+            continue
+        accept(record, "osm_import")
     known = raw_ids | {i for p in records for i in p["source"].get("mergedOsmIds", [p["id"]])}
     for record in unnamed_osm_playgrounds(raw, osm_meta["retrievedAt"], {r["id"] for r in records}):
         accept(record, "osm_unnamed_playground")
@@ -529,6 +545,8 @@ def main():
             rejected["overture_places:low_confidence"] += 1
         elif JUNK_NAME.search(name) or (group == "green" and not GREEN_NAME.search(name)):
             rejected["overture_places:name_not_a_place"] += 1
+        elif not_a_venue(name):
+            rejected["overture_places:not_a_venue"] += 1
         elif OTHER_CITY.search(address) or re.search(r"алматы|almaty", name, re.I):
             rejected["overture_places:other_city"] += 1
         elif not inside(row["lat"], row["lon"]):
@@ -536,6 +554,10 @@ def main():
         else:
             record = from_overture_place(row, kind, overture_at, release)
             record["_candidateNames"] = [record["name"], record["nameRu"], record["nameKk"], record["nameEn"]]
+            if blocked.match(record, 150)[0]:
+                record.pop("_candidateNames")
+                rejected["overture_places:not_a_venue"] += 1
+                continue
             match, how = index.match(record, 150 if group == "food" else 300)
             elsewhere = None if match or group != "other" else index.landmark_elsewhere(
                 record, [r for r in records if kind_group(r["category"]) not in ("food", "mall", "service")])
