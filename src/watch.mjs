@@ -18,15 +18,24 @@ const LABELS = { park: 'парк', cafe: 'кафе', museum: 'музей', playg
   restaurant: 'где поесть', mall: 'торговый центр', culture: 'культурное место', family: 'место для семейного отдыха', nightlife: 'бар или паб' };
 const EN_LABELS = { park: 'a park', cafe: 'a cafe', museum: 'a museum', playground: 'a playground', attraction: 'a sight',
   restaurant: 'a place to eat', mall: 'a shopping centre', culture: 'a cultural venue', family: 'a family place', nightlife: 'a bar or pub' };
+const KK_LABELS = { park: 'саябақ', cafe: 'кафе', museum: 'мұражай', playground: 'балалар алаңы', attraction: 'көрікті жер',
+  restaurant: 'тамақтанатын орын', mall: 'сауда орталығы', culture: 'мәдени орын', family: 'отбасылық демалыс орны', nightlife: 'бар немесе паб' };
 // What Siri says when there is no plan to read, in the language of the question.
 const SAY = {
   ru: { nothing: 'Рядом не нашлось мест, на которые хватит времени. Попробуйте дать прогулке больше времени.', outside: 'Aidem пока подбирает прогулки только в Астане.',
     mood: 'Неизвестное настроение прогулки.', busy: 'Слишком много запросов. Попробуйте через минуту.' },
   en: { nothing: 'Nothing nearby fits your time. Try giving the walk more time.', outside: 'For now Aidem plans walks only in Astana.',
-    mood: 'Unknown walk mood.', busy: 'Too many requests. Try again in a minute.', failed: 'Aidem could not answer right now. Please try again.' }
+    mood: 'Unknown walk mood.', busy: 'Too many requests. Try again in a minute.', failed: 'Aidem could not answer right now. Please try again.' },
+  kk: { nothing: 'Жақын маңда уақытыңызға сай орын табылмады. Серуенге көбірек уақыт беріңіз.', outside: 'Aidem әзірге тек Астанада серуен ұсынады.',
+    mood: 'Серуеннің мұндай түрі белгісіз.', busy: 'Сұрау тым көп. Бір минуттан кейін қайталап көріңіз.', failed: 'Aidem қазір жауап бере алмады. Қайталап көріңіз.' }
 };
-/** English when the question is in Latin letters or lang=en asks for it; otherwise Russian. */
-export const spokenLanguage = (text, lang) => (lang === 'en' || (!lang && /[a-z]/i.test(text || '') && !/[а-яёәғқңөұүһі]/iu.test(text || '')) ? 'en' : 'ru');
+/** The language of the spoken answer: lang=ru|kk|en if given, else the question's letters, as answerLanguage does for the main plan. */
+export function spokenLanguage(text, lang) {
+  if (['ru', 'kk', 'en'].includes(lang)) return lang;
+  const question = String(text || '');
+  if (/[әғқңөұүһі]/iu.test(question)) return 'kk';
+  return /[a-z]/i.test(question) && !/[а-яё]/iu.test(question) ? 'en' : 'ru';
+}
 export const say = (key, lang) => SAY[lang]?.[key] || SAY.ru[key];
 const HEADERS = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin' };
 
@@ -65,6 +74,14 @@ export function spokenPlan(plan, now = new Date(), lang = 'ru') {
   const [first, ...rest] = plan.places;
   if (!first) return say('nothing', lang);
   const back = astanaTime(new Date(now.getTime() + first.totalMinutes * 60000));
+  if (lang === 'kk') {
+    // Kazakh numerals take no plural: «8 минут».
+    let kazakh = `${first.name}, ${KK_LABELS[first.category] || 'орын'}. Жаяу шамамен ${first.walkMinutes} минут, `
+      + `барып-қайтқанда бүкіл серуен шамамен ${first.totalMinutes} минут алады, сағат ${back} шамасында ораласыз.`;
+    if (first.hours?.status === 'open' && first.hours.closesAt) kazakh += ` ${first.source?.label || 'Дереккөз'} деректері бойынша ${first.hours.closesAt} дейін ашық.`;
+    if (rest.length) kazakh += ` Тағы: ${rest.map(place => `${place.name}, жаяу ${place.walkMinutes} минут`).join('; ')}.`;
+    return kazakh;
+  }
   if (lang === 'en') {
     let english = `${first.name}, ${EN_LABELS[first.category] || 'a place'}. About ${enMinutes(first.walkMinutes)} on foot; `
       + `the whole walk there and back takes about ${enMinutes(first.totalMinutes)}, so you are back by ${back}.`;
@@ -81,7 +98,7 @@ export function spokenPlan(plan, now = new Date(), lang = 'ru') {
 
 /** The assistant's answer as one paragraph for Siri: Gemini's own words, or the same places read like a plan without it. */
 export function spokenAnswer(answer, now = new Date(), lang = 'ru') {
-  if (typeof answer?.error === 'string') return lang === 'en' ? say('failed', lang) : answer.error;
+  if (typeof answer?.error === 'string') return lang === 'ru' ? answer.error : say('failed', lang);
   if (answer?.mode === 'agent' && answer.summary) return answer.summary;
   const places = (answer?.places || []).filter(place => Number.isFinite(place.totalMinutes))
     .map(place => ({ ...place, source: { label: place.dataSource || 'OpenStreetMap' } }));
