@@ -146,6 +146,122 @@
     } finally { clearTimeout(timer); }
   }
 
+  // Search by name: "Мега", "Хан Шатыр", "кофе". Dictation gives Cyrillic, many places are named in Latin letters,
+  // so a Cyrillic query is also searched transliterated.
+  const LATIN = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n',
+    о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'kh', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e',
+    ю: 'yu', я: 'ya', ә: 'a', ғ: 'g', қ: 'k', ң: 'n', ө: 'o', ұ: 'u', ү: 'u', һ: 'h', і: 'i' };
+  const latin = (text) => [...text].map((letter) => LATIN[letter] ?? letter).join('');
+
+  async function searchPlaces(raw) {
+    const query = raw.trim().replace(/[.!?…]+$/, '').toLowerCase().slice(0, 60);
+    // Dictation can end with both a change and a submit.
+    if (query.length < 2 || (state.lastSearch?.query === query && Date.now() - state.lastSearch.at < 1500)) return;
+    state.lastSearch = { query, at: Date.now() };
+    state.mood = null;
+    show('loading');
+    $('loading-text').textContent = `Ищем «${query}»…`;
+    const start = await resolveStart();
+    const near = `&lat=${start.lat.toFixed(5)}&lon=${start.lon.toFixed(5)}`;
+    const variants = [...new Set([query, latin(query)])];
+    try {
+      const answers = await Promise.all(variants.map((variant) => fetch(`/api/social/places?q=${encodeURIComponent(variant)}${near}`)
+        .then((response) => (response.ok ? response.json() : { places: [] }))));
+      const seen = new Set();
+      // Names that start with the query first ("Mega Silk Way" before "Taksim Fastfood Mega Silkway"), then the nearest.
+      const found = answers.flatMap((answer) => answer.places || []).filter((place) => inAstana(place) && !seen.has(place.id) && seen.add(place.id))
+        .map((place) => ({ place, starts: variants.some((variant) => place.name.toLowerCase().replace(/ё/g, 'е').startsWith(variant)) }))
+        .sort((a, b) => b.starts - a.starts || a.place.distanceMeters - b.place.distanceMeters).slice(0, 5)
+        .map(({ place }) => {
+          const walkMinutes = Math.max(1, Math.ceil(place.distanceMeters / METERS_PER_MINUTE));
+          const visitMinutes = Math.max(10, state.minutes - 2 * walkMinutes - RESERVE_MINUTES);
+          return { ...place, walkMinutes, visitMinutes, returnMinutes: walkMinutes, totalMinutes: 2 * walkMinutes + visitMinutes + RESERVE_MINUTES, hours: { status: 'no_data' } };
+        });
+      state.plan = { places: found, query: '', start, minutes: state.minutes, at: Date.now(), search: query };
+      renderResults();
+      $('ask-gemini').hidden = true;
+      show('results');
+    } catch {
+      showError('Нет связи с Aidem. Проверьте интернет на часах или телефоне.', () => searchPlaces(query));
+    }
+  }
+
+  // Voice: the browser's speech recognition, or a recording written down by /api/listen. Without either (Apple Watch)
+  // the mic stays a plain label for the field, and watchOS opens its own dictation.
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const canRecord = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+
+  function setListening(on) {
+    $('voice').classList.toggle('rec', on);
+    $('search-input').placeholder = on ? 'Говорите…' : 'Найти место';
+    buzz(on ? 30 : 15);
+  }
+
+  function heard(text) {
+    $('search-input').value = text;
+    searchPlaces(text);
+  }
+
+  function voice(event) {
+    if (!Recognition && !canRecord) return;
+    event.preventDefault();
+    if (state.recording) { state.recording.stop(); return; }
+    if (Recognition) recognize(); else record();
+  }
+
+  function recognize() {
+    const recognition = new Recognition();
+    recognition.lang = 'ru-RU';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    let result = '';
+    recognition.onresult = (event) => { result = event.results[0]?.[0]?.transcript || ''; };
+    recognition.onerror = (event) => { if (event.error === 'network' || event.error === 'service-not-allowed') result = null; };
+    recognition.onend = () => {
+      state.recording = null;
+      setListening(false);
+      if (result) heard(result);
+      else if (result === null && canRecord) record();
+    };
+    state.recording = recognition;
+    setListening(true);
+    recognition.start();
+  }
+
+  async function record() {
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { $('search-input').focus(); return; }
+    const type = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/webm'].find((item) => MediaRecorder.isTypeSupported?.(item)) || '';
+    const recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+    const chunks = [];
+    let limit;
+    recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+    recorder.onstop = async () => {
+      clearTimeout(limit);
+      stream.getTracks().forEach((track) => track.stop());
+      state.recording = null;
+      setListening(false);
+      const blob = new Blob(chunks, { type: (recorder.mimeType || type || 'audio/webm').split(';')[0] });
+      if (blob.size < 800) return;
+      show('loading');
+      $('loading-text').textContent = 'Распознаём…';
+      try {
+        const audio = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); });
+        const response = await fetch('/api/listen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio, mimeType: blob.type, lang: 'ru' }) });
+        const data = await response.json();
+        if (!response.ok || !data.text) throw new Error(typeof data.error === 'string' ? data.error : 'Не расслышали. Попробуйте ещё раз.');
+        heard(data.text);
+      } catch (error) {
+        showError(error instanceof TypeError ? 'Нет связи с Aidem. Проверьте интернет на часах или телефоне.' : error.message, () => { renderHome(); show('home'); });
+      }
+    };
+    state.recording = recorder;
+    recorder.start();
+    setListening(true);
+    // Up to 5 seconds, or until the second tap.
+    limit = setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 5000);
+  }
+
   function renderResults() {
     const list = $('results');
     list.replaceChildren();
@@ -153,6 +269,13 @@
     $('ask-gemini').hidden = false;
     $('ask-gemini').disabled = false;
     const { places, start } = state.plan;
+    if (!places.length && state.plan.search) {
+      const card = element('article', 'card');
+      card.append(element('p', 'card-name', `Не нашли «${state.plan.search}»`), element('p', 'card-hours', 'Попробуйте сказать название иначе или выберите настроение.'));
+      list.append(card);
+      $('ask-gemini').hidden = true;
+      return;
+    }
     if (!places.length) {
       const card = element('article', 'card');
       card.append(element('p', 'card-name', 'Рядом ничего не успеть'), element('p', 'card-hours', `За ${state.plan.minutes} мин с дорогой обратно подходящих мест нет.`));
@@ -292,6 +415,8 @@
   }
 
   function startWalk(place) {
+    // A place found by name may need more time than the chip says.
+    state.plan.minutes = Math.max(state.plan.minutes, place.totalMinutes);
     const walk = newWalk({ kind: 'place', place, start: state.plan.start });
     walk.deadline = walk.t0 + state.plan.minutes * 60000;
     const there = place.walkMinutes, back = place.returnMinutes;
@@ -851,6 +976,11 @@
       save(); renderHome();
     });
     $('ask-gemini').addEventListener('click', askGemini);
+    $('search-form').addEventListener('submit', (event) => { event.preventDefault(); $('search-input').blur(); searchPlaces($('search-input').value); });
+    $('voice').addEventListener('click', voice);
+    $('voice').addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); $('voice').click(); } });
+    // Apple Watch returns dictation as a change, without a submit.
+    $('search-input').addEventListener('change', () => { if ($('view-home').hidden === false) searchPlaces($('search-input').value); });
     $('back-home').addEventListener('click', () => { history.replaceState(null, '', location.pathname + location.search); renderHome(); show('home'); });
     $('go-next').addEventListener('click', next);
     $('go-stop').addEventListener('click', () => {
