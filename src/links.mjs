@@ -18,7 +18,7 @@ export function calendarLink(place, { start = new Date(), sourceLabel = 'OpenStr
   // Round up to the next 5 minutes so the event does not start in the past.
   const begin = new Date(Math.ceil(start.getTime() / 300000) * 300000);
   const end = new Date(begin.getTime() + total * 60000);
-  const parts = [`Прогулка Seruen: ${place.name}.`];
+  const parts = [`Прогулка Ulger: ${place.name}.`];
   if (Number.isFinite(place.walkMinutes)) {
     parts.push(`Туда ~${place.walkMinutes} мин, на месте ~${place.visitMinutes} мин`
       + (place.returnMinutes ? `, обратно ~${place.returnMinutes} мин` : '') + ', запас 5 мин.');
@@ -26,7 +26,7 @@ export function calendarLink(place, { start = new Date(), sourceLabel = 'OpenStr
   parts.push(`Вернуться к ${astanaClock(end)} (Астана). Время — оценка, не обещание.`);
   if (place.sourceUrl) parts.push(`Источник данных: ${sourceLabel}, ${place.sourceUrl}`);
   parts.push(`Маршрут пешком: ${mapLinks(place).googleMapsWalk}`);
-  const query = new URLSearchParams({ action: 'TEMPLATE', text: `Seruen: ${place.name}`, dates: `${calendarTime(begin)}/${calendarTime(end)}`,
+  const query = new URLSearchParams({ action: 'TEMPLATE', text: `Ulger: ${place.name}`, dates: `${calendarTime(begin)}/${calendarTime(end)}`,
     details: parts.join('\n'), location: point(place), ctz: 'Asia/Almaty' });
   return `https://calendar.google.com/calendar/render?${query}`;
 }
@@ -36,7 +36,7 @@ export function mapLinks(place) {
   const destination = point(place);
   return {
     googleMaps: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`,
-    // No origin: the maps app starts from the visitor's own position on their device, so Seruen never writes it into a link.
+    // No origin: the maps app starts from the visitor's own position on their device, so Ulger never writes it into a link.
     googleMapsWalk: `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=walking`,
     twoGis: `https://2gis.kz/astana/directions/points/%7C${Number(place.lon).toFixed(6)}%2C${Number(place.lat).toFixed(6)}`
   };

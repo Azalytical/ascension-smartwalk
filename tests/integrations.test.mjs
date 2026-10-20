@@ -56,7 +56,7 @@ test('recommendations come with Google Maps, 2GIS and Google Calendar links', as
 test('MCP: initialize, list tools, call a tool', async () => {
   const init = await (await mcp({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } } })).json();
   assert.equal(init.result.protocolVersion, '2025-06-18');
-  assert.equal(init.result.serverInfo.name, 'seruen');
+  assert.equal(init.result.serverInfo.name, 'ulger');
   assert.ok(init.result.capabilities.tools);
   const unknownVersion = await (await mcp({ jsonrpc: '2.0', id: 2, method: 'initialize', params: { protocolVersion: '1999-01-01' } })).json();
   assert.equal(unknownVersion.result.protocolVersion, '2025-11-25');
