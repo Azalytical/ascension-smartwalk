@@ -85,7 +85,11 @@ function placeNode(place) {
   const hoursText = hours[0] === 'open' && place.hours?.closesAt ? `${hours[1]} до ${place.hours.closesAt}` : hours[1];
   const meta = el('div', { class: 'meta' });
   if (Number.isFinite(place.walkMinutes)) meta.append(el('span', { text: `≈${place.walkMinutes} мин пешком` }));
-  if (Number.isFinite(place.totalMinutes)) meta.append(el('span', { text: `всего ≈${place.totalMinutes} мин, обратно к ${clockIn(place.totalMinutes)}` }));
+  if (Number.isFinite(place.totalMinutes)) {
+    // «Вернётесь к» as in the app: without the reserve, which is spare time on top.
+    const reserve = place.safetyReserveMinutes ?? 5;
+    meta.append(el('span', { text: `всего ≈${place.totalMinutes} мин с запасом ${reserve} мин, вернётесь к ${clockIn(place.totalMinutes - reserve)}` }));
+  }
   meta.append(el('span', { class: `tag ${hours[0]}`, text: `${hoursText} · ${place.dataSource || 'OSM'}` }));
   const links = el('div', { class: 'links' });
   const add = (href, text) => href && links.append(el('a', { href, target: '_blank', rel: 'noopener', text }));

@@ -140,6 +140,10 @@ test('a place asked for by name is found in either script, and one left out is n
   const late = recommend(places, { ...aitu, query: 'Мега', visitDate: '2026-10-21T22:30:00+05:00' });
   assert.ok(!late.recommendations.some(place => place.name === 'Mega Silk Way'));
   assert.ok(late.warnings.some(note => note.startsWith('«Mega Silk Way» по режиму работы из источника закрыто')));
+  // Shortly before closing it is open on arrival, and the note says when it closes.
+  const closing = recommend(places, { ...aitu, query: 'Мега', visitDate: '2026-10-21T21:30:00+05:00' });
+  assert.ok(!closing.recommendations.some(place => place.name === 'Mega Silk Way'));
+  assert.ok(closing.warnings.some(note => /^«Mega Silk Way» по режиму работы из источника работает до \d\d:\d\d и закроется раньше/.test(note)), closing.warnings.join('\n'));
   // Kazakh letters and a Latin spelling match the Russian one.
   const baiterek = { lat: 51.1283, lon: 71.4304, minutes: 60, maxWalkMinutes: 15, returnToStart: true, visitDate: '2026-10-21T15:00:00+05:00' };
   for (const query of ['Байтерек', 'Baiterek']) assert.equal(recommend(places, { ...baiterek, query }).recommendations[0].name, 'Бәйтерек', query);

@@ -886,7 +886,7 @@ export function recommend(dataset, input, context = {}) {
       : null;
     if (hours && ['closed', 'closes_early'].includes(hours.status)) {
       counters.closedByHours++;
-      if (nameHit >= NAME_STRONG && (!namedMissed || nameHit >= namedMissed.score)) namedMissed = { poi, score: nameHit, reason: 'closed', walkMinutes, totalMinutes };
+      if (nameHit >= NAME_STRONG && (!namedMissed || nameHit >= namedMissed.score)) namedMissed = { poi, score: nameHit, reason: 'closed', walkMinutes, totalMinutes, hours };
       continue;
     }
     // Late at night a roofed place is suggested only when its recorded hours cover the visit.
@@ -1024,8 +1024,11 @@ export function recommend(dataset, input, context = {}) {
   note('cards', `Каждая карточка — отдельный вариант прогулки. В суммарное время входят путь, посещение, выбранный возврат и резерв ${reserve} минут.`, { reserve });
   note('live', 'Актуальное открытие мест, цены и наличие свободных мест не проверены.');
   if (namedMissed && !recommendations.some(rec => rec.scoreBreakdown.name >= namedMissed.score)) {
-    const { poi, reason, walkMinutes, totalMinutes } = namedMissed;
-    if (reason === 'closed') note('namedClosed', `«${poi.name}» по режиму работы из источника закрыто к моменту визита, поэтому его нет среди вариантов.`, { name: poi.name });
+    const { poi, reason, walkMinutes, totalMinutes, hours } = namedMissed;
+    if (reason === 'closed' && hours.status === 'closes_early') {
+      note('namedClosesEarly', `«${poi.name}» по режиму работы из источника работает до ${hours.closesAt} и закроется раньше, чем закончится визит, поэтому его нет среди вариантов.`,
+        { name: poi.name, closesAt: hours.closesAt });
+    } else if (reason === 'closed') note('namedClosed', `«${poi.name}» по режиму работы из источника закрыто к моменту визита, поэтому его нет среди вариантов.`, { name: poi.name });
     else {
       note('namedTooFar', `«${poi.name}» не помещается: около ${walkMinutes} мин пешком в одну сторону, нужно примерно ${totalMinutes} мин${constraints.returnToStart ? ' с возвращением' : ''}.`,
         { name: poi.name, walk: walkMinutes, needed: totalMinutes, returnToStart: Boolean(constraints.returnToStart) });

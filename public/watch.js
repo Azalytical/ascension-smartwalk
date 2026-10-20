@@ -15,6 +15,8 @@
   // Same estimate as the server: straight line × 1.35 at 4.2 km/h, plus a 5-minute reserve.
   const METERS_PER_MINUTE = 4200 / 60 / 1.35;
   const RESERVE_MINUTES = 5;
+  // «Обратно к» as on the phone: the way there, the visit and the way back; the reserve is spare time on top.
+  const backIn = (place) => place.walkMinutes + place.visitMinutes + place.returnMinutes;
   const ASTANA = { minLat: 51, maxLat: 51.35, minLon: 71.25, maxLon: 71.65 };
   // Watch screens in CSS pixels: a 44 mm round Wear OS watch and a 45 mm Apple Watch.
   const SHAPES = { round: { w: 230, h: 230 }, square: { w: 198, h: 242 } };
@@ -351,7 +353,7 @@
       caption.append('мин', document.createElement('br'), 'пешком');
       walk.append(element('b', '', String(place.walkMinutes)), caption);
       const back = element('p', 'card-back', 'обратно к ');
-      back.append(element('b', '', time(Date.now() + place.totalMinutes * 60000)));
+      back.append(element('b', '', time(Date.now() + backIn(place) * 60000)));
       const facts = [distanceText(place.distanceMeters)];
       facts.push(place.hours?.status === 'open' && place.hours.closesAt ? `открыто до ${place.hours.closesAt}` : 'часы неизвестны');
       const go = element('button', 'action', 'Идём');
@@ -469,7 +471,7 @@
       // Without Gemini the agent's summary is a generic line; the watch says what it found instead, and says Gemini was not there.
       const first = places[0];
       const summary = data.mode === 'agent' ? String(data.summary || '').trim()
-        : first ? `Gemini сейчас не ответил. Ближе всего «${first.name}»: ${first.walkMinutes} мин пешком, обратно к ${time(Date.now() + first.totalMinutes * 60000)}.`
+        : first ? `Gemini сейчас не ответил. Ближе всего «${first.name}»: ${first.walkMinutes} мин пешком, обратно к ${time(Date.now() + backIn(first) * 60000)}.`
           : 'Gemini сейчас не ответил, а рядом под ваш вопрос ничего не нашлось. Попробуйте спросить иначе.';
       state.chat = { question, summary };
       state.plan = { places, query: '', start, minutes: state.minutes, at: Date.now(),
@@ -671,6 +673,7 @@
     const reserve = Math.max(0, place.totalMinutes - there - stay - back);
     const walk = newWalk({ kind: 'place', place, start: state.plan.start, minutes: there + stay + back + reserve, reserve });
     walk.deadline = walk.t0 + walk.minutes * 60000;
+    walk.backAt = walk.deadline - reserve * 60000;
     beginWalk(walk, [['there', there], ['stay', stay], ['back', back], ['reserve', reserve]]);
     if (window.SeruenRemind?.supported()) remindOnWrist(walk);
   }
@@ -742,10 +745,10 @@
     const reminders = [];
     if (walk.leaveAt - 5 * 60000 > Date.now() + 60000) {
       reminders.push({ at: walk.leaveAt - 5 * 60000, tag: 'seruen-soon', title: 'Через 5 минут обратно',
-        body: `Выйдите из «${name}» в ${time(walk.leaveAt)}, чтобы вернуться к ${time(walk.deadline)}.` });
+        body: `Выйдите из «${name}» в ${time(walk.leaveAt)}, чтобы вернуться к ${time(walk.backAt)}.` });
     }
     reminders.push({ at: Math.max(Date.now(), walk.leaveAt), tag: 'seruen-back', title: 'Пора обратно',
-      body: `До старта примерно ${walk.place.returnMinutes} мин пешком. Успеете к ${time(walk.deadline)}.` });
+      body: `До старта примерно ${walk.place.returnMinutes} мин пешком. Успеете к ${time(walk.backAt)}.` });
     window.SeruenRemind.schedule(reminders).then((result) => {
       if (!result.ok) return;
       if (state.walk !== walk) { window.SeruenRemind.cancel(result.id); return; }
@@ -813,7 +816,7 @@
     buzz([400, 150, 400, 150, 400]);
     if (walk.demo && window.SeruenRemind?.supported() && Notification.permission === 'granted') {
       window.SeruenRemind.schedule([{ at: Date.now(), tag: 'seruen-back', title: 'Пора обратно',
-        body: `До старта примерно ${walk.place.returnMinutes} мин пешком. Успеете к ${time(walk.deadline)}.` }]);
+        body: `До старта примерно ${walk.place.returnMinutes} мин пешком. Успеете к ${time(walk.backAt)}.` }]);
     }
     setPhase('back');
   }
@@ -874,7 +877,7 @@
       $('go-phase').textContent = `${walk.phase === 'back' ? (walk.alerted ? 'Пора обратно' : 'Обратно') : 'Туда'} · ${distanceText(distance)}`;
       $('go-minutes').textContent = String(walkMinutes);
       $('go-unit').textContent = 'мин';
-      $('go-back').replaceChildren(walk.phase === 'back' ? 'успеть к ' : 'обратно к ', element('b', '', time(walk.deadline)));
+      $('go-back').replaceChildren(walk.phase === 'back' ? 'успеть к ' : 'обратно к ', element('b', '', time(walk.backAt)));
     }
     $('go-next').textContent = { to: 'Я на месте', stay: 'Обратно', back: 'Я вернулся' }[walk.phase];
   }
