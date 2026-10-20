@@ -105,6 +105,21 @@ test('Gemini answers naming unknown places or unsupported claims fall back', asy
   } finally { globalThis.fetch = original; }
 });
 
+test('an empty references list falls back to the known place ids the model described', async () => {
+  const original = globalThis.fetch;
+  let sent;
+  try {
+    globalThis.fetch = async (u, o) => { sent = JSON.parse(o.body); return geminiReply({ summary: 'Можно выбрать Парк: примерно 20 минут вместе с возвращением и запасом.', references: [],
+      places: [{ id: poi.id, why: 'Подходит под прогулку.', todo: 'Пройтись по парку.' }, { id: 'node/999', why: 'x', todo: 'y' }] }); };
+    const data = await (await handleApi(request(valid), { GEMINI_API_KEY: 'g', LOCAL_DEVELOPMENT: true }, [poi])).json();
+    assert.equal(data.generation.mode, 'llm'); assert.deepEqual(data.generation.references, [poi.id]);
+    assert.match(sent.systemInstruction.parts[0].text, /references/);
+    globalThis.fetch = async () => geminiReply({ summary: 'Можно выбрать Парк.', references: [], places: [] });
+    const none = await (await handleApi(request(valid), { GEMINI_API_KEY: 'g', LOCAL_DEVELOPMENT: true }, [poi])).json();
+    assert.equal(none.generation.mode, 'fallback'); assert.equal(none.generation.reason, 'validation');
+  } finally { globalThis.fetch = original; }
+});
+
 test('status reports the generation provider without the key', async () => {
   const text = await (await handleApi(new Request('https://demo.example/api/status'), { GEMINI_API_KEY: 'g-secret' }, [poi])).text();
   assert.equal(JSON.parse(text).generationProvider, 'gemini'); assert.ok(!text.includes('g-secret'));
