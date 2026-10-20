@@ -533,7 +533,7 @@ function understoodFor(constraints, requested, excluded, intents, reference, nig
   if (intents.night) items.push({ key: 'night', label: nightShift ? 'Поздно вечером: режим работы проверен на сегодня, 22:00' : 'Поздно вечером: только места, открытые на время визита' });
   if (intents.unusual) items.push({ key: 'unusual', label: 'Необычное: выше места культуры и городские объекты, ниже сетевые заведения' });
   if (intents.group) items.push({ key: 'group', label: intents.groupSize ? `Компания из ${intents.groupSize} человек` : 'Компания' });
-  if (intents.accessible) items.push({ key: 'accessible', label: 'Безбарьерность: учитывается тег wheelchair из источника, места с wheelchair=no исключены' });
+  if (intents.accessible) items.push({ key: 'accessible', label: 'Доступно для коляски: места, где в данных отмечено «нет», убраны' });
   if (intents.quiet) items.push({ key: 'quiet', label: 'Спокойное место: ниже бары, фастфуд и торговые центры' });
   if (weather) items.push({ key: 'weather', label: `Погода сейчас: ${weather.text} (Open-Meteo)${weatherRoof ? ', поэтому только места под крышей' : ''}` });
   if (reference && !nightShift) items.push({ key: 'hours', label: `Режим работы проверен на ${localClock(reference)}` });
