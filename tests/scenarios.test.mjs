@@ -222,3 +222,29 @@ test('jury v2: a mini-route has at most one place to eat unless food is the requ
     if (route) assert.ok(route.stops.filter(stop => food.includes(stop.category)).length <= 1, query);
   }
 });
+
+test('jury v3: a company gets places whose format suits it, and the «why» names that format from the source', () => {
+  at.khan = [51.1324, 71.4036];
+  const result = ask('khan', { minutes: 90, maxWalkMinutes: 20, query: 'Нас четверо друзей, хотим поужинать', visitDate: '2026-10-22T19:00:00+05:00' });
+  const first = result.recommendations[0];
+  assert.match(first.why, /для компании из 4 по данным источника: (пицца|гриль|стейки|караоке|фудкорт|тематический ресторан|грузинская кухня|местная кухня|казахская кухня|узбекская кухня)/);
+  assert.ok(first.scoreBreakdown.intent >= 13);
+  assert.ok(result.recommendations.every(place => !/для компании/.test(place.why) || place.why.split('для компании').length === 2));
+});
+
+test('jury v3: «поужинать и погулять» keeps food on the cards and adds a walk to the mini-route', () => {
+  const result = ask('khan', { minutes: 90, maxWalkMinutes: 20, query: 'Нас четверо друзей, хотим поужинать и погулять', visitDate: '2026-10-22T19:00:00+05:00' });
+  assert.deepEqual(result.retrieval.requestedCategories, ['restaurant', 'park', 'attraction']);
+  assert.deepEqual(categories(result), ['restaurant', 'restaurant', 'restaurant']);
+  assert.ok(result.route.stops.some(stop => ['park', 'attraction'].includes(stop.category)));
+  assert.equal(result.route.stops.filter(stop => stop.category === 'restaurant').length, 1);
+});
+
+test('jury v3: a tourist with few sights in walking range is told the nearest one beyond it needs transport', () => {
+  at.airport = [51.0269, 71.4614];
+  const result = ask('airport', { minutes: 120, maxWalkMinutes: 30, query: 'Я турист, у меня 2 часа перед вылетом: что можно посмотреть поблизости?', visitDate: '2026-10-22T14:00:00+05:00' });
+  assert.ok(result.recommendations.length > 0 && result.recommendations.length < 3);
+  assert.match(result.warnings[0], /^Пешком отсюда мест для осмотра мало\. Ближайшее за пределами вашего времени: «[^»]+», около [\d,]+ км по прямой, примерно \d+ мин пешком в одну сторону\. Дальше нужен транспорт/);
+  const baiterek = ask('baiterek', { minutes: 120, maxWalkMinutes: 30, query: 'Я турист, у меня 2 часа перед вылетом: что можно посмотреть поблизости?', visitDate: '2026-10-22T14:00:00+05:00' });
+  assert.ok(!baiterek.warnings.some(warning => warning.startsWith('Пешком отсюда мест для осмотра мало')));
+});

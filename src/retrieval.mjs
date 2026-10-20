@@ -16,6 +16,7 @@ const LABELS = { park: 'парк', cafe: 'кафе', museum: 'музей', playg
   restaurant: 'место, где поесть', mall: 'торговый центр', culture: 'место для культурного досуга', family: 'место для семейного отдыха', nightlife: 'бар или паб' };
 // Categories that keep a visitor under a roof. Used for rain, cold and "indoor" requests.
 const INDOOR = ['mall', 'museum', 'cafe', 'restaurant', 'culture'];
+const FOOD = ['cafe', 'restaurant', 'nightlife'];
 const CHILD = ['park', 'playground', 'family'];
 // A child also widens the search to museums, as in «площадки или музей с интерактивами».
 const CHILD_ALLOWED = [...CHILD, 'museum'];
@@ -50,6 +51,7 @@ const KIND_INTENT = [
   [/(?:^|[^\p{L}])мост|көпір|bridge/u, ['bridge']],
   [/аттракцион|amusement|развлекат/u, ['amusement_park', 'theme_park']],
 ];
+const WALK_INTENT = /погуля|прогул|серуен|\bwalk\b/;
 const INDOOR_INTENT = /дожд|ливень|rain|под крыш|в помещен|indoor|жаңбыр|мороз|холодн|cold|снег|snow|қар/;
 const STOP_WORDS = new Set(['хочу', 'нужен', 'нужна', 'нужно', 'рядом', 'меня', 'есть', 'сейчас', 'что', 'как', 'для', 'куда', 'можно', 'минут', 'час', 'часа', 'with', 'the', 'near', 'want', 'and', 'мен', 'үшін']);
 
@@ -167,7 +169,7 @@ function queryCategories(query) {
     const roofed = categories.filter(category => INDOOR.includes(category));
     return roofed.length ? roofed : [...INDOOR];
   }
-  if (!categories.length && /погуля|прогул|серуен|\bwalk\b/.test(positive)) return ['park', 'attraction'];
+  if (!categories.length && WALK_INTENT.test(positive)) return ['park', 'attraction'];
   return categories;
 }
 
@@ -234,7 +236,6 @@ function wheelchairOf(poi) {
   return ['yes', 'limited', 'no', 'designated'].includes(value) ? (value === 'designated' ? 'yes' : value) : null;
 }
 
-const FOOD = ['cafe', 'restaurant', 'nightlife'];
 const OUTDOOR = ['park', 'attraction', 'playground'];
 
 /**
@@ -401,6 +402,19 @@ function intentCategories(requested, intents, child) {
   return [...categories];
 }
 
+// Formats that suit a company, read from the record itself: shared dishes, karaoke, a food court.
+const GROUP_KINDS = { karaoke_venue: 'караоке', bar_and_grill_restaurant: 'гриль', barbecue_restaurant: 'гриль', pizza_restaurant: 'пицца',
+  theme_restaurant: 'тематический ресторан', steakhouse: 'стейки', georgian_restaurant: 'грузинская кухня', food_court: 'фудкорт' };
+const GROUP_CUISINES = { barbecue: 'гриль', bar_and_grill: 'гриль', grill: 'гриль', pizza: 'пицца', italian_pizza: 'пицца', steak_house: 'стейки',
+  georgian: 'грузинская кухня', regional: 'местная кухня', local: 'местная кухня', kazakh: 'казахская кухня', uzbek: 'узбекская кухня' };
+
+/** A format from the source that suits a company («караоке», «гриль»), or null. */
+function groupFormat(poi, kind) {
+  const tags = poi.tags && !Array.isArray(poi.tags) ? poi.tags : {};
+  const cuisine = String(tags.cuisine ?? '').split(';').map(item => item.trim()).find(item => GROUP_CUISINES[item]);
+  return GROUP_KINDS[normalize(tags['overture:category']).trim()] ?? GROUP_KINDS[kind] ?? GROUP_CUISINES[cuisine] ?? null;
+}
+
 function intentScore(poi, kind, hours, intents, wheelchair) {
   let points = poi.nameIsGenerated ? -20 : 0;
   const tags = poi.tags && !Array.isArray(poi.tags) ? poi.tags : {};
@@ -411,7 +425,7 @@ function intentScore(poi, kind, hours, intents, wheelchair) {
   if (intents.sightseeing && ['museum', 'attraction'].includes(poi.category) && !poi.nameIsGenerated) points += 5;
   if (intents.quiet) points += ['nightlife', 'mall'].includes(poi.category) || fastFood ? -10 : ['cafe', 'park'].includes(poi.category) || kind === 'library' ? 5 : 0;
   if (intents.night) points += (hours?.status === 'open' ? 10 : 0) + ({ nightlife: 12, culture: 8 }[poi.category] ?? 0);
-  if (intents.group) points += fastFood ? -10 : GROUP.includes(poi.category) ? 5 : 0;
+  if (intents.group) points += fastFood ? -10 : (GROUP.includes(poi.category) ? 5 : 0) + (groupFormat(poi, kind) ? 8 : 0);
   if (intents.accessible) points += { yes: 30, limited: 15 }[wheelchair] ?? 0;
   return points;
 }
@@ -453,8 +467,10 @@ function whyFor(pick, constraints, intents, reference) {
   else if (intents.unusual && UNUSUAL.includes(poi.category)) match = `${label} — под запрос «что-то необычное»: не сетевое заведение`;
   else match = `${label} рядом с выбранной точкой`;
   if (intents.accessible && wheelchairOf(poi) === 'yes') match += ', в источнике отмечен доступ для коляски';
-  const facts = factsFor(poi);
-  if (facts.length) match += `; по данным источника: ${facts.join(', ')}`;
+  const format = intents.group && !poi.nameIsGenerated ? groupFormat(poi, pick.kind) : null;
+  if (format) match += `; для компании${constraints.groupSize ? ` из ${constraints.groupSize}` : ''} по данным источника: ${format}`;
+  const facts = factsFor(poi).filter(fact => fact !== format);
+  if (facts.length) match += `; ${format ? 'также' : 'по данным источника'}: ${facts.join(', ')}`;
   // The clock time below is the same «вернётесь к» as plan.backAt and the app: the way there, the visit and back; the reserve is spare.
   const time = `примерно ${walkMinutes} мин в одну сторону, ${totalMinutes - RESERVE} мин ${constraints.returnToStart ? 'туда, на месте и обратно' : 'туда и на месте'}`
     + ` и ещё ${RESERVE} мин в запасе из ваших ${constraints.minutes}`;
@@ -572,12 +588,19 @@ export function recommend(dataset, input, context = {}) {
     const kept = requested.filter(category => roofed.includes(category));
     requested = (kept.length ? kept : roofed).filter(category => !excluded.includes(category));
   }
+  // «Поужинать и погулять»: food stays the main ask, and parks and sights join with a smaller category score,
+  // so the cards lead with food and the mini-route can add a walk after it.
+  const walkToo = !weatherRoof && lexical.length > 0 && lexical.every(category => FOOD.includes(category)) && WALK_INTENT.test(normalize(constraints.query))
+    ? ['park', 'attraction'].filter(category => !requested.includes(category) && !excluded.includes(category) && (!child || CHILD_ALLOWED.includes(category))) : [];
+  requested = [...requested, ...walkToo];
   const terms = tokens(constraints.query);
   const counters = { invalidRecords: 0, unsupportedCategory: 0, restrictedAccess: 0, duplicates: 0, gambling: 0, category: 0, walkBudget: 0, totalBudget: 0,
     closedByHours: 0, unknownHoursAtNight: 0, notAccessible: 0 };
   // The nearest place that matched the request but not the time limits, offered when nothing fits.
   let nearest = null;
   const nearestByCategory = new Map();
+  // For a tourist with few sights in walking range: the nearest named sight beyond it, to say that transport is needed.
+  let nearestSight = null;
   // Hours are checked against the requested visit time, or against now when no time was given.
   // A date without a time cannot be checked; minutes are dropped so equal requests give equal answers.
   // A night request in the daytime is checked against tonight, 22:00.
@@ -611,6 +634,8 @@ export function recommend(dataset, input, context = {}) {
       }
       if (named.includes(category) && !poi.nameIsGenerated && !(intents.accessible && wheelchair === 'no')
         && (nearestByCategory.get(category)?.walkMinutes ?? Infinity) > walkMinutes) nearestByCategory.set(category, { poi, walkMinutes, totalMinutes });
+      if (intents.sightseeing && ['attraction', 'museum'].includes(category) && !poi.nameIsGenerated
+        && (!nearestSight || walkMinutes < nearestSight.walkMinutes)) nearestSight = { poi, walkMinutes, directDistance };
       continue;
     }
     if (intents.accessible && wheelchair === 'no') { counters.notAccessible++; continue; }
@@ -625,7 +650,7 @@ export function recommend(dataset, input, context = {}) {
     const matchedTerms = terms.filter(term => text.includes(term));
     const categoryIntent = constraints.category === category || (requested.includes(category) && named.includes(category));
     const scoreBreakdown = {
-      category: constraints.category === category || requested.includes(category) ? 35 : 0,
+      category: constraints.category === category || requested.includes(category) ? (walkToo.includes(category) ? 15 : 35) : 0,
       keywords: Math.min(20, matchedTerms.length * 5),
       proximity: Math.round(25 * (1 - Math.min(1, walkMinutes / constraints.maxWalkMinutes))),
       timeFit: Math.round(15 * (1 - totalMinutes / constraints.minutes)),
@@ -741,6 +766,11 @@ export function recommend(dataset, input, context = {}) {
   for (const missing of [...nearestMissing].reverse()) {
     warnings.unshift(`${capitalize(LABELS[missing.category])} в ваше время не помещается: ближайший вариант «${missing.name}», около ${missing.walkMinutes} мин пешком в одну сторону, `
       + `нужно примерно ${missing.neededMinutes} мин${constraints.returnToStart ? ' с возвращением' : ''}. Режим работы для него не проверялся.`);
+  }
+  if (intents.sightseeing && recommendations.length && recommendations.length < 3 && nearestSight) {
+    const km = (nearestSight.directDistance / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 });
+    warnings.unshift(`Пешком отсюда мест для осмотра мало. Ближайшее за пределами вашего времени: «${nearestSight.poi.name}», около ${km} км по прямой, `
+      + `примерно ${nearestSight.walkMinutes} мин пешком в одну сторону. Дальше нужен транспорт; его время сервис не считает.`);
   }
   return { recommendations, route, nearestBeyondLimits, nearestMissing, constraints, warnings,
     intents: Object.keys(intents).filter(key => intents[key] === true),
