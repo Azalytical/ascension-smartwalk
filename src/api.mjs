@@ -278,7 +278,7 @@ export async function handleApi(request, env = {}, dataset = []) {
     if (!poi) return json({ error: 'Место не найдено' }, 404);
     return json({ ...poi, category: placeCategory(poi), kind: poi.category ?? null }, 200, { 'Cache-Control': 'public, max-age=300' });
   }
-  if (url.pathname.startsWith('/api/watch/')) return handleWatch(request, env, pois) ?? json({ error: 'Не найдено' }, 404);
+  if (url.pathname.startsWith('/api/watch/')) return (await handleWatch(request, env, pois)) ?? json({ error: 'Не найдено' }, 404);
   if (url.pathname === '/telegram/webhook') {
     if (request.method !== 'POST') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'POST' });
     // Per-chat limit through the same in-memory budget; over the limit the bot answers without the model.

@@ -11,6 +11,7 @@
   // Run next to Google: from Cloudflare's Astana location the Gemini API is unreachable and every answer falls back.
   "placement": { "region": "gcp:europe-west1" },
   // Friends, location sharing, meetups and events: one SQLite-backed Durable Object per city (available on the Workers Free plan).
-  "durable_objects": { "bindings": [{ "name": "SOCIAL", "class_name": "SocialHub" }] },
-  "migrations": [{ "tag": "social-v1", "new_sqlite_classes": ["SocialHub"] }]
+  // Watch reminders ("time to head back" via Web Push): VAPID keys and pending reminders, woken by an alarm.
+  "durable_objects": { "bindings": [{ "name": "SOCIAL", "class_name": "SocialHub" }, { "name": "WATCH_PUSH", "class_name": "WatchPush" }] },
+  "migrations": [{ "tag": "social-v1", "new_sqlite_classes": ["SocialHub"] }, { "tag": "watch-v1", "new_sqlite_classes": ["WatchPush"] }]
 }

@@ -11,6 +11,7 @@
   <title>Seruen · часы</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230E1621'/%3E%3Cpath d='M37.6 16.7A16 16 0 1 0 48 30' fill='none' stroke='%23F5B700' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='43.5' cy='20.5' r='3.6' fill='%234AA8FF'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="/watch.css">
+  <script src="/watch-remind.js" defer></script>
   <script src="/watch.js" defer></script>
 </head>
 <body>
@@ -24,7 +25,7 @@
           <div class="moods">
             <button class="mood" type="button" data-mood="coffee"><img src="/assets/icons/categories/coffee-64.webp" alt="" width="32" height="32"><span>Кофе</span></button>
             <button class="mood" type="button" data-mood="park"><img src="/assets/icons/categories/park-64.webp" alt="" width="32" height="32"><span>Парк</span></button>
-            <button class="mood" type="button" data-mood="child"><img src="/assets/icons/categories/family-64.webp" alt="" width="32" height="32"><span>С ребёнком</span></button>
+            <button class="mood" type="button" data-mood="child"><img src="/assets/icons/categories/family-64.webp" alt="" width="32" height="32"><span>С детьми</span></button>
             <button class="mood" type="button" data-mood="indoor"><img src="/assets/icons/categories/indoor-64.webp" alt="" width="32" height="32"><span>Под крышей</span></button>
             <button class="mood" type="button" data-mood="food"><img src="/assets/icons/categories/food-64.webp" alt="" width="32" height="32"><span>Поесть</span></button>
             <button class="mood" type="button" data-mood="sights"><img src="/assets/icons/categories/landmark-64.webp" alt="" width="32" height="32"><span>Интересное</span></button>
@@ -90,7 +91,7 @@
     <aside class="caption" aria-label="О версии для часов">
       <p class="kicker"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><path d="M37.6 16.7A16 16 0 1 0 48 30"/><circle cx="43.5" cy="20.5" r="3.6"/></svg>seruen · часы</p>
       <h2>Взгляните на запястье: куда идти, сколько и когда обратно.</h2>
-      <p>Выберите настроение, и часы покажут стрелку к месту, минуты пешком и кольцо времени: туда, на месте, обратно. Синяя точка идёт по кольцу, а когда пора возвращаться, часы вибрируют.</p>
+      <p>Выберите настроение, и часы покажут стрелку к месту, минуты пешком и кольцо времени: туда, на месте, обратно. Синяя точка идёт по кольцу. Когда пора возвращаться, приходит уведомление «Пора обратно», и его повторяют любые часы или браслет, подключённые к телефону.</p>
       <div class="segmented" role="group" aria-label="Форма часов">
         <button type="button" data-shape="round" aria-pressed="true">Круглые</button>
         <button type="button" data-shape="square" aria-pressed="false">Apple Watch</button>
