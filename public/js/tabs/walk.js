@@ -13,6 +13,7 @@ import { timeRing } from '../ui/ring.js';
 import { art, categoryArt, categoryName, hoursStatus, hoursChip, share, returnBy, backButton, listenButton } from '../ui/common.js';
 import { placeView } from '../ui/place.js';
 import { understand, canListen, startListening } from '../core/voice.js';
+import { speakText, stopSpeaking, unlockAudio } from '../core/media.js';
 import { mountLive, startWalk } from '../ui/live.js';
 
 const MINUTES = [30, 45, 60, 90, 120];
@@ -38,6 +39,8 @@ let lastRoute = null;
 let locating = false;
 let locationNote = null;
 let autoLocated = false;
+// A search started by voice is answered aloud: the Gemini tip, or a short line when there is none.
+let speakNext = false;
 const MANUAL_START_MS = 3 * 3600000;
 
 function presetStart(id) {
@@ -116,7 +119,7 @@ function renderPlan() {
     placeholder: t('plan.queryPlaceholder'), value: plan.query, 'aria-label': t('plan.queryLabel') });
   query.addEventListener('input', () => { plan.query = query.value; plan.mood = MOODS.find(([id]) => t(`moodQuery.${id}`) === query.value)?.[0] || null; savePlan(); syncMoods(); });
   query.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); query.blur(); submit(); } });
-  const mic = voiceButton(query, () => { query.blur(); submit(); });
+  const mic = voiceButton(query, () => { query.blur(); submit({ spoken: true }); });
 
   const moods = h('div', { class: 'chip-row no-drag', role: 'group', 'aria-label': t('plan.queryLabel') },
     MOODS.map(([id, file]) => h('button', { type: 'button', class: 'chip', dataset: { mood: id }, 'aria-pressed': String(plan.mood === id),
@@ -190,6 +193,8 @@ function voiceButton(input, onDone) {
   };
   button.addEventListener('click', async () => {
     if (session) { session.stop(); return; }
+    stopSpeaking();
+    unlockAudio();
     input.value = '';
     session = startListening({ onState: setState, onText: (text) => { input.value = text; } });
     try {
@@ -280,7 +285,8 @@ function buildRequest() {
   return body;
 }
 
-async function submit() {
+async function submit(options) {
+  speakNext = options?.spoken === true;
   const said = understand(plan.query);
   if (said.minutes) { plan.minutes = said.minutes; plan.query = said.query; plan.mood = null; savePlan(); }
   inflight?.abort();
@@ -340,6 +346,7 @@ function renderResults() {
   const generation = result.generation || {};
   const llm = generation.mode === 'llm' && generation.summary;
   const leave = leaveAt();
+  const tip = llm ? aiCard(generation) : h('div', { class: 'ai-card is-quiet' }, h('p', { class: 'fine', text: t('results.fallback') }));
 
   const rows = recs.map((place, index) => {
     const status = hoursStatus(place, place.walkMinutes, place.visitMinutes, place.hoursCheck);
@@ -358,11 +365,16 @@ function renderResults() {
     h('div', { class: 'view-bar' }, back, h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: 'Ulger', text: t('results.title', { min: request.minutes }), url: shareLink() }) }, icon('share'))),
     h('h2', { id: 'results-title', class: 'title-1', text: t('results.title', { min: request.minutes }) }),
     h('p', { class: 'meta' }, icon('pin', 'icon-xs'), t('results.start', { name: startName() }), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }), t('plan.returnBy', { time: time(leave + request.minutes * 60000) })),
-    llm ? aiCard(generation) : h('div', { class: 'ai-card is-quiet' }, h('p', { class: 'fine', text: t('results.fallback') })),
+    tip,
     h('div', { class: 'result-list' }, rows),
     understoodRow(result.understood),
     routeCard(result.route)));
   drawResultsMap(recs);
+  if (speakNext) {
+    speakNext = false;
+    if (llm) tip.querySelector('.listen-btn')?.click();
+    else speakText(t('voice.answer', { n: recs.length, name: recs[0].name, walk: recs[0].walkMinutes, time: time(leave + recs[0].totalMinutes * 60000) }));
+  }
 }
 
 // «Мы учли»: what the server understood from the request (time, categories, child, night, weather, hours).
@@ -449,9 +461,11 @@ function renderEmpty(back) {
       h('small', { text: t('results.nearestValue', { walk: nearest.walkMinutes, n: nearest.neededMinutes }) }))) : null,
     h('div', { class: 'stack' }, actions)));
   layers.hidePins(); layers.hideRoutes(); layers.showReach(start, reachMeters(plan.minutes, plan.maxWalk));
+  if (speakNext) { speakNext = false; speakText(`${t('results.empty.title')} ${nearest?.name ? t('voice.nearest', { name: nearest.name, n: nearest.neededMinutes }) : ''}`); }
 }
 
 function renderError(back) {
+  speakNext = false;
   const kind = error?.kind;
   const text = kind === 'offline' ? t('error.offline') : kind === 'timeout' ? t('error.timeout') : error?.message && kind !== 'server' ? error.message : (error?.message || t('error.server'));
   clear(root, h('section', { class: 'view state-view' }, h('div', { class: 'view-bar' }, back),

@@ -1,5 +1,6 @@
 // Pieces shared by the walk, nearby and saved screens: category art, opening-hours status, navigation links, sharing.
 import { h, icon } from '../core/dom.js';
+import { speakText, stopSpeaking, unlockAudio } from '../core/media.js';
 import { t, time, lang } from '../core/i18n.js';
 import { checkVisit } from '../lib/hours.mjs';
 import { toast } from './toast.js';
@@ -72,8 +73,8 @@ export function listenButton(getText) {
   const button = h('button', { class: 'btn btn-quiet btn-sm listen-btn', type: 'button', 'aria-pressed': 'false' }, icon('speaker'), h('span', { text: t('common.listen') }));
   const label = button.querySelector('span');
   button.addEventListener('click', async () => {
-    const { speakText, stopSpeaking } = await import('../core/media.js');
     if (button.getAttribute('aria-pressed') === 'true') { stopSpeaking(); return; }
+    unlockAudio();
     button.setAttribute('aria-pressed', 'true'); label.textContent = t('common.stop');
     try { await speakText(typeof getText === 'function' ? getText() : getText); }
     finally { button.setAttribute('aria-pressed', 'false'); label.textContent = t('common.listen'); }
