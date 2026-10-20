@@ -44,7 +44,7 @@ export function spokenPlan(plan, now = new Date()) {
   if (!first) return 'Рядом не нашлось мест, на которые хватит времени. Попробуйте дать прогулке больше времени.';
   const back = astanaTime(new Date(now.getTime() + first.totalMinutes * 60000));
   let text = `${first.name}, ${LABELS[first.category] || 'место'}. Идти примерно ${minutes(first.walkMinutes)}, `
-    + `с посещением и дорогой обратно около ${minutes(first.totalMinutes)}, вернётесь примерно к ${back}.`;
+    + `вся прогулка с дорогой обратно займёт примерно ${minutes(first.totalMinutes)}, вернётесь к ${back}.`;
   if (first.hours?.status === 'open' && first.hours.closesAt) text += ` По данным OpenStreetMap работает до ${first.hours.closesAt}.`;
   if (rest.length) text += ` Ещё: ${rest.map(place => `${place.name}, ${minutes(place.walkMinutes)} пешком`).join('; ')}.`;
   return text;

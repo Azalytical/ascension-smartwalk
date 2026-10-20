@@ -27,7 +27,7 @@ test('voice format answers in plain Russian and accepts comma decimals', async (
   assert.match(response.headers.get('Content-Type'), /text\/plain/);
   const text = await response.text();
   assert.match(text, /^Кофейня у Байтерека, кафе\. Идти примерно \d+ минут/);
-  assert.match(text, /вернётесь примерно к \d\d:\d\d/);
+  assert.match(text, /займёт примерно \d+ минут[уы]?, вернётесь к \d\d:\d\d\./);
 });
 
 test('outside Astana is explained, readable aloud in voice format', async () => {
