@@ -263,6 +263,24 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .notability { display: inline-flex; align-items: center; font-size: var(--fs-12); font-weight: 500; padding: 2px 8px; border-radius: var(--r-pill); border: 1px solid var(--line-strong); color: var(--ink-3); }
 .result-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .result-badges .confidence { font-size: var(--fs-12); padding: 2px 8px; }
+/* Aidem users' ratings: gold stars, kept apart from the outlined open-data notability chip, which is not a rating. */
+.user-rating-chip { display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-13); font-weight: 650; color: var(--ink-2); }
+.user-rating-chip .icon, .user-rating-avg .icon { color: var(--gold-strong); }
+.user-rating-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; color: var(--ink-2); }
+.user-rating-avg { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-17); font-weight: 700; color: var(--ink); }
+.user-rating-avg .icon { width: 18px; height: 18px; }
+.stars { display: flex; gap: 2px; margin-left: -6px; }
+.star-btn { width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--r-pill); color: var(--ink-3); transition: transform var(--t-press) var(--ease-out), color var(--t-fast) var(--ease-out); }
+.star-btn .icon { width: 30px; height: 30px; }
+.star-btn.is-on { color: var(--gold-strong); }
+.star-btn .star-on, .star-btn.is-on .star-off { display: none; }
+.star-btn.is-on .star-on { display: block; }
+.star-btn:active { transform: scale(.9); }
+.user-rating-remove { justify-self: start; text-decoration: underline; text-underline-offset: 3px; }
+.user-rating.is-prompt { justify-items: center; width: 100%; text-align: center; }
+.user-rating.is-prompt .block-title { margin: 4px 0 0; }
+.user-rating.is-prompt .stars { margin-left: 0; }
+.user-rating.is-prompt .user-rating-remove, .user-rating.is-prompt .user-rating-summary { justify-self: center; justify-content: center; }
 .place-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .place-actions:empty { display: none; }
 .plan-steps { display: grid; gap: 10px; counter-reset: step; padding: 14px 16px; border-radius: var(--r-lg); background: var(--surface); }

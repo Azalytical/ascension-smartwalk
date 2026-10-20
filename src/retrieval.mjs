@@ -1,11 +1,13 @@
 /**
  * Deterministic, source-grounded POI retrieval. No network or LLM here: when the dictionary finds no category in a request,
  * the categories Gemini embeddings found (src/semantic.mjs) may arrive in context.semantic and are used in their place.
+ * Aidem users' ratings may arrive in context.ratings (Map id → { count, sum }); from 5 ratings they nudge the order a little.
  */
 import { checkVisit } from './hours.mjs';
 import { queryIntents, nightReference, localClock } from './intent.mjs';
 import { microRoute } from './route.mjs';
 import { weatherCondition } from './weather.mjs';
+import { ratingBonus, ratingSummary, RATINGS } from './ratings.mjs';
 
 const BOUNDS = Object.freeze({ minLat: 51, maxLat: 51.35, minLon: 71.25, maxLon: 71.65 });
 const DETOUR = 1.35;
@@ -615,6 +617,7 @@ export function recommend(dataset, input, context = {}) {
   const named = lexical.length ? lexical : meant;
   // Live weather (server-side only, never from the request body) applies to walks that start now.
   const now = new Date(Math.floor(Date.now() / 60000) * 60000);
+  const ratings = context.ratings instanceof Map ? context.ratings : null;
   const nightShift = intents.night && !constraints.visitDate ? nightReference(now) : null;
   const weather = !constraints.visitDate && !nightShift ? weatherCondition(context.weather) : null;
   const weatherRoof = Boolean(weather?.bad && !named.length && !intents.night);
@@ -694,9 +697,10 @@ export function recommend(dataset, input, context = {}) {
       childCategory: child ? 5 : 0,
       hoursConfirmed: hours?.status === 'open' ? 5 : 0,
       intent: intentScore(poi, kind, hours, intents, wheelchair),
+      userRatings: ratings ? ratingBonus(ratings.get(String(poi.id))) : 0,
     };
     const score = scoreBreakdown.category + scoreBreakdown.keywords + scoreBreakdown.proximity + scoreBreakdown.timeFit
-      + scoreBreakdown.childCategory + scoreBreakdown.hoursConfirmed + scoreBreakdown.intent;
+      + scoreBreakdown.childCategory + scoreBreakdown.hoursConfirmed + scoreBreakdown.intent + scoreBreakdown.userRatings;
     candidates.push({ poi, kind, name, directDistance, walkMinutes, returnMinutes, visitMinutes, totalMinutes, hours,
       matchedTerms, categoryIntent, scoreBreakdown, score });
   }
@@ -785,6 +789,8 @@ export function recommend(dataset, input, context = {}) {
       why: whyFor({ ...pick, weather }, constraints, intents, reference), activities: activitiesFor(category), activitiesAreSuggestions: true,
       plan: planFor({ ...pick, poi }, constraints, reference, pairing), pairing,
       confidence: confidenceFor(poi, hours, constraints), notability: notabilityFor(poi), provenance: provenanceFor(poi), wheelchair: wheelchairOf(poi),
+      // People's stars, kept apart from notability (open data): shown as «Оценки пользователей Aidem».
+      ...(ratings ? { userRating: ratingSummary(ratings.get(String(pick.poi.id))?.count, ratings.get(String(pick.poi.id))?.sum) } : {}),
       warnings: warningsFor(poi, constraints, hours), evidence, score, scoreBreakdown, matchedTerms,
       hoursCheck: hours ?? { status: poi.openingHours ? 'not_checked' : 'no_data' } };
   });
@@ -850,7 +856,8 @@ export function recommend(dataset, input, context = {}) {
       inputRecords: pois.length, validUniqueRecords: prepared.unique.length, feasibleCandidates: candidates.length, returned: recommendations.length,
       requestedCategories: requested, requestedKinds: kinds, excludedCategories: excluded, queryTerms: terms, rejected: counters,
       scoring: { category: 35, keywordsPerMatch: 5, keywordsCap: 20, proximityMax: 25, timeFitMax: 15, childCategory: 5, hoursConfirmed: 5,
-        intentRange: [-32, 30], repeatCategoryPenalty: 8, repeatNamePenalty: 15 },
+        intentRange: [-32, 30], repeatCategoryPenalty: 8, repeatNamePenalty: 15,
+        userRatings: { from: RATINGS.rankedFrom, prior: RATINGS.prior, priorWeight: RATINGS.priorWeight, range: [-RATINGS.maxBonus, RATINGS.maxBonus], used: Boolean(ratings) } },
       hoursReferenceTime: reference ? reference.toISOString() : null, hoursTimezone: 'UTC+05:00',
       scoreIsConfidence: false } };
 }

@@ -350,10 +350,43 @@
       const go = element('button', 'action', 'Идём');
       go.type = 'button';
       go.addEventListener('click', () => startWalk(place));
+      card.dataset.place = place.id;
       card.append(top, element('p', 'card-name', place.name), walk, back, element('p', 'card-hours', facts.join(' · ')), trust(place), go);
+      const rated = ratingLine(place.userRating);
+      if (rated) go.before(rated);
       if (index === 0 && start.note) card.prepend(startNote(start));
       list.append(card);
     });
+    fillRatings(places.filter((place) => !place.userRating), list);
+  }
+
+  // Aidem users' ratings, read-only on the wrist: «★ 4,6 · 12 оценок» from three ratings, «мало оценок» below, nothing with none.
+  // They are people's stars, not open data; they are given on the phone.
+  function ratingLine(rating) {
+    if (!rating?.count) return null;
+    const many = rating.count % 10 === 1 && rating.count % 100 !== 11 ? 'оценка' : [2, 3, 4].includes(rating.count % 10) && ![12, 13, 14].includes(rating.count % 100) ? 'оценки' : 'оценок';
+    const enough = rating.state === 'enough' && Number.isFinite(rating.average);
+    const text = enough ? `${rating.average.toFixed(1).replace('.', ',')} · ${rating.count} ${many}` : `мало оценок (${rating.count})`;
+    const line = element('p', 'card-rating');
+    if (enough) line.append(element('span', 'card-star', '★'), ' ');
+    line.append(text);
+    line.setAttribute('aria-label', `Оценки пользователей Aidem: ${text}`);
+    return line;
+  }
+
+  // Places found by name or by the assistant come without ratings; one request fetches them for all cards.
+  async function fillRatings(places, list) {
+    const ids = places.map((place) => place.id).filter(Boolean);
+    if (!ids.length) return;
+    try {
+      const response = await fetch(`/api/ratings?ids=${ids.slice(0, 30).map(encodeURIComponent).join(',')}`);
+      if (!response.ok) return;
+      const { ratings = {} } = await response.json();
+      for (const card of list.querySelectorAll('.card[data-place]')) {
+        const line = !card.querySelector('.card-rating') && ratingLine(ratings[card.dataset.place]);
+        if (line) card.querySelector('.action')?.before(line);
+      }
+    } catch { /* ratings are optional on the watch */ }
   }
 
   // How complete the data is and where it came from, as on the place card in the main app.

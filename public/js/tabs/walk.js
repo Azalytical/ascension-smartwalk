@@ -12,6 +12,7 @@ import { toast, announce } from '../ui/toast.js';
 import { timeRing } from '../ui/ring.js';
 import { art, categoryArt, categoryName, hoursStatus, hoursChip, share, backTime, confidenceChip, backButton, listenButton } from '../ui/common.js';
 import { placeView } from '../ui/place.js';
+import { ratingChip } from '../ui/rating.js';
 import { understand, canListen, startListening } from '../core/voice.js';
 import { speakText, stopSpeaking, unlockAudio } from '../core/media.js';
 import { locateMe } from '../core/where.js';
@@ -487,7 +488,7 @@ function renderResults() {
     categoryArt(place.category, 44, 'art'),
     h('span', { class: 'result-text' }, h('strong', { class: 'result-name', text: place.name }),
       h('span', { class: 'meta' }, categoryName(place.category), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }), t('explore.walk', { n: place.walkMinutes })),
-      h('span', { class: 'result-badges' }, hoursChip(status), confidenceChip(place.confidence))),
+      h('span', { class: 'result-badges' }, hoursChip(status), confidenceChip(place.confidence), ratingChip(place))),
     h('span', { class: 'result-time' }, timeRing({ there: place.walkMinutes, visit: place.visitMinutes, back: place.returnMinutes, reserve: place.safetyReserveMinutes, size: 50, stroke: 6 }),
       h('span', { class: 'num result-total', text: t('plan.min', { n: place.totalMinutes }) })));
   });
