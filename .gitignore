@@ -10,8 +10,8 @@ tmp/
 src/assets.generated.mjs
 .openai/.local/
 docs/.build/
-video/build/
-video/tools/
+archive/first-submission/video/build/
+archive/first-submission/video/tools/
 deliverables/slide-previews/
 deliverables/*-r*.pptx
 deliverables/*-demo.mp4

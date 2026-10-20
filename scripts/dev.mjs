@@ -10,8 +10,11 @@ import { preparePublic } from './prepare-public.mjs';
 const root = resolve(import.meta.dirname, '..');
 // SMARTWALK_PRODUCTION=1 (set in the Dockerfile for Cloud Run) listens on all interfaces and enforces the request budget.
 const production = process.env.SMARTWALK_PRODUCTION === '1';
-const env = { GEMINI_API_KEY: process.env.GEMINI_API_KEY, GEMINI_MODEL: process.env.GEMINI_MODEL,
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY, OPENAI_MODEL: process.env.OPENAI_MODEL,
+// The same settings the Worker reads from wrangler.jsonc and its secrets (names in docs/deploy.md).
+const settings = ['GEMINI_API_KEY', 'GEMINI_MODEL', 'GEMINI_AGENT_MODEL', 'GEMINI_EMBEDDING_MODEL', 'GEMINI_TTS_MODEL', 'GEMINI_TTS_VOICE',
+  'GEMINI_VISION_MODEL', 'GEMINI_LISTEN_MODEL', 'OPENAI_API_KEY', 'OPENAI_MODEL', 'OPENAI_TRANSCRIBE_MODEL', 'WEATHER', 'AGENT_DAILY_LIMIT',
+  'SOCIAL_SALT', 'TELEGRAM_WEBHOOK_SECRET'];
+const env = { ...Object.fromEntries(settings.filter(name => process.env[name]).map(name => [name, process.env[name]])),
   ...(production ? { MEMORY_BUDGET: true } : { LOCAL_DEVELOPMENT: true }),
   // Friends and meetups: SQLite file in SOCIAL_DB (or in memory), the same store the Durable Object uses.
   SOCIAL_LOCAL: localSocialHub(process.env.SOCIAL_DB || ':memory:'),
@@ -43,4 +46,4 @@ createServer(async (req, res) => {
     const body = await readFile(target);
     res.writeHead(200, { 'Content-Type': types[extname(target)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' }); res.end(body);
   } catch { res.writeHead(404); res.end('Not found'); }
-}).listen(port, host, () => console.log(`SmartWalk ${production ? 'server' : 'local preview'}: http://${host}:${port}`));
+}).listen(port, host, () => console.log(`Aidem ${production ? 'server' : 'local preview'}: http://${host}:${port}`));
