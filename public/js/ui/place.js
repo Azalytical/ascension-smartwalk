@@ -11,7 +11,7 @@ import { toast } from './toast.js';
 
 const WHEELCHAIR = { yes: 'place.wheelchair.yes', limited: 'place.wheelchair.limited', no: 'place.wheelchair.no' };
 
-export function placeView({ place, timing, start, serverHours, why, activities = [], warnings = [], onBack, backLabel, onStart, routeInfo, shareUrl }) {
+export function placeView({ place, timing, start, serverHours, why, activities = [], warnings = [], onBack, backLabel, onStart, routeInfo, shareUrl, voice = null }) {
   const hours = hoursStatus(place, timing.walkMinutes, timing.visitMinutes, serverHours);
   const saved = store.isSaved(place.id);
   const saveButton = h('button', { class: `icon-btn${saved ? ' is-on' : ''}`, type: 'button', 'aria-pressed': String(saved), 'aria-label': t(saved ? 'place.saved' : 'place.save') }, icon(saved ? 'heart-fill' : 'heart'));
@@ -57,7 +57,7 @@ export function placeView({ place, timing, start, serverHours, why, activities =
   const pairing = place.pairing?.name ? place.pairing : null;
 
   return h('article', { class: 'view place-view', 'aria-labelledby': 'place-title' },
-    h('div', { class: 'view-bar' }, backButton(backLabel || t('common.back'), onBack), h('div', { class: 'view-bar-actions' }, saveButton, shareButton)),
+    h('div', { class: 'view-bar' }, backButton(backLabel || t('common.back'), onBack), h('div', { class: 'view-bar-actions' }, voice, saveButton, shareButton)),
     h('header', { class: 'place-head' }, categoryArt(place.category, 56, 'art art-lg'),
       h('div', {}, h('h2', { id: 'place-title', class: 'title-2', text: place.name }),
         h('p', { class: 'meta' }, categoryName(place.category), timing.distanceMeters ? h('span', { class: 'meta-sep', 'aria-hidden': 'true' }) : null,
