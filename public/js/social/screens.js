@@ -372,7 +372,7 @@ export function mountSocial(root, ctx = {}) {
   function inviteView() {
     const box = h('div', { class: 'sx-stack' }, h('h3', { class: 'sx-section-title' }, 'Пригласить друга'), h('p', { class: 'sx-hint' }, 'Создаём ссылку…'));
     social.act('createInvite').then(({ code, expiresAt }) => {
-      const link = `${location.origin}/?friend=${code}`;
+      const link = `${location.origin}${location.pathname}?friend=${code}`;
       const qr = h('div', { class: 'sx-qr', role: 'img', 'aria-label': 'QR-код приглашения' });
       loadQr().then(factory => {
         const code = factory(0, 'M');
@@ -657,7 +657,7 @@ export function mountSocial(root, ctx = {}) {
     if (view.justOpened) layer?.fit([item.place]);
     const signed = social.signedIn();
     const join = () => signed ? run(() => social.act('joinEvent', { id }), null).then(result => result && toast(result.event.myStatus === 'waitlist' ? 'Мест нет: вы в листе ожидания, сообщим, если освободится' : 'Вы идёте!', 'success')) : toast('Создайте профиль на вкладке «Друзья», чтобы записаться', 'info');
-    const link = `${location.origin}/?event=${item.id}`;
+    const link = `${location.origin}${location.pathname}?event=${item.id}`;
     const share = () => navigator.share ? navigator.share({ title: item.title, text: `${item.title} · ${when(item.startsAt)} · ${item.place.name}`, url: link }).catch(() => {})
       : navigator.clipboard.writeText(link).then(() => toast('Ссылка скопирована', 'success')).catch(() => prompt('Скопируйте ссылку', link));
     const full = item.capacity !== null && item.going >= item.capacity;
@@ -727,7 +727,10 @@ export function mountSocial(root, ctx = {}) {
       : ['event_invite', 'event_spot', 'event_cancelled', 'event_joined'].includes(item.type) ? { type: 'event', id: item.entityId }
         : ['friend_added', 'location_shared'].includes(item.type) ? { type: 'friend', id: item.entityId }
           : item.type === 'location_request' ? { type: 'share' } : null;
-    return h('div', { class: 'sx-stack' }, h('h3', { class: 'sx-section-title' }, 'Уведомления'),
+    const canAsk = 'Notification' in window && Notification.permission === 'default';
+    const ask = canAsk ? h('div', { class: 'sx-note' }, h('p', {}, 'Можно получать уведомления, пока вкладка Seruen открыта в фоне.'),
+      button('Включить уведомления', async () => { await Notification.requestPermission().catch(() => {}); render(true); }, 'ghost')) : null;
+    return h('div', { class: 'sx-stack' }, h('h3', { class: 'sx-section-title' }, 'Уведомления'), ask,
       list.length ? h('ul', { class: 'sx-list' }, list.map(item => h('li', {}, h('button', { type: 'button', class: `sx-row${item.read ? '' : ' is-unread'}`, onclick: () => { const next = target(item); if (next) open(next); } },
         item.actor ? avatar(item.actor, 'sm') : h('span', { class: 'sx-avatar sx-avatar-sm' }, '🔔'),
         h('span', { class: 'sx-row-text sx-wrap' }, h('strong', {}, item.text), h('span', {}, ago(item.createdAt)))))))

@@ -8,7 +8,7 @@ const publicRoot = resolve(root, 'public');
 const mediaTypes = { '.svg': 'image/svg+xml', '.webp': 'image/webp', '.png': 'image/png', '.ico': 'image/x-icon', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg' };
 for (const [name, type] of [['index.html', 'text/html; charset=utf-8'], ['app.js', 'text/javascript; charset=utf-8'], ['styles.css', 'text/css; charset=utf-8'],
   ['watch.html', 'text/html; charset=utf-8'], ['watch.js', 'text/javascript; charset=utf-8'], ['watch.css', 'text/css; charset=utf-8'],
-  ['watch-remind.js', 'text/javascript; charset=utf-8'], ['watch-sw.js', 'text/javascript; charset=utf-8']]) {
+  ['watch-remind.js', 'text/javascript; charset=utf-8'], ['watch-sw.js', 'text/javascript; charset=utf-8'], ['friends.html', 'text/html; charset=utf-8']]) {
   assets['/' + name] = { body: await readFile(resolve(root, 'public', name), 'utf8'), type };
 }
 async function collectMedia(directory) {
@@ -30,8 +30,24 @@ async function collectMedia(directory) {
   }
 }
 await collectMedia(resolve(publicRoot, 'assets'));
+// Friends page modules: public/js/**/*.js and public/css/**/*.css, served at the same paths.
+async function collectText(directory, extension, type) {
+  const entries = await readdir(directory, { withFileTypes: true }).catch((error) => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  });
+  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    const filename = resolve(directory, entry.name);
+    if (entry.isDirectory()) { await collectText(filename, extension, type); continue; }
+    if (!entry.isFile() || !entry.name.endsWith(extension)) continue;
+    assets['/' + relative(publicRoot, filename).split(sep).join('/')] = { body: await readFile(filename, 'utf8'), type };
+  }
+}
+await collectText(resolve(publicRoot, 'js'), '.js', 'text/javascript; charset=utf-8');
+await collectText(resolve(publicRoot, 'css'), '.css', 'text/css; charset=utf-8');
 assets['/'] = assets['/index.html'];
 assets['/watch'] = assets['/watch.html'];
+assets['/friends'] = assets['/friends.html'];
 const data = JSON.parse(await readFile(resolve(root, 'data/places.json'), 'utf8'));
 const code = `import {handleApi,prepareApi} from './src/api.mjs';
 import {prepareDataset} from './src/retrieval.mjs';

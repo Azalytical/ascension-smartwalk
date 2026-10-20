@@ -394,6 +394,12 @@
     mapButton.type = 'button';
     mapButton.addEventListener('click', () => selectPlace(index, place));
     const distance = numeric(place.distanceMeters);
+    const lat = numeric(place.lat), lon = numeric(place.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon) && lat && lon) {
+      const invite = element('a', 'show-on-map invite-friends', 'Позвать друзей');
+      invite.href = `/friends?${new URLSearchParams({ name: place.name || 'Место встречи', lat: String(lat), lon: String(lon), ...(place.id ? { place: String(place.id) } : {}) })}`;
+      actions.append(invite);
+    }
     actions.append(mapButton, element('span', 'distance-note', distance > 0 ? `~${distance >= 1000 ? `${(distance / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} км` : `${Math.round(distance)} м`} по прямой` : ''));
     card.append(actions);
     return card;
