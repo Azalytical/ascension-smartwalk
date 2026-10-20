@@ -36,13 +36,18 @@ shell.registerTab({
 social.start();
 
 // Links people send each other: /?friend=CODE (invite), /?event=ID, /?meetup=ID.
+// They are handled after main.js has booted the shell and opened its first tab, which happens right after this import.
 const params = new URLSearchParams(location.search);
 const invite = params.get('friend'), eventId = params.get('event'), meetupId = params.get('meetup');
 if (invite || eventId || meetupId) {
-  history.replaceState(null, '', location.pathname + location.hash);
-  if (invite) whenMounted(tab => tab.openInvite(invite));
-  if (eventId) whenMounted(tab => tab.openEvent(eventId));
-  if (meetupId) whenMounted(tab => tab.openMeetup(meetupId));
+  const url = new URL(location.href);
+  for (const key of ['friend', 'event', 'meetup']) url.searchParams.delete(key);
+  history.replaceState(null, '', url);
+  setTimeout(() => {
+    if (invite) whenMounted(tab => tab.openInvite(invite));
+    if (eventId) whenMounted(tab => tab.openEvent(eventId));
+    if (meetupId) whenMounted(tab => tab.openMeetup(meetupId));
+  });
 }
 
 // «Позвать друзей» on a place card: window.SeruenSocial.planMeetup({ id, name, lat, lon }).

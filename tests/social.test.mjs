@@ -181,6 +181,47 @@ test('meetups invite friends only and collect answers', async () => {
   assert.equal((await api('state', { token: stranger.token })).data.meetups.length, 0);
 });
 
+test('friends vote between up to three places and the meetup settles on the leader', async () => {
+  const { api, person, befriend, now } = setup();
+  const ana = await person('Ана'), bek = await person('Бек'), dana = await person('Дана');
+  await befriend(ana, bek); await befriend(ana, dana);
+  const options = dataset.slice(0, 3).map(({ id, name, lat, lon }) => ({ id, name, lat, lon }));
+  const created = await api('createMeetup', { token: ana.token, body: { title: 'Кофе', options, startsAt: now() + 3600_000, invitees: [bek.id, dana.id] } });
+  assert.equal(created.status, 200, JSON.stringify(created.data));
+  const id = created.data.meetup.id;
+  assert.equal(created.data.meetup.poll.open, true);
+  assert.equal(created.data.meetup.poll.options.length, 3);
+  assert.equal(created.data.meetup.place.name, 'Кофе у Аны');
+  assert.equal((await api('createMeetup', { token: ana.token, body: { title: 'x', options: options.slice(0, 1), startsAt: now() + 3600_000, invitees: [bek.id] } })).status, 400);
+
+  // Bek votes for the middle café: it leads, but the vote stays open until everyone has answered.
+  let vote = await api('voteMeetup', { token: bek.token, body: { id, option: 1 } });
+  assert.equal(vote.status, 200, JSON.stringify(vote.data));
+  assert.equal(vote.data.meetup.place.name, 'Кофе посередине');
+  assert.equal(vote.data.meetup.poll.myVote, 1);
+  assert.equal(vote.data.meetup.poll.open, true);
+  const host = await api('state', { token: ana.token });
+  assert.ok(host.data.notifications.some(item => item.type === 'meetup_vote' && item.text.includes('Кофе посередине')));
+  assert.equal((await api('voteMeetup', { token: bek.token, body: { id, option: 7 } })).status, 400);
+  assert.equal((await api('decideMeetup', { token: bek.token, body: { id, option: 2 } })).status, 403);
+
+  // Dana declines and the host votes: everyone left has voted, so the place is fixed and members are told.
+  await api('rsvpMeetup', { token: dana.token, body: { id, status: 'declined' } });
+  vote = await api('voteMeetup', { token: ana.token, body: { id, option: 1 } });
+  assert.equal(vote.data.meetup.poll.open, false);
+  assert.equal(vote.data.meetup.place.name, 'Кофе посередине');
+  const guest = await api('state', { token: bek.token });
+  assert.ok(guest.data.notifications.some(item => item.text.startsWith('Место выбрано: Кофе посередине')));
+  assert.equal(guest.data.meetups[0].changed, true);
+  assert.equal((await api('voteMeetup', { token: bek.token, body: { id, option: 0 } })).status, 409);
+
+  // The host can also settle a vote early.
+  const second = await api('createMeetup', { token: ana.token, body: { title: 'Обед', options, startsAt: now() + 7200_000, invitees: [bek.id] } });
+  const decided = await api('decideMeetup', { token: ana.token, body: { id: second.data.meetup.id, option: 2 } });
+  assert.equal(decided.data.meetup.poll.open, false);
+  assert.equal(decided.data.meetup.place.name, 'Кофе у Бека');
+});
+
 test('events respect capacity, promote the waitlist and hide after reports', async () => {
   const { api, person, befriend, now } = setup();
   const host = await person('Организатор'), a = await person('А'), b = await person('Б'), c = await person('В'), d = await person('Г');

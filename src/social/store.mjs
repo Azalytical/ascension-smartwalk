@@ -43,6 +43,10 @@ export const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS meetups_start ON meetups(starts_at)`,
   `CREATE TABLE IF NOT EXISTS meetup_members (meetup_id TEXT NOT NULL, user_id TEXT NOT NULL, status TEXT NOT NULL, seen_revision INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL, PRIMARY KEY (meetup_id, user_id))`,
   `CREATE INDEX IF NOT EXISTS meetup_members_user ON meetup_members(user_id)`,
+  // A meetup can start as a vote between up to three places; the poll closes when everyone voted or the host picks.
+  `CREATE TABLE IF NOT EXISTS meetup_polls (meetup_id TEXT PRIMARY KEY, closed_at INTEGER)`,
+  `CREATE TABLE IF NOT EXISTS meetup_options (meetup_id TEXT NOT NULL, idx INTEGER NOT NULL, place_name TEXT NOT NULL, place_id TEXT, lat REAL NOT NULL, lon REAL NOT NULL, PRIMARY KEY (meetup_id, idx))`,
+  `CREATE TABLE IF NOT EXISTS meetup_votes (meetup_id TEXT NOT NULL, user_id TEXT NOT NULL, idx INTEGER NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (meetup_id, user_id))`,
   `CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, meetup_id TEXT NOT NULL, user_id TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS messages_meetup ON messages(meetup_id, created_at)`,
   `CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, host_id TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL, category TEXT NOT NULL, place_name TEXT NOT NULL, place_id TEXT, lat REAL NOT NULL, lon REAL NOT NULL, starts_at INTEGER NOT NULL, ends_at INTEGER NOT NULL, capacity INTEGER, visibility TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
@@ -218,6 +222,7 @@ export class SocialStore {
     const oldMeetups = 'SELECT id FROM meetups WHERE starts_at <= ?';
     this.db.run(`DELETE FROM messages WHERE meetup_id IN (${oldMeetups})`, now - 2 * DAY);
     this.db.run(`DELETE FROM meetup_members WHERE meetup_id IN (${oldMeetups})`, now - 2 * DAY);
+    for (const table of ['meetup_polls', 'meetup_options', 'meetup_votes']) this.db.run(`DELETE FROM ${table} WHERE meetup_id IN (${oldMeetups})`, now - 2 * DAY);
     this.db.run('DELETE FROM meetups WHERE starts_at <= ?', now - 2 * DAY);
     const oldEvents = 'SELECT id FROM events WHERE ends_at <= ?';
     this.db.run(`DELETE FROM event_members WHERE event_id IN (${oldEvents})`, now - 7 * DAY);
@@ -276,8 +281,53 @@ export class SocialStore {
       myStatus: me?.status ?? null, changed: Boolean(me && meetup.host_id !== viewerId && me.seen_revision > 0 && me.seen_revision < meetup.revision),
       members: members.map(member => ({ ...publicUser(member), status: member.status, updatedAt: member.updated_at })),
       messages: messages.map(message => ({ id: message.id, body: message.body, createdAt: message.created_at, author: publicUser({ id: message.user_id, name: message.name, emoji: message.emoji, color: message.color }) })),
+      poll: this.pollView(meetup.id, viewerId, members),
       updatedAt: meetup.updated_at
     };
+  }
+
+  pollView(meetupId, viewerId, members) {
+    const poll = this.db.get('SELECT * FROM meetup_polls WHERE meetup_id = ?', meetupId);
+    if (!poll) return null;
+    const votes = this.db.all('SELECT user_id, idx FROM meetup_votes WHERE meetup_id = ?', meetupId);
+    const options = this.db.all('SELECT * FROM meetup_options WHERE meetup_id = ? ORDER BY idx', meetupId).map(option => ({
+      index: option.idx, place: { name: option.place_name, id: option.place_id, lat: option.lat, lon: option.lon },
+      voters: votes.filter(vote => vote.idx === option.idx).map(vote => vote.user_id)
+    }));
+    return {
+      open: poll.closed_at === null, options, myVote: votes.find(vote => vote.user_id === viewerId)?.idx ?? null,
+      voted: votes.length, eligible: members.filter(member => member.status !== 'declined').length
+    };
+  }
+
+  /** The option with the most votes; ties go to the earlier option, which the planner ranked fairer. */
+  pollLeader(meetupId) {
+    return this.db.get(`SELECT meetup_options.*, COUNT(meetup_votes.user_id) AS votes FROM meetup_options
+      LEFT JOIN meetup_votes ON meetup_votes.meetup_id = meetup_options.meetup_id AND meetup_votes.idx = meetup_options.idx
+      WHERE meetup_options.meetup_id = ? GROUP BY meetup_options.idx ORDER BY votes DESC, meetup_options.idx LIMIT 1`, meetupId);
+  }
+
+  /** While the vote is open the meetup shows the current leader; it is fixed once everyone who hasn't declined has voted. */
+  settlePoll(meetup, now) {
+    const poll = this.db.get('SELECT * FROM meetup_polls WHERE meetup_id = ?', meetup.id);
+    if (!poll || poll.closed_at !== null) return;
+    const leader = this.pollLeader(meetup.id);
+    const votes = this.db.get('SELECT COUNT(*) AS n FROM meetup_votes WHERE meetup_id = ?', meetup.id).n;
+    const waiting = this.db.get(`SELECT COUNT(*) AS n FROM meetup_members WHERE meetup_id = ? AND status != 'declined'
+      AND user_id NOT IN (SELECT user_id FROM meetup_votes WHERE meetup_id = ?)`, meetup.id, meetup.id).n;
+    if (votes > 0 && waiting === 0) this.closePoll(meetup, leader, null, now);
+    else this.db.run('UPDATE meetups SET place_name = ?, place_id = ?, lat = ?, lon = ?, updated_at = ? WHERE id = ?', leader.place_name, leader.place_id, leader.lat, leader.lon, now, meetup.id);
+  }
+
+  /** Fixes the place, bumps the revision so members see the change, and tells everyone but the actor. */
+  closePoll(meetup, option, actor, now) {
+    this.db.run('UPDATE meetup_polls SET closed_at = ? WHERE meetup_id = ?', now, meetup.id);
+    this.db.run('UPDATE meetups SET place_name = ?, place_id = ?, lat = ?, lon = ?, revision = revision + 1, updated_at = ? WHERE id = ?',
+      option.place_name, option.place_id, option.lat, option.lon, now, meetup.id);
+    for (const member of this.db.all('SELECT user_id FROM meetup_members WHERE meetup_id = ?', meetup.id)) {
+      if (member.user_id === actor?.id) this.db.run('UPDATE meetup_members SET seen_revision = seen_revision + 1 WHERE meetup_id = ? AND user_id = ?', meetup.id, member.user_id);
+      else this.notify(member.user_id, 'meetup_changed', actor?.id ?? null, meetup.id, `Место выбрано: ${option.place_name} · ${meetup.title}`, now);
+    }
   }
 
   meetupsView(user, now) {
@@ -343,6 +393,7 @@ export class SocialStore {
       for (const member of this.db.all('SELECT user_id FROM meetup_members WHERE meetup_id = ?', id)) this.notify(member.user_id, 'meetup_cancelled', null, id, 'Встреча отменена: организатор удалил профиль', now);
       this.db.run('DELETE FROM messages WHERE meetup_id = ?', id);
       this.db.run('DELETE FROM meetup_members WHERE meetup_id = ?', id);
+      for (const table of ['meetup_polls', 'meetup_options', 'meetup_votes']) this.db.run(`DELETE FROM ${table} WHERE meetup_id = ?`, id);
       this.db.run('DELETE FROM meetups WHERE id = ?', id);
     }
     for (const event of this.db.all('SELECT id FROM events WHERE host_id = ?', userId)) {
@@ -354,7 +405,7 @@ export class SocialStore {
       'DELETE FROM tokens WHERE user_id = ?', 'DELETE FROM invites WHERE user_id = ?', 'DELETE FROM link_codes WHERE user_id = ?',
       'DELETE FROM friendships WHERE low = ? OR high = ?', 'DELETE FROM blocks WHERE blocker = ? OR blocked = ?',
       'DELETE FROM shares WHERE user_id = ?', 'DELETE FROM share_recipients WHERE user_id = ? OR recipient_id = ?',
-      'DELETE FROM meetup_members WHERE user_id = ?', 'DELETE FROM messages WHERE user_id = ?', 'DELETE FROM event_members WHERE user_id = ?',
+      'DELETE FROM meetup_members WHERE user_id = ?', 'DELETE FROM meetup_votes WHERE user_id = ?', 'DELETE FROM messages WHERE user_id = ?', 'DELETE FROM event_members WHERE user_id = ?',
       'DELETE FROM event_reports WHERE user_id = ?', 'DELETE FROM notifications WHERE user_id = ? OR actor_id = ?', 'DELETE FROM users WHERE id = ?'
     ]) this.db.run(statement, ...Array(statement.split('?').length - 1).fill(userId));
   }
@@ -554,7 +605,9 @@ const USER_OPS = {
     this.limit(`meetup:${user.id}`, 40, DAY, now);
     const title = text(input.title, { field: 'Название', max: 60, fallback: '' }) || 'Встреча';
     const note = text(input.note, { field: 'Комментарий', max: 200 });
-    const where = place(input.place);
+    const choices = input.options === undefined ? null : Array.isArray(input.options) && input.options.length >= 2 && input.options.length <= 3
+      ? input.options.map(place) : fail(400, 'INVALID_INPUT', 'Для голосования нужно 2 или 3 места');
+    const where = choices ? choices[0] : place(input.place);
     const startsAt = timestamp(input.startsAt, 'время встречи');
     if (startsAt < now - 10 * MINUTE || startsAt > now + 30 * DAY) fail(400, 'INVALID_INPUT', 'Время встречи: от сейчас до 30 дней вперёд');
     const invitees = idList(input.invitees, 20).filter(id => id !== user.id);
@@ -566,9 +619,14 @@ const USER_OPS = {
     this.db.run(`INSERT INTO meetups (id, host_id, title, note, place_name, place_id, lat, lon, starts_at, status, revision, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 1, ?, ?)`, id, user.id, title, note, where.name, where.id, where.lat, where.lon, startsAt, now, now);
     this.db.run(`INSERT INTO meetup_members (meetup_id, user_id, status, seen_revision, updated_at) VALUES (?, ?, 'going', 1, ?)`, id, user.id, now);
+    if (choices) {
+      this.db.run('INSERT INTO meetup_polls (meetup_id, closed_at) VALUES (?, NULL)', id);
+      choices.forEach((choice, index) => this.db.run('INSERT INTO meetup_options (meetup_id, idx, place_name, place_id, lat, lon) VALUES (?, ?, ?, ?, ?, ?)',
+        id, index, choice.name, choice.id, choice.lat, choice.lon));
+    }
     for (const friendId of invitees) {
       this.db.run(`INSERT INTO meetup_members (meetup_id, user_id, status, seen_revision, updated_at) VALUES (?, ?, 'invited', 0, ?)`, id, friendId, now);
-      this.notify(friendId, 'meetup_invite', user.id, id, `${user.name} зовёт вас: ${title} · ${where.name}`, now);
+      this.notify(friendId, 'meetup_invite', user.id, id, choices ? `${user.name} зовёт вас: ${title}. Выберите место из ${choices.length}` : `${user.name} зовёт вас: ${title} · ${where.name}`, now);
     }
     return { meetup: this.meetupView(this.db.get('SELECT * FROM meetups WHERE id = ?', id), user.id) };
   },
@@ -581,7 +639,35 @@ const USER_OPS = {
     this.db.run('UPDATE meetup_members SET status = ?, seen_revision = ?, updated_at = ? WHERE meetup_id = ? AND user_id = ?', status, meetup.revision, now, meetup.id, user.id);
     const phrases = { going: 'придёт', declined: 'не сможет прийти', arrived: 'уже на месте', on_way: 'уже в пути' };
     if (before !== status && phrases[status]) this.notify(meetup.host_id, `meetup_${status}`, user.id, meetup.id, `${user.name} ${phrases[status]}: ${meetup.title}`, now);
-    return { meetup: this.meetupView(meetup, user.id) };
+    if (status === 'declined') this.settlePoll(meetup, now);
+    return { meetup: this.meetupView(this.db.get('SELECT * FROM meetups WHERE id = ?', meetup.id), user.id) };
+  },
+
+  voteMeetup({ user, input, now }) {
+    const meetup = this.memberMeetup(user, input.id);
+    if (meetup.status === 'cancelled') fail(409, 'CANCELLED', 'Встреча отменена');
+    const poll = this.db.get('SELECT * FROM meetup_polls WHERE meetup_id = ?', meetup.id);
+    if (!poll || poll.closed_at !== null) fail(409, 'POLL_CLOSED', 'Место уже выбрано');
+    this.limit(`vote:${user.id}`, 30, MINUTE, now);
+    const option = this.db.get('SELECT * FROM meetup_options WHERE meetup_id = ? AND idx = ?', meetup.id, Number(input.option));
+    if (!option) fail(400, 'INVALID_INPUT', 'Такого варианта нет');
+    const before = this.db.get('SELECT idx FROM meetup_votes WHERE meetup_id = ? AND user_id = ?', meetup.id, user.id);
+    this.db.run('INSERT OR REPLACE INTO meetup_votes (meetup_id, user_id, idx, created_at) VALUES (?, ?, ?, ?)', meetup.id, user.id, option.idx, now);
+    this.db.run(`UPDATE meetup_members SET status = CASE WHEN status = 'invited' THEN 'maybe' ELSE status END, seen_revision = ?, updated_at = ? WHERE meetup_id = ? AND user_id = ?`,
+      meetup.revision, now, meetup.id, user.id);
+    if (meetup.host_id !== user.id && before?.idx !== option.idx) this.notify(meetup.host_id, 'meetup_vote', user.id, meetup.id, `${user.name} голосует за ${option.place_name}: ${meetup.title}`, now);
+    this.settlePoll(meetup, now);
+    return { meetup: this.meetupView(this.db.get('SELECT * FROM meetups WHERE id = ?', meetup.id), user.id) };
+  },
+
+  decideMeetup({ user, input, now }) {
+    const meetup = this.hostMeetup(user, input.id);
+    const poll = this.db.get('SELECT * FROM meetup_polls WHERE meetup_id = ?', meetup.id);
+    if (!poll || poll.closed_at !== null) fail(409, 'POLL_CLOSED', 'Место уже выбрано');
+    const option = input.option === undefined || input.option === null ? this.pollLeader(meetup.id)
+      : this.db.get('SELECT * FROM meetup_options WHERE meetup_id = ? AND idx = ?', meetup.id, Number(input.option)) ?? fail(400, 'INVALID_INPUT', 'Такого варианта нет');
+    this.closePoll(meetup, option, user, now);
+    return { meetup: this.meetupView(this.db.get('SELECT * FROM meetups WHERE id = ?', meetup.id), user.id) };
   },
 
   updateMeetup({ user, input, now }) {
@@ -592,6 +678,7 @@ const USER_OPS = {
     const startsAt = input.startsAt === undefined ? meetup.starts_at : timestamp(input.startsAt, 'время встречи');
     if (startsAt !== meetup.starts_at && (startsAt < now - 10 * MINUTE || startsAt > now + 30 * DAY)) fail(400, 'INVALID_INPUT', 'Время встречи: от сейчас до 30 дней вперёд');
     const moved = startsAt !== meetup.starts_at || where.lat !== meetup.lat || where.lon !== meetup.lon;
+    if (input.place !== undefined) this.db.run('UPDATE meetup_polls SET closed_at = ? WHERE meetup_id = ? AND closed_at IS NULL', now, meetup.id);
     this.db.run(`UPDATE meetups SET title = ?, note = ?, place_name = ?, place_id = ?, lat = ?, lon = ?, starts_at = ?, revision = revision + ?, updated_at = ? WHERE id = ?`,
       title, note, where.name, where.id, where.lat, where.lon, startsAt, moved ? 1 : 0, now, meetup.id);
     this.db.run('UPDATE meetup_members SET seen_revision = seen_revision + ? WHERE meetup_id = ? AND user_id = ?', moved ? 1 : 0, meetup.id, user.id);
