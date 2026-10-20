@@ -1,6 +1,6 @@
-# Seruen · Прогулка по Астане, ровно на ваше время
+# Ulger · Прогулка по Астане, ровно на ваше время
 
-Seruen (по-казахски «прогулка»). SmartWalk — рабочее имя до 20 октября, оно осталось в адресе сайта, в репозитории и в первом ролике.
+Ulger (по-русски «Улгер», от казахского «үлгеру», «успеть»). SmartWalk — рабочее имя до 20 октября, оно осталось в адресе сайта, в репозитории и в первом ролике.
 
 Команда **Ascension**, Build with AI Hackathon 2026, секция AI for Smart City.
 
@@ -98,7 +98,7 @@ API: `GET /api/social/state|events|event|invite`, `POST /api/social/<дейст�
 
 - **ИИ-агент на Gemini** (`/agent`): Gemini сам вызывает инструменты (погода, подбор мест, поиск, карточка места, мини-маршрут из 3 мест) и показывает каждый шаг. Координаты человека в модель не уходят.
 - **«Что это за здание?»** по фото и **ответ голосом** через Gemini (русский, казахский, английский).
-- **MCP-сервер** `/mcp` с теми же инструментами: `gemini extensions install https://github.com/Azalytical/ascension-smartwalk` подключает Seruen к Gemini CLI; пример агента на Google ADK — `integrations/adk/`.
+- **MCP-сервер** `/mcp` с теми же инструментами: `gemini extensions install https://github.com/Azalytical/ascension-smartwalk` подключает Ulger к Gemini CLI; пример агента на Google ADK — `integrations/adk/`.
 - У каждого места ссылки **Google Maps** (пешком, без точки старта в ссылке), **2ГИС** и **Google Календарь** на время прогулки; погода и закат из Open-Meteo.
 
 ## Как работает RAG
