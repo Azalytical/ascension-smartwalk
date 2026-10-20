@@ -1,4 +1,4 @@
-// Seruen service worker. Build __BUILD_ID__.
+// Ulger service worker. Build __BUILD_ID__.
 // The app shell is network-first (a fresh deploy always wins) with the cache as the offline fallback;
 // vendored libraries and fonts are cache-first, icons and map tiles stale-while-revalidate; the API is never cached.
 const VERSION = '__BUILD_ID__';

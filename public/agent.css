@@ -1,4 +1,4 @@
-/* Seruen agent page. Tokens follow the Seruen design system (v2/design/README.md). */
+/* Ulger agent page. Tokens follow the Ulger design system (v2/design/README.md). */
 :root{--ink:#0E1621;--muted:#5B6675;--gold:#F5B700;--sky:#1A8CFF;--bg:#F4F3EF;--surface:#FFFFFF;--surface-2:#ECEAE4;--line:#DEDBD3;--green:#0F9F4F;--amber:#B86E00;--red:#D93036;
   --ease-out:cubic-bezier(.2,.8,.3,1);--radius:18px;--font:Onest,-apple-system,"SF Pro Text",system-ui,"Google Sans",Roboto,"Segoe UI",Arial,sans-serif}
 @media (prefers-color-scheme:dark){:root{--ink:#F2F4F7;--muted:#97A3B3;--gold:#FFC21A;--sky:#4AA8FF;--bg:#0A0F15;--surface:#121922;--surface-2:#1B2531;--line:#263241;--green:#3CCB7F;--amber:#FFB020;--red:#FF5A5F}}
