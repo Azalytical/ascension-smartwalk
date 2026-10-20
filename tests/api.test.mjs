@@ -157,3 +157,27 @@ test('the model is told which language to answer in', async () => {
     assert.equal(JSON.parse(body.contents[0].parts[0].text).answerLanguage, 'en');
   } finally { globalThis.fetch = original; }
 });
+
+test('Gemini writes «почему» and «что делать» per place; a text with an invented number or claim is dropped', async () => {
+  const original = globalThis.fetch;
+  const second = { ...poi, id: 'node/2', name: 'Сквер', lat: 51.1290, sourceUrl: 'https://www.openstreetmap.org/node/2' };
+  let sent;
+  try {
+    globalThis.fetch = async (_url, options) => {
+      sent = JSON.parse(JSON.parse(options.body).contents[0].parts[0].text);
+      const [first, other] = sent.alternatives;
+      return geminiReply({ summary: 'Можно выбрать Парк или Сквер: оба рядом и помещаются в ваше время.', references: [first.id, other.id],
+        places: [{ id: first.id, why: `Ближе всего к вам: ${first.walkMinutes} мин пешком, вернётесь к ${first.backAt}.`, todo: `${first.visitMinutes} мин прогулки по парку, затем обратно.` },
+          { id: other.id, why: 'Всего 3 минуты, а вход бесплатный.', todo: 'Пройтись 99 минут.' }] });
+    };
+    const data = await (await handleApi(request(valid), { GEMINI_API_KEY: 'g', LOCAL_DEVELOPMENT: true }, [poi, second])).json();
+    assert.equal(data.generation.mode, 'llm');
+    const [first, other] = data.recommendations;
+    assert.ok(first.aiWhy.includes(`${first.walkMinutes} мин`));
+    assert.equal(first.provenance.aiWhy.origin, 'generated');
+    assert.equal(other.aiWhy, undefined, 'invented number and «вход бесплатный» are rejected');
+    assert.ok(first.why && other.why, 'computed «почему» stays on every card');
+    assert.ok(sent.alternatives.every(place => place.lat === undefined && place.lon === undefined));
+    assert.ok(Array.isArray(sent.understood));
+  } finally { globalThis.fetch = original; }
+});

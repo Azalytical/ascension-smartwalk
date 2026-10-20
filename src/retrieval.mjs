@@ -613,7 +613,7 @@ export function recommend(dataset, input, context = {}) {
       evidence.push({ field: 'address', label: 'Адрес из источника', value: poi.address, sourceUrl: addressUrl, retrievedAt: poi.retrievedAt ?? null });
     }
     const pairing = pairingFor(pick, prepared, constraints, reference, pickedIds);
-    return { ...poi, distanceMeters: Math.ceil(directDistance), estimatedWalkDistanceMeters: Math.ceil(directDistance * DETOUR),
+    return { ...poi, kind: pick.kind, distanceMeters: Math.ceil(directDistance), estimatedWalkDistanceMeters: Math.ceil(directDistance * DETOUR),
       walkMinutes, visitMinutes, returnMinutes, safetyReserveMinutes: RESERVE, totalMinutes,
       why: whyFor({ ...pick, weather }, constraints, intents, reference), activities: activitiesFor(category), activitiesAreSuggestions: true,
       plan: planFor(pick, constraints, reference, pairing), pairing,
