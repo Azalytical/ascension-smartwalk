@@ -2,7 +2,7 @@
   "source": "Overture Maps Foundation",
   "release": "2026-09-23.1",
   "bucket": "s3://overturemaps-us-west-2/release/2026-09-23.1/",
-  "retrievedAt": "2026-10-20T09:34:42Z",
+  "retrievedAt": "2026-10-20T09:54:39Z",
   "bbox": {
     "south": 50.95,
     "west": 71.1,
@@ -15,8 +15,8 @@
     {
       "file": "places.json",
       "theme": "theme=places/type=place",
-      "rows": 1544,
-      "sha256": "43906f5a949639636648a636a831cfd4b2687b0cbf146c0cc74b44005e9f8c2b",
+      "rows": 1771,
+      "sha256": "6adb411809b99edd7fb122090827024e2442e7025a474b29ca4d1c00a4deff12",
       "filter": "named rows whose basic_category matches PLACE_CATEGORIES",
       "license": "Per source: Meta, Microsoft, PinMeTo CDLA-Permissive-2.0; Foursquare Apache-2.0; AllThePlaces CC0-1.0"
     },
