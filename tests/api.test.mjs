@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleApi } from '../src/api.mjs';
+import { handleApi, resetGenerationState } from '../src/api.mjs';
 
 const poi = { id: 'node/1', name: 'Парк', lat: 51.1283, lon: 71.4304, category: 'park', description: 'Парк', tags: { leisure: 'park' }, sourceUrl: 'https://www.openstreetmap.org/node/1', retrievedAt: '2026-10-19T10:00:00Z', openingHours: null };
 const request = (body, extra = {}) => new Request('https://demo.example/api/recommend', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://demo.example', ...extra }, body: JSON.stringify(body) });
@@ -143,6 +143,7 @@ test('in-memory budget: Gemini for 8 requests a minute per address, then places 
 });
 
 test('a busy Gemini is retried, and client errors are not', async () => {
+  resetGenerationState();
   const original = globalThis.fetch;
   const ok = { summary: 'Можно выбрать Парк: примерно 20 минут вместе с возвращением и запасом.', references: [poi.id] };
   const env = { GEMINI_API_KEY: 'g', LOCAL_DEVELOPMENT: true, RETRY_DELAY_MS: 1 };
@@ -157,8 +158,8 @@ test('a busy Gemini is retried, and client errors are not', async () => {
     globalThis.fetch = async () => { calls++; throw new TypeError('network'); };
     data = await (await handleApi(request(valid), env, [poi])).json();
     assert.equal(data.generation.mode, 'fallback');
-    assert.equal(calls, 2);
-    assert.deepEqual(data.generation.diagnostics.attempts.map(item => item.error), ['network', 'network']);
+    assert.equal(calls, 3);
+    assert.deepEqual(data.generation.diagnostics.attempts.map(item => item.error), ['network', 'network', 'network']);
 
     calls = 0;
     globalThis.fetch = async () => { calls++; return new Response('{}', { status: 400 }); };
@@ -226,6 +227,7 @@ test('Gemini writes «почему» and «что делать» per place; a te
 });
 
 test('a failing Gemini hands over to OpenAI once when its key is set', async () => {
+  resetGenerationState();
   const original = globalThis.fetch;
   const ok = { summary: 'Можно выбрать Парк: примерно 20 минут вместе с возвращением и запасом.', references: [poi.id], places: [] };
   const env = { GEMINI_API_KEY: 'g', OPENAI_API_KEY: 'o', LOCAL_DEVELOPMENT: true, RETRY_DELAY_MS: 1 };
@@ -238,6 +240,6 @@ test('a failing Gemini hands over to OpenAI once when its key is set', async () 
     };
     const data = await (await handleApi(request(valid), env, [poi])).json();
     assert.equal(data.generation.mode, 'llm'); assert.equal(data.generation.provider, 'openai');
-    assert.deepEqual(hosts, ['generativelanguage.googleapis.com', 'generativelanguage.googleapis.com', 'api.openai.com']);
+    assert.deepEqual(hosts, ['generativelanguage.googleapis.com', 'generativelanguage.googleapis.com', 'generativelanguage.googleapis.com', 'api.openai.com']);
   } finally { globalThis.fetch = original; }
 });

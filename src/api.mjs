@@ -80,20 +80,21 @@ export function activeProvider(env = {}) {
 }
 
 // Gemini 3 models think before answering unless told otherwise, and with default thinking the walk text took longer than
-// the whole time budget on the live site: two 8-second attempts, then the answer without the AI text. The least thinking
-// is enough here. A model that refuses a level (HTTP 400 naming thinking) is asked again at once with the next one, remembered
-// for this isolate; any other 400 is returned as it is, so a bad request never switches thinking back to the slow default.
-const THINKING_LEVELS = ['minimal', 'low', null];
-let thinkingIndex = 0;
-/** Forgets which thinking level the model accepted; for tests. */
-export function resetGenerationState() { thinkingIndex = 0; }
+// the whole time budget on the live site: two 8-second attempts, then the answer without the AI text. Low thinking is what
+// the /agent calls use on the same model and answers in seconds («minimal» got 503 on the live site). A model that refuses
+// a level (HTTP 400 naming thinking) is asked again at once without it, remembered per model for this isolate; any other
+// 400 is returned as it is, so a bad request never switches thinking back to the slow default.
+const THINKING_LEVELS = ['low', null];
+const thinkingIndex = new Map();
+/** Forgets which thinking level each model accepted; for tests. */
+export function resetGenerationState() { thinkingIndex.clear(); busyAt.clear(); }
 
 async function callGemini(input, provider, env, signal) {
   for (;;) {
-    const thinking = THINKING_LEVELS[thinkingIndex];
-    const reply = await postGemini(input, provider, env, signal, thinking);
-    if (!reply.thinkingRefused || thinkingIndex >= THINKING_LEVELS.length - 1) return reply;
-    thinkingIndex++;
+    const index = thinkingIndex.get(provider.model) ?? 0;
+    const reply = await postGemini(input, provider, env, signal, THINKING_LEVELS[index]);
+    if (!reply.thinkingRefused || index >= THINKING_LEVELS.length - 1) return reply;
+    thinkingIndex.set(provider.model, index + 1);
   }
 }
 
@@ -155,6 +156,9 @@ async function callOpenAI(input, provider, env, signal) {
 
 // The walk text has one time budget: an answer with the AI text within it, or the answer from the place data at once.
 const GENERATION_MS = 9500, ATTEMPT_MS = 7000;
+// After a 503 or 429 a model is skipped for this long in this isolate.
+const BUSY_MS = 3 * 60000;
+const busyAt = new Map();
 // A rewrite, the spare model and the OpenAI hand-over are asked only while this much of the budget is left.
 const SECOND_CALL_MS = 3500;
 
@@ -210,14 +214,24 @@ async function generate(result, query, env, preferred) {
   const parse = text => { try { return JSON.parse(text); } catch { return null; } };
   try {
     let used = provider;
-    let reply = await callWithRetry(provider, input, env, { deadline, log: attempts });
-    // Free-tier quotas are per model: out of quota, the spare model answers.
-    if (reply.error === 'provider_429' && provider.name === 'gemini' && left() >= SECOND_CALL_MS) {
-      const spare = { name: 'gemini', model: env.GEMINI_SPARE_MODEL || SPARE_AGENT_MODEL };
-      if (spare.model !== provider.model) {
-        const second = await callWithRetry(spare, input, env, { deadline, log: attempts, maxAttempts: 1 });
-        if (!second.error) { reply = second; used = spare; }
+    const spare = provider.name === 'gemini' ? { name: 'gemini', model: env.GEMINI_SPARE_MODEL || SPARE_AGENT_MODEL } : null;
+    // A model that answered 503 or 429 lately is skipped for a few minutes: the spare one starts, as on /agent.
+    const first = spare && spare.model !== provider.model && Date.now() - (busyAt.get(provider.model) || 0) < BUSY_MS ? spare : provider;
+    let reply = await callWithRetry(first, input, env, { deadline, log: attempts, maxAttempts: 1 });
+    used = first;
+    // Busy, out of quota or unreachable: the other Gemini model answers within the same budget (quotas and load are per model).
+    if (reply.error && RETRYABLE.test(reply.error) && spare && left() >= SECOND_CALL_MS) {
+      if (/^provider_(429|5\d\d)$/.test(reply.error)) busyAt.set(first.model, Date.now());
+      const other = first === spare ? provider : spare;
+      if (other.model !== first.model) {
+        const second = await callWithRetry(other, input, env, { deadline, log: attempts, maxAttempts: 1 });
+        if (!second.error) { reply = second; used = other; } else if (/^provider_(429|5\d\d)$/.test(second.error)) busyAt.set(other.model, Date.now());
       }
+    }
+    // Both busy with an error that may pass: one more try on the primary while time is left.
+    if (reply.error && RETRYABLE.test(reply.error) && left() >= SECOND_CALL_MS + 1000) {
+      const third = await callWithRetry(provider, input, env, { deadline, log: attempts, maxAttempts: 1 });
+      if (!third.error) { reply = third; used = provider; }
     }
     // A busy or failing Gemini hands over to OpenAI once when that key is set and time is left, so the answer still has a text.
     if (reply.error && used.name === 'gemini' && env.OPENAI_API_KEY && left() >= SECOND_CALL_MS) {

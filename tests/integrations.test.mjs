@@ -346,7 +346,7 @@ test('listen: the spoken language comes back, and a model out of quota hands ove
     body: JSON.stringify({ audio: 'UklGR'.padEnd(400, 'A'), mimeType: 'audio/wav', lang: 'kk' }) }), { ...env, GEMINI_API_KEY: 'test' }, pois);
   const data = await response.json();
   assert.equal(response.status, 200);
-  assert.deepEqual(globalThis.__listenModels, ['gemini-3.5-flash-lite', 'gemini-3.8-flash']);
+  assert.deepEqual(globalThis.__listenModels, ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite']);
   assert.equal(data.lang, 'kk');
   assert.equal(data.text, 'Бір сағат, кофе және саябақ');
 }));
