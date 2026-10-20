@@ -45,7 +45,7 @@ export function understand(text) {
     }
     break;
   }
-  query = query.replace(/^(?:у меня|i have|менде)\s+/i, '').replace(/\s+([,.!?])/g, '$1').replace(/^[\s,.;:—-]+|[\s,.;:—-]+$/g, '').replace(/\s+/g, ' ').trim();
+  query = query.trim().replace(/^(?:(?:у меня|i have|менде|а|ну|тогда|давай(?:те)?|and|so|well|ал|енді)(?:\s+|$))+/i, '').replace(/\s+([,.!?])/g, '$1').replace(/^[\s,.;:—-]+|[\s,.;:—-]+$/g, '').replace(/\s+/g, ' ').trim();
   return { minutes, query };
 }
 
