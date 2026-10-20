@@ -5,7 +5,7 @@ import { handleTelegram } from './telegram.mjs';
 import { handleSocial } from './social/routes.mjs';
 import { handleWatch, spokenAnswer, spokenLanguage, say } from './watch.mjs';
 import { handleMcp } from './mcp.mjs';
-import { runAgent } from './agent.mjs';
+import { farNote, runAgent } from './agent.mjs';
 import { identifyPlace, speak, listen, MediaError } from './media.mjs';
 import { placeLinks } from './links.mjs';
 import { astanaWeather } from './weather.mjs';
@@ -399,8 +399,10 @@ async function watchAsk(request, url, env, dataset) {
   const response = await gemini(new Request(agentUrl, { method: 'POST', headers, body: JSON.stringify(body) }), agentUrl, env, dataset);
   const answer = await response.json();
   if (!text) return json(answer, response.status, { 'Access-Control-Allow-Origin': '*' });
-  // Siri reads the body aloud, so an error is said as text with status 200.
-  return new Response(spokenAnswer(answer, new Date(), lang), { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' } });
+  // Siri reads the body aloud, so an error is said as text with status 200. Gemini's own answer already carries the transport hint.
+  let spoken = spokenAnswer(answer, new Date(), lang);
+  if (answer.mode !== 'agent' && answer.beyondWalk) spoken += ` ${farNote(answer.beyondWalk, lang)}`;
+  return new Response(spoken, { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' } });
 }
 
 export async function handleApi(request, env = {}, dataset = []) {

@@ -308,3 +308,32 @@ test('jury v5: the airport transport hint reaches Gemini as beyondWalk, and the 
     { env: {}, dataset: places, limitedJson, answerLanguage, unsupported: UNSUPPORTED });
   assert.match(kk.summary, /^Төменде бөлек нұсқалар/);
 });
+
+test('jury compliance: Gemini answering an English question in Russian is sent back, and the transport hint is kept', async () => {
+  at.airport = [51.0269, 71.4614];
+  const query = 'I am a tourist with 2 hours before my flight, what can I see nearby?';
+  const plan = await runTool('plan_walk', { minutes: 120, query, lat: at.airport[0], lon: at.airport[1] }, { dataset: places });
+  const [first] = plan.places;
+  const call = (name, args) => ({ candidates: [{ content: { role: 'model', parts: [{ functionCall: { name, args } }] } }] });
+  const turns = [call('plan_walk', { query }),
+    call('give_answer', { summary: `«${first.name}» рядом: дорога туда и обратно с запасом займёт около ${first.totalMinutes} минут, успеете до вылета.`, place_ids: [first.id] }),
+    call('give_answer', { summary: `${first.name} is close: the way there and back with a reserve takes about ${first.totalMinutes} minutes.`, place_ids: [first.id] })];
+  const sent = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = async (_url, init) => { sent.push(JSON.parse(init.body)); return new Response(JSON.stringify(turns[sent.length - 1]), { headers: { 'Content-Type': 'application/json' } }); };
+  try {
+    const answer = await runAgent({ query, lat: at.airport[0], lon: at.airport[1], minutes: 120, lang: 'en' },
+      { env: { GEMINI_API_KEY: 'test' }, dataset: places, limitedJson, answerLanguage, unsupported: UNSUPPORTED, fetchImpl: async () => new Response('{}', { status: 503 }) });
+    assert.equal(answer.mode, 'agent');
+    assert.equal(sent.length, 3);
+    assert.match(JSON.stringify(sent[2].contents.at(-1)), /answerLanguage = en/);
+    assert.ok(answer.steps.some(step => step.tool === 'check' && step.summary === 'Ответ не на языке вопроса'));
+    assert.match(answer.summary, new RegExp(`^${first.name} is close`));
+    assert.ok(answer.summary.endsWith(`the nearest beyond it is «${plan.beyondWalk.name}», about ${plan.beyondWalk.distanceKm} km away, so you would need transport.`));
+    assert.equal(answer.beyondWalk.name, plan.beyondWalk.name);
+  } finally { globalThis.fetch = original; }
+
+  const spoken = await (await handleApi(new Request(`https://demo.example/api/watch/ask?format=text&lat=${at.airport[0]}&lon=${at.airport[1]}&minutes=120&q=${encodeURIComponent(query)}`), {}, places)).text();
+  assert.match(spoken, /About \d+ minutes? on foot/);
+  assert.match(spoken, /so you would need transport\.$/, 'Siri keeps the hint without Gemini too');
+});
