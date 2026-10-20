@@ -17,6 +17,9 @@ const PLACE_BATCH = 15;
 const RUN_TIMEOUT_MS = 20 * 60000;
 const STALE_MS = 26 * 3600000;
 const RETRY_AFTER_MS = 3600000;
+// Raised with every change to the parser or the venue placement: a listing read by an older version is collected again
+// on the next visit after the deploy, instead of waiting for the morning run.
+export const PARSER_VERSION = 2;
 const MIN_DATED = 8;
 const MIN_LOCATED = 5;
 const MAX_EVENTS = 200;
@@ -86,7 +89,7 @@ export async function collectStep(storage, { fetcher = fetch, now = Date.now(), 
   const failed = run.pages.filter(item => item.error).length;
   const stats = { pages: run.pages.length, failedPages: failed, cards: run.rows.length, dated: events.length, located: located.length };
   const ok = events.length >= MIN_DATED && located.length >= MIN_LOCATED;
-  if (ok) await storage.put('live', { collectedAt, fetchedAt, stats, events: located });
+  if (ok) await storage.put('live', { collectedAt, fetchedAt, parser: PARSER_VERSION, stats, events: located });
   await storage.put('status', { at: fetchedAt, startedAt: new Date(run.startedAt).toISOString(), reason: run.reason, ok,
     ...(ok ? {} : { problem: failed === run.pages.length ? run.pages[0]?.error || 'fetch_failed' : 'too_few_events' }), stats, pages: run.pages });
   await storage.delete('run');
@@ -109,8 +112,11 @@ export class CityEventsStore {
     if (pathname !== '/current') return new Response('Not found', { status: 404 });
     const [live, status] = await Promise.all([storage.get('live'), storage.get('status')]);
     // A missed or failed daily run is made up on the next visit, at most once an hour.
-    const stale = !live || now - Date.parse(live.fetchedAt) > STALE_MS;
-    if (stale && !(status && now - Date.parse(status.at) < RETRY_AFTER_MS)) await startRun(storage, now, live ? 'stale' : 'first');
+    const outdated = Boolean(live) && live.parser !== PARSER_VERSION;
+    const stale = !live || outdated || now - Date.parse(live.fetchedAt) > STALE_MS;
+    // After a failed attempt the next one waits an hour; a listing read by an older parser is collected again at once.
+    const waiting = status && !status.ok && now - Date.parse(status.at) < RETRY_AFTER_MS;
+    if (stale && !waiting) await startRun(storage, now, !live ? 'first' : outdated ? 'parser' : 'stale');
     return Response.json({ live: live ?? null,
       lastAttempt: status ? { at: status.at, ok: status.ok, reason: status.reason, problem: status.problem ?? null, stats: status.stats } : null });
   }
