@@ -317,3 +317,9 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .ai-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .listen-btn[aria-pressed="true"] { background: var(--gold); color: #0E1621; }
 .watch-card-icon .icon { color: inherit; }
+
+.event-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.event-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
+.event-row .row-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.event-row small { color: var(--ink-2); }
+.event-pin { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--surface); color: var(--ink); border: 2px solid var(--gold); box-shadow: 0 2px 6px rgba(0, 0, 0, .25); }

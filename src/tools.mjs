@@ -4,6 +4,7 @@ import { recommend, preparedPlaces, haversineMeters, VISIT } from './retrieval.m
 import { checkVisit } from './hours.mjs';
 import { placeLinks, mapLinks } from './links.mjs';
 import { astanaWeather } from './weather.mjs';
+import { CITY_EVENTS, cityEventsFor } from './events.mjs';
 
 export const CATEGORIES = Object.keys(VISIT);
 const DETOUR = 1.35, SPEED_M_PER_MIN = 4200 / 60, RESERVE = 5;
@@ -89,6 +90,7 @@ function planWalk(args, { dataset, now }) {
     throw error;
   }
   const begin = at || now;
+  const events = cityEventsFor(CITY_EVENTS, { ...start, minutes, maxWalkMinutes: result.constraints.maxWalkMinutes, withChild: result.constraints.withChild, now: begin, limit: 2 });
   return {
     start, minutes, query,
     places: result.recommendations.map(p => ({ id: String(p.id), name: p.name, category: p.category, lat: p.lat, lon: p.lon,
@@ -105,6 +107,9 @@ function planWalk(args, { dataset, now }) {
     ...(result.unconfirmed?.length ? { unconfirmed: result.unconfirmed } : {}),
     ...(result.beyondWalk ? { beyondWalk: { name: result.beyondWalk.name, category: result.beyondWalk.category,
       distanceKm: Math.round(result.beyondWalk.distanceMeters / 100) / 10, walkMinutes: result.beyondWalk.walkMinutes, needsTransport: true } } : {}),
+    // Today's events from the city listing within walking reach; the model names the listing and says to check the time.
+    ...(events.length ? { cityEvents: events.map(event => ({ title: event.title, venue: event.venue, when: event.whenLabel, walkMinutes: event.walkMinutes,
+      fitsWindow: event.fitsWindow, price: event.price, from: 'афиша sxodim.com', check: 'время и билеты уточнять на странице события', sourceUrl: event.url })) } : {}),
     notes: result.warnings, rejected: result.retrieval.rejected, ...SOURCE,
     method: 'Отбор по расстоянию, категории, времени и часам работы из OSM; время пешком — оценка по прямой ×1,35 при 4,2 км/ч, резерв 5 минут.'
   };
