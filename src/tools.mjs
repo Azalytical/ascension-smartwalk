@@ -107,7 +107,7 @@ function planWalk(args, { dataset, now, ratings = null, cityEvents = null }) {
     places: result.recommendations.map(p => ({ id: String(p.id), name: p.name, category: p.category, lat: p.lat, lon: p.lon,
       distanceMeters: p.distanceMeters, walkMinutes: p.walkMinutes, visitMinutes: p.visitMinutes, returnMinutes: p.returnMinutes,
       safetyReserveMinutes: p.safetyReserveMinutes, totalMinutes: p.totalMinutes, hours: { status: p.hoursCheck?.status || 'no_data', closesAt: p.hoursCheck?.closesAt ?? null },
-      why: p.why, ...(p.versus ? { versus: p.versus.text } : {}), ...(p.plan?.text ? { plan: p.plan.text } : {}), ...(p.confidence ? { confidence: { level: p.confidence.level, reasons: p.confidence.reasons } } : {}),
+      why: p.why, ...(Array.isArray(p.whyKeys) ? { whyKeys: p.whyKeys } : {}), ...(p.versus ? { versus: p.versus.text } : {}), ...(p.plan?.text ? { plan: p.plan.text } : {}), ...(p.confidence ? { confidence: { level: p.confidence.level, reasons: p.confidence.reasons } } : {}),
       ...(p.notability && p.notability.level !== 'low' ? { notability: p.notability.label } : {}),
       activities: p.activities, warnings: p.warnings.slice(0, 2), dataSource: sourceOf(p), sourceUrl: p.sourceUrl,
       links: placeLinks(p, { start: begin, sourceLabel: sourceOf(p) }) })),
