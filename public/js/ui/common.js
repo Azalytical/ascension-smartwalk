@@ -4,8 +4,8 @@ import { t, time, lang } from '../core/i18n.js';
 import { checkVisit } from '../lib/hours.mjs';
 import { toast } from './toast.js';
 
-export const CATEGORY_ART = { cafe: 'coffee', restaurant: 'food', park: 'park', playground: 'family', museum: 'museum', attraction: 'landmark', mall: 'indoor', culture: 'museum' };
-export const CATEGORY_COLOR = { cafe: '--cat-cafe', restaurant: '--cat-food', park: '--cat-park', playground: '--cat-family', museum: '--cat-culture', attraction: '--cat-landmark', mall: '--cat-mall', culture: '--cat-culture' };
+export const CATEGORY_ART = { cafe: 'coffee', restaurant: 'food', park: 'park', playground: 'family', museum: 'museum', attraction: 'landmark', mall: 'indoor', culture: 'museum', family: 'family', nightlife: 'food' };
+export const CATEGORY_COLOR = { cafe: '--cat-cafe', restaurant: '--cat-food', park: '--cat-park', playground: '--cat-family', museum: '--cat-culture', attraction: '--cat-landmark', mall: '--cat-mall', culture: '--cat-culture', family: '--cat-family', nightlife: '--cat-night' };
 
 export function art(name, size = 32, className = 'art') {
   const file = name || 'landmark';
@@ -14,7 +14,7 @@ export function art(name, size = 32, className = 'art') {
     alt: '', width: size, height: size, decoding: 'async', loading: 'lazy' });
 }
 export const categoryArt = (category, size, className) => art(CATEGORY_ART[category], size, className);
-export const categoryName = (category) => t(`cat.${category}`) || category;
+export const categoryName = (category) => { const key = `cat.${category}`; const name = t(key); return name === key ? t('cat.other') : name; };
 
 /** Opening-hours status for a visit starting after `walkMinutes`, from the server's check when there is one. */
 export function hoursStatus(place, walkMinutes = 0, visitMinutes = 20, serverCheck = null) {

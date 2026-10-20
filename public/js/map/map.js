@@ -78,6 +78,7 @@ export async function initMap(container, options = {}) {
 }
 
 export const mapFailed = () => failed;
+export const getMaplibre = () => maplibregl;
 
 export function setDark(next) {
   if (!map || dark === next) { dark = next; return; }
@@ -138,7 +139,7 @@ export function marker(element, lngLat, options = {}) {
     let removed = false;
     let real = null;
     mapReady.then(() => { if (!removed) real = marker(element, lngLat, options); });
-    return { remove() { removed = true; real?.remove(); } };
+    return { remove() { removed = true; real?.remove(); }, getElement: () => element };
   }
   return new maplibregl.Marker({ element, anchor: options.anchor || 'center', ...options }).setLngLat(lngLat).addTo(map);
 }

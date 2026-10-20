@@ -29,12 +29,12 @@ export async function preparePublic() {
   await copyFile(resolve(root, 'src/hours.mjs'), resolve(pub, 'js/lib/hours.mjs'));
 
   const dataset = JSON.parse(await readFile(resolve(root, 'data/places.json'), 'utf8'));
-  // Compact rows for the browse layer: [id, name, category, lat, lon, openingHours, phone, website, wheelchair].
+  // Compact rows for the browse layer: [id, name, category, lat, lon, openingHours, phone, website, wheelchair, source, address].
   const rows = preparedPlaces(dataset).map(p => [String(p.id), p.name, p.category, +p.lat.toFixed(6), +p.lon.toFixed(6),
-    p.openingHours || null, p.phone || null, p.website || null, p.wheelchair || null]);
-  const places = { source: 'OpenStreetMap', license: 'ODbL-1.0', count: rows.length,
+    p.openingHours || null, p.phone || null, p.website || null, p.wheelchair || null, p.source?.label || null, p.address || null]);
+  const places = { source: 'OpenStreetMap, Overture Maps', license: 'ODbL-1.0, CDLA-Permissive-2.0', count: rows.length,
     updatedAt: (Array.isArray(dataset) ? dataset[0]?.retrievedAt : dataset.retrievedAt) || null,
-    fields: ['id', 'name', 'category', 'lat', 'lon', 'openingHours', 'phone', 'website', 'wheelchair'], rows };
+    fields: ['id', 'name', 'category', 'lat', 'lon', 'openingHours', 'phone', 'website', 'wheelchair', 'source', 'address'], rows };
   await mkdir(resolve(pub, 'data'), { recursive: true });
   const body = JSON.stringify(places);
   await writeFile(resolve(pub, 'data/places.json'), body);

@@ -13,7 +13,7 @@ import { categoryArt, categoryName, hoursStatus, hoursChip, CATEGORY_COLOR, back
 import { placeView } from '../ui/place.js';
 import { startWalk } from '../ui/live.js';
 
-const FILTERS = [['all', null], ['cafe', ['cafe']], ['restaurant', ['restaurant']], ['park', ['park', 'playground']], ['culture', ['museum', 'culture']], ['attraction', ['attraction']], ['mall', ['mall']]];
+const FILTERS = [['all', null], ['cafe', ['cafe']], ['restaurant', ['restaurant']], ['park', ['park', 'playground']], ['family', ['family', 'playground']], ['culture', ['museum', 'culture']], ['attraction', ['attraction']], ['nightlife', ['nightlife']], ['mall', ['mall']]];
 const PAGE = 40;
 let root = null;
 let data = null;
@@ -118,7 +118,7 @@ function openPlace(place) {
 }
 
 registerTab({
-  id: 'explore', order: 20, icon: 'map', title: 'tab.explore',
+  id: 'explore', ownMap: true, order: 20, icon: 'map', title: 'tab.explore',
   mount(container) {
     root = container;
     renderBrowse();

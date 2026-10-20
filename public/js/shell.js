@@ -21,7 +21,12 @@ export function registerTab(tab) {
   if (bar) renderBar();
 }
 
-export const context = () => ({ map: mapApi.getMap(), mapApi, h, icon, clear, t, pick, lang, store, api, toast, announce, setSnap, ensureAtLeast, getSnap, on, emit, open: openTab });
+// toast(message, kind) from other teams' modules is accepted too: the kind only picks an icon.
+const KIND_ICON = { success: 'check', ok: 'check', error: 'warning', warning: 'warning', info: 'info' };
+const toastAny = (message, options) => toast(message, typeof options === 'string' ? { iconName: KIND_ICON[options] } : options);
+
+export const context = () => ({ map: mapApi.getMap(), maplibregl: mapApi.getMaplibre(), mapApi, h, icon, clear, t, pick, lang, store, api,
+  toast: toastAny, announce, setSnap, openSheet: setSnap, ensureAtLeast, getSnap, on, emit, open: openTab });
 
 export function initShell(rootEl, barEl) {
   root = rootEl;
@@ -47,7 +52,12 @@ function mount(tab, remount = false) {
   root.replaceChildren();
   root.dataset.tab = tab.id;
   root.scrollTop = 0;
-  tab.mount(root, context());
+  if (tab.ownMap || mapApi.getMap() || mapApi.mapFailed()) tab.mount(root, context());
+  else {
+    // A tab opened by a link before the map exists still gets the map once it is there (or after a short wait).
+    const wait = Promise.race([mapApi.mapReady, new Promise((resolve) => setTimeout(resolve, 2500))]);
+    wait.then(() => { if (active === tab && !root.childElementCount) tab.mount(root, context()); });
+  }
   renderBar();
   emit('tab', tab.id);
 }

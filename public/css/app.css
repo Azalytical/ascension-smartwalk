@@ -246,3 +246,17 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .watch-btn { justify-self: start; }
 .watch-card-icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: #0E1621; color: var(--gold); box-shadow: inset 0 0 0 1px var(--line); }
 .watch-card-icon .icon { width: 26px; height: 26px; }
+
+/* place: badges, actions, plan, pairing, origin labels */
+.place-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 4px; }
+.confidence { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-13); font-weight: 600; padding: 3px 9px; border-radius: var(--r-pill); background: var(--surface-2); color: var(--ink-2); }
+.confidence-high { background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); }
+.confidence-low { background: var(--amber-soft); color: var(--amber); }
+.place-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.place-actions:empty { display: none; }
+.plan-steps { display: grid; gap: 10px; counter-reset: step; padding: 14px 16px; border-radius: var(--r-lg); background: var(--surface); }
+.plan-steps li { counter-increment: step; display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; line-height: 1.4; }
+.plan-steps li::before { content: counter(step); width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--gold-soft); color: var(--gold-ink); font-size: var(--fs-13); font-weight: 700; font-variant-numeric: tabular-nums; }
+.pairing { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--r-lg); background: var(--surface); }
+.origin { display: flex; align-items: center; gap: 6px; font-size: var(--fs-12); color: var(--ink-3); }
+.origin.is-idea { color: var(--sky-ink, var(--sky)); }

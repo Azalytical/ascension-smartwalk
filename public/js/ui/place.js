@@ -1,4 +1,5 @@
-// Place details: the time ring, why it fits, what is known and what is not, and the actions.
+// Place details: the time ring, why it fits, a step plan, what is known and what is not, and the actions.
+// Each block that the server labels with its origin (data, computed, idea) shows that label.
 import { h, icon, externalLink, safeUrl } from '../core/dom.js';
 import { t, date as formatDate } from '../core/i18n.js';
 import { formatDistance } from '../core/geo.js';
@@ -34,17 +35,27 @@ export function placeView({ place, timing, start, serverHours, why, activities =
   if (phone) facts.push(row('phone', t('place.phone'), h('a', { class: 'link', href: `tel:${String(phone).replace(/[^+\d]/g, '')}`, text: phone })));
   const site = safeUrl(place.website || place.contacts?.website);
   if (site) facts.push(row('globe', t('place.site'), h('a', { class: 'link', href: site, target: '_blank', rel: 'noopener noreferrer', text: new URL(site).hostname.replace(/^www\./, '') })));
+  if (place.address) facts.push(row('pin', t('place.address'), place.address));
   if (WHEELCHAIR[place.wheelchair]) facts.push(row('accessible', t('place.wheelchair'), t(WHEELCHAIR[place.wheelchair])));
 
+  const sourceName = place.source?.label || 'OpenStreetMap';
+  const confidence = CONFIDENCE[place.confidence?.level];
   const checks = [
-    ['check', 'good', t('place.check.osm')],
+    ['check', 'good', t('place.check.in', { source: sourceName })],
     ['check', 'good', t('place.check.coords')],
     place.openingHours ? ['check', 'good', t('place.check.hours')] : ['info', 'muted', t('place.check.noHours')],
+    ...(place.confidence?.reasons || []).slice(0, 3).map((reason) => ['info', 'muted', capitalize(reason)]),
     ['info', 'muted', t('place.check.live')],
   ];
   const snapshot = formatDate(place.retrievedAt);
+  const origin = (key) => place.provenance?.[key]?.label ? h('p', { class: 'origin' }, icon('info', 'icon-xs'), place.provenance[key].label) : null;
 
   const routeLine = h('p', { class: 'fine', text: routeInfo ? t('place.route', { d: formatDistance(routeInfo.meters, lang()), n: Math.ceil(routeInfo.seconds / 60) }) : t('place.estimate') });
+  const friends = window.SeruenSocial?.planMeetup
+    ? h('button', { class: 'btn btn-quiet btn-sm', type: 'button', onclick: () => window.SeruenSocial.planMeetup({ id: place.id, name: place.name, lat: place.lat, lon: place.lon, category: place.category }) }, icon('friends'), t('place.friends'))
+    : null;
+  const steps = Array.isArray(place.plan?.steps) ? place.plan.steps : [];
+  const pairing = place.pairing?.name ? place.pairing : null;
 
   return h('article', { class: 'view place-view', 'aria-labelledby': 'place-title' },
     h('div', { class: 'view-bar' }, backButton(backLabel || t('common.back'), onBack), h('div', { class: 'view-bar-actions' }, saveButton, shareButton)),
@@ -52,22 +63,28 @@ export function placeView({ place, timing, start, serverHours, why, activities =
       h('div', {}, h('h2', { id: 'place-title', class: 'title-2', text: place.name }),
         h('p', { class: 'meta' }, categoryName(place.category), timing.distanceMeters ? h('span', { class: 'meta-sep', 'aria-hidden': 'true' }) : null,
           timing.distanceMeters ? t('place.straight', { d: formatDistance(timing.distanceMeters, lang()) }) : null),
-        hoursChip(hours))),
+        h('div', { class: 'place-badges' }, hoursChip(hours), confidence ? h('span', { class: `confidence confidence-${place.confidence.level}` }, icon(confidence.icon, 'icon-xs'), t(confidence.label)) : null))),
     h('section', { class: 'time-card' },
       timeRing({ there: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, reserve: timing.safetyReserveMinutes, size: 132, stroke: 13, label: `${total}`, sublabel: t('plan.min', { n: '' }).trim() }),
       h('div', { class: 'time-card-side' }, h('ul', { class: 'legend' }, legend), h('p', { class: 'return-by' }, icon('return'), t('place.returnNow', { time: returnBy(total) })))),
     routeLine,
     h('button', { class: 'btn btn-gold btn-xl', type: 'button', onclick: onStart }, icon('play'), t('place.start')),
+    h('div', { class: 'place-actions' }, watchButton({ place, start, walk: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, minutes: timing.totalMinutes }), friends),
     start ? navLinks(start, place) : null,
-    watchButton({ place, start, walk: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, minutes: timing.totalMinutes }),
-    why ? section(t('place.why'), h('p', { class: 'prose', text: why })) : null,
-    activities.length ? section(t('place.todo'), h('ul', { class: 'bullets' }, activities.map((item) => h('li', { text: item })))) : null,
-    facts.length ? section(t('place.info'), h('dl', { class: 'facts' }, facts)) : null,
+    why ? section(t('place.why'), h('p', { class: 'prose', text: why }), origin('why')) : null,
+    steps.length ? section(t('place.plan'), h('ol', { class: 'plan-steps' }, steps.map((step) => h('li', { text: step }))), origin('plan')) : null,
+    pairing ? section(t('place.pairing'), h('div', { class: 'pairing' }, categoryArt(pairing.category, 32, 'art'),
+      h('span', { class: 'row-text' }, h('strong', { text: pairing.name }), h('small', { text: t('place.pairingValue', { d: formatDistance(pairing.distanceMeters, lang()), n: pairing.extraMinutes }) })))) : null,
+    activities.length ? section(t('place.todo'), h('ul', { class: 'bullets' }, activities.map((item) => h('li', { text: item }))), h('p', { class: 'origin is-idea' }, icon('sparkle', 'icon-xs'), t('place.idea'))) : null,
+    facts.length ? section(t('place.info'), h('dl', { class: 'facts' }, facts), origin('facts')) : null,
     section(t('place.checks'), h('ul', { class: 'checks' }, checks.map(([name, tone, text]) => h('li', { class: `check-${tone}` }, icon(name), h('span', { text })))),
-      h('p', { class: 'fine' }, externalLink(t('place.source'), place.sourceUrl), snapshot ? h('span', { text: ` ${t('place.snapshot', { date: snapshot })}` }) : null)),
+      h('p', { class: 'fine' }, externalLink(t('place.sourceOf', { source: sourceName }), place.sourceUrl), snapshot ? h('span', { text: ` ${t('place.snapshot', { date: snapshot })}` }) : null)),
     warnings.length ? h('details', { class: 'disclosure' }, h('summary', {}, icon('warning'), t('place.warnings'), h('span', { class: 'count num', text: warnings.length })), h('ul', { class: 'bullets fine' }, warnings.map((item) => h('li', { text: item })))) : null,
   );
 }
+
+const CONFIDENCE = { high: { icon: 'check', label: 'conf.high' }, medium: { icon: 'info', label: 'conf.medium' }, low: { icon: 'warning', label: 'conf.low' } };
+const capitalize = (text) => String(text).charAt(0).toLocaleUpperCase() + String(text).slice(1);
 
 function row(iconName, label, value) {
   return h('div', { class: 'fact' }, h('dt', {}, icon(iconName), label), h('dd', {}, value));

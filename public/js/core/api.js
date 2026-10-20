@@ -20,7 +20,8 @@ export function places() {
   placesPromise ||= withTimeout('/data/places.json', {}, 15000).then((r) => {
     if (!r.ok) throw new Error('places');
     return r.json();
-  }).then((data) => ({ ...data, items: data.rows.map(([id, name, category, lat, lon, openingHours, phone, website, wheelchair]) => ({ id, name, category, lat, lon, openingHours, phone, website, wheelchair, sourceUrl: osmUrl(id) })) }))
+  }).then((data) => ({ ...data, items: data.rows.map(([id, name, category, lat, lon, openingHours, phone, website, wheelchair, source, address]) => ({ id, name, category, lat, lon, openingHours, phone, website, wheelchair, address,
+    source: source ? { label: source } : null, sourceUrl: id.startsWith('overture:') ? `https://explore.overturemaps.org/#18/${lat}/${lon}` : osmUrl(id) })) }))
     .catch((error) => { placesPromise = null; throw error; });
   return placesPromise;
 }

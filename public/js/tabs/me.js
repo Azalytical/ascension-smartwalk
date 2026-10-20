@@ -75,7 +75,7 @@ function repeat(item) {
 }
 
 registerTab({
-  id: 'me', order: 90, icon: 'user', title: 'tab.me',
+  id: 'me', ownMap: true, order: 90, icon: 'user', title: 'tab.me',
   mount(container) { root = container; render(); },
   reopen() { if (root) render(); },
   unmount() { root = null; },

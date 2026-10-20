@@ -7,7 +7,7 @@ import { PRESETS, inAstana, reachMeters, estimate } from '../core/geo.js';
 import * as api from '../core/api.js';
 import { mapReady, getMap, flyTo, fitPoints } from '../map/map.js';
 import * as layers from '../map/layers.js';
-import { setSnap, ensureAtLeast } from '../ui/sheet.js';
+import { setSnap, ensureAtLeast, getSnap } from '../ui/sheet.js';
 import { toast, announce } from '../ui/toast.js';
 import { timeRing } from '../ui/ring.js';
 import { art, categoryArt, categoryName, hoursStatus, hoursChip, share, returnBy, backButton } from '../ui/common.js';
@@ -347,19 +347,53 @@ function renderResults() {
     h('div', { class: 'view-bar' }, back, h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: 'Seruen', text: t('results.title', { min: request.minutes }), url: shareLink() }) }, icon('share'))),
     h('h2', { id: 'results-title', class: 'title-1', text: t('results.title', { min: request.minutes }) }),
     h('p', { class: 'meta' }, icon('pin', 'icon-xs'), t('results.start', { name: startName() }), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }), t('plan.returnBy', { time: time(leave + request.minutes * 60000) })),
+    understoodRow(result.understood),
     llm ? aiCard(generation) : h('div', { class: 'ai-card is-quiet' }, h('p', { class: 'fine', text: t('results.fallback') })),
     h('div', { class: 'result-list' }, rows),
+    routeCard(result.route),
     unchecked.length ? h('details', { class: 'disclosure' }, h('summary', {}, icon('info'), t('results.unchecked'), h('span', { class: 'count num', text: unchecked.length })), h('ul', { class: 'bullets fine' }, unchecked.map((w) => h('li', { text: w })))) : null,
     h('p', { class: 'fine data-line' }, icon('map'), t('results.source', { count: number(result.dataset?.poiCount || 0), date: formatDate(result.dataset?.updatedAt) || '—' }))));
   drawResultsMap(recs);
 }
+
+// «Мы учли»: what the server understood from the request (time, categories, child, night, weather, hours).
+function understoodRow(items) {
+  const shown = (items || []).filter((item) => item.key !== 'location' && item.label);
+  if (!shown.length) return null;
+  const icons = { time: 'clock', categories: 'filter', child: 'user', night: 'moon', group: 'friends', accessible: 'accessible', weather: 'cloud', hours: 'clock' };
+  return h('div', { class: 'understood' }, h('p', { class: 'understood-title', text: t('results.understood') }),
+    h('div', { class: 'chip-row no-drag' }, shown.map((item) => h('span', { class: 'chip is-static' }, icon(icons[item.key] || 'check', 'icon-xs'), item.label))));
+}
+
+// A three-stop micro-route from the server: stops with clock times, shown on the map on tap.
+function routeCard(route) {
+  const stops = (route?.stops || []).filter((stop) => Number.isFinite(stop.lat) && Number.isFinite(stop.lon));
+  if (stops.length < 2) return null;
+  const show = () => {
+    const chain = [[start.lon, start.lat], ...stops.map((stop) => [stop.lon, stop.lat]), ...(route.returnToStart ? [[start.lon, start.lat]] : [])];
+    layers.showPins(stops, () => {});
+    layers.showRoutes([{ coordinates: chain, selected: true }]);
+    fitPoints(chain, { maxZoom: 17 });
+    ensureAtLeastHalf();
+    toast(t('results.routeShown'), { iconName: 'route' });
+  };
+  return h('section', { class: 'route-card' },
+    h('div', { class: 'route-head' }, h('span', { class: 'route-icon', 'aria-hidden': 'true' }, icon('route')),
+      h('div', {}, h('strong', { text: t('results.route', { n: stops.length }) }),
+        h('small', { class: 'num', text: t('results.routeMeta', { n: route.totalMinutes, time: route.backBy || '' }) }))),
+    h('ol', { class: 'route-stops' }, stops.map((stop) => h('li', {},
+      h('span', { class: 'route-time num', text: stop.arriveAt || '' }),
+      h('span', { class: 'row-text' }, h('strong', { text: stop.name }), h('small', { text: t('results.routeStop', { walk: stop.walkFromPreviousMinutes, visit: stop.visitMinutes }) }))))),
+    h('button', { class: 'btn btn-quiet btn-sm', type: 'button', onclick: show }, icon('map'), t('results.routeShow')));
+}
+const ensureAtLeastHalf = () => { if (getSnap() === 'full') setSnap('half'); };
 
 // The Gemini tip, three lines at first so the places stay in view; the full text and the note open on tap.
 function aiCard(generation) {
   const note = h('p', { class: 'fine', text: t('results.aiNote'), hidden: true });
   const more = h('button', { class: 'ai-more', type: 'button', 'aria-expanded': 'false', text: t('results.aiMore') });
   const card = h('div', { class: 'ai-card' }, h('p', { class: 'ai-label' }, icon('sparkle'), t(generation.provider === 'gemini' ? 'results.aiGemini' : 'results.ai')),
-    h('p', { class: 'ai-text', text: generation.summary }), note, more);
+    h('p', { class: 'ai-text', text: generation.summary }), generation.label ? h('p', { class: 'origin', text: generation.label }) : null, note, more);
   more.addEventListener('click', () => {
     const open = !card.classList.contains('is-open');
     card.classList.toggle('is-open', open);
@@ -392,9 +426,17 @@ function renderEmpty(back) {
   if (plan.minutes < 180) actions.push(h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { plan.minutes = Math.min(180, plan.minutes + 15); savePlan(); submit(); } }, icon('plus'), t('results.empty.add')));
   if (plan.maxWalk < 30) actions.push(h('button', { class: 'btn btn-quiet', type: 'button', onclick: () => { plan.maxWalk = 30; savePlan(); submit(); } }, icon('walk'), t('results.empty.walk')));
   if (plan.query) actions.push(h('button', { class: 'btn btn-quiet', type: 'button', onclick: () => { plan.query = ''; plan.mood = null; savePlan(); submit(); } }, icon('close'), t('results.empty.clear')));
+  const nearest = result?.nearestBeyondLimits;
+  if (nearest?.neededMinutes && nearest.neededMinutes <= 180) {
+    const minutes = Math.min(180, Math.ceil(nearest.neededMinutes / 15) * 15);
+    actions.unshift(h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { plan.minutes = minutes; plan.maxWalk = Math.max(plan.maxWalk, Math.min(60, nearest.walkMinutes)); savePlan(); submit(); } },
+      icon('plus'), t('results.empty.take', { n: minutes })));
+  }
   clear(root, h('section', { class: 'view state-view' }, h('div', { class: 'view-bar' }, back),
     h('div', { class: 'state-icon', 'aria-hidden': 'true' }, icon('compass')),
     h('h2', { class: 'title-2', text: t('results.empty.title') }), h('p', { class: 'lead', text: t('results.empty.text') }),
+    nearest ? h('div', { class: 'pairing nearest' }, categoryArt(nearest.category, 36, 'art'), h('span', { class: 'row-text' }, h('small', { text: t('results.nearest') }), h('strong', { text: nearest.name }),
+      h('small', { text: t('results.nearestValue', { walk: nearest.walkMinutes, n: nearest.neededMinutes }) }))) : null,
     h('div', { class: 'stack' }, actions)));
   layers.hidePins(); layers.hideRoutes(); layers.showReach(start, reachMeters(plan.minutes, plan.maxWalk));
 }
@@ -463,7 +505,7 @@ function applyUrl() {
 }
 
 registerTab({
-  id: 'walk', order: 10, icon: 'loop', title: 'tab.walk',
+  id: 'walk', ownMap: true, order: 10, icon: 'loop', title: 'tab.walk',
   mount(container) {
     root = container;
     if (store.get('walk')) view = 'live';
