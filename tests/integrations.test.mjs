@@ -248,3 +248,60 @@ test('the full place base works through MCP within the Workers CPU budget', asyn
   assert.ok(plan.structuredContent.places.length > 0);
   assert.ok(performance.now() - began < 50, 'search and plan stay fast on the full dataset');
 });
+
+test('agent: a rejected answer goes back to Gemini once with the reason, and the rewrite is accepted', withFetch(async (url, init) => {
+  if (String(url).includes('open-meteo')) return jsonResponse(weatherBody);
+  const body = JSON.parse(init.body);
+  globalThis.__requests.push(body);
+  const turn = body.contents.filter(content => content.role === 'model').length;
+  if (turn === 0) return jsonResponse({ candidates: [{ content: { role: 'model', parts: [{ functionCall: { name: 'plan_walk', args: { query: 'кофе' } }, thoughtSignature: 's' }] } }] });
+  const summary = turn === 1 ? 'Кофейня у Байтерека расположена рядом и предлагает завтраки.' : 'Кофейня у Байтерека: примерно 2 минуты пешком, часы позволяют зайти.';
+  return jsonResponse({ candidates: [{ content: { role: 'model', parts: [{ functionCall: { name: 'give_answer', args: { summary, place_ids: ['node/1'] } } }] } }] });
+}, async () => {
+  globalThis.__requests = [];
+  const response = await handleApi(new Request('https://demo.example/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: 'кофе', ...START, minutes: 60 }) }), { ...env, GEMINI_API_KEY: 'test' }, pois);
+  const data = await response.json();
+  assert.equal(data.mode, 'agent');
+  assert.match(data.summary, /2 минуты/);
+  assert.deepEqual(data.steps.map(step => step.tool), ['plan_walk', 'check', 'give_answer']);
+  assert.match(data.steps[1].summary, /расположен/);
+  const retry = globalThis.__requests[2];
+  assert.deepEqual(retry.toolConfig.functionCallingConfig.allowedFunctionNames, ['give_answer']);
+  assert.match(retry.contents.at(-1).parts[0].functionResponse.response.error, /отклонён проверкой/);
+}));
+
+test('agent: a second rejected answer falls back to the deterministic plan', withFetch(async (url, init) => {
+  const turn = JSON.parse(init.body).contents.filter(content => content.role === 'model').length;
+  if (turn === 0) return jsonResponse({ candidates: [{ content: { role: 'model', parts: [{ functionCall: { name: 'plan_walk', args: { query: 'кофе' } }, thoughtSignature: 's' }] } }] });
+  return jsonResponse({ candidates: [{ content: { role: 'model', parts: [{ functionCall: { name: 'give_answer', args: { summary: 'Кофейня у Байтерека открыта сейчас.', place_ids: ['node/1'] } } }] } }] });
+}, async () => {
+  const response = await handleApi(new Request('https://demo.example/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: 'кофе', ...START }) }), { ...env, GEMINI_API_KEY: 'test' }, pois);
+  const data = await response.json();
+  assert.equal(data.mode, 'fallback');
+  assert.equal(data.reason, 'unsupported_claim');
+  assert.equal(data.steps.filter(step => step.tool === 'check').length, 1);
+}));
+
+test('speak: a refused or unknown voice model hands over to the next one', withFetch(async url => {
+  globalThis.__ttsModels.push(String(url).match(/models\/([^:]+)/)[1]);
+  if (globalThis.__ttsModels.length === 1) return new Response('{"error":{"code":404}}', { status: 404 });
+  return jsonResponse({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: 'BBBB' } }] } }] });
+}, async () => {
+  globalThis.__ttsModels = [];
+  const response = await handleApi(new Request('https://demo.example/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: 'Another voice, please.' }) }), { ...env, GEMINI_API_KEY: 'test' }, pois);
+  const data = await response.json();
+  assert.equal(response.status, 200);
+  assert.deepEqual(globalThis.__ttsModels, ['gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts']);
+  assert.equal(data.model, 'gemini-3.8-flash-tts');
+  assert.equal(data.data, 'BBBB');
+}));
+
+test('weather: one Open-Meteo 503 is retried', async () => {
+  let calls = 0;
+  const value = await astanaWeather({ lat: 51.09, lon: 71.41 }, { fetchImpl: async () => (++calls === 1 ? new Response('', { status: 503 }) : jsonResponse(weatherBody)) });
+  assert.equal(calls, 2);
+  assert.equal(value.available, true);
+});

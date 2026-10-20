@@ -3,7 +3,7 @@ const $ = id => document.getElementById(id);
 const state = { lat: 51.1283, lon: 71.4304, minutes: 60 };
 const CATEGORY = { park: 'парк', cafe: 'кафе', museum: 'музей', playground: 'детская площадка', attraction: 'достопримечательность',
   restaurant: 'где поесть', mall: 'торговый центр', culture: 'культура' };
-const ICON = { get_weather: '☁', plan_walk: '🧭', search_places: '🔎', place_details: '📍', build_route: '🗺', give_answer: '✦' };
+const ICON = { get_weather: '☁', plan_walk: '🧭', search_places: '🔎', place_details: '📍', build_route: '🗺', check: '✓', give_answer: '✦' };
 const HOURS = { open: ['open', 'открыто'], closed: ['closed', 'закрыто'], closes_early: ['closed', 'закроется раньше'], unknown: ['unknown', 'часы не разобраны'],
   no_data: ['unknown', 'часы неизвестны'], not_checked: ['unknown', 'часы не проверены'] };
 const inAstana = (lat, lon) => lat >= 51 && lat <= 51.35 && lon >= 71.25 && lon <= 71.65;
@@ -138,32 +138,40 @@ $('ask').addEventListener('submit', async event => {
   }
 });
 
-function playPcm(base64, sampleRate) {
+// The audio context is created inside the tap: iOS keeps a context made after an await silent.
+async function playPcm(context, base64, sampleRate) {
   const bytes = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
-  const samples = new Int16Array(bytes.buffer, 0, Math.floor(bytes.length / 2));
-  const context = new (window.AudioContext || window.webkitAudioContext)();
-  const buffer = context.createBuffer(1, samples.length, sampleRate);
+  // A WAV answer starts with a RIFF header; the samples after it are the same 16-bit PCM.
+  const offset = bytes.length > 44 && String.fromCharCode(...bytes.subarray(0, 4)) === 'RIFF' ? 44 : 0;
+  const samples = new Int16Array(bytes.buffer, offset, Math.floor((bytes.length - offset) / 2));
+  const buffer = context.createBuffer(1, samples.length, sampleRate || 24000);
   const channel = buffer.getChannelData(0);
   for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768;
   const source = context.createBufferSource();
-  source.buffer = buffer; source.connect(context.destination); source.start();
+  source.buffer = buffer; source.connect(context.destination);
+  await context.resume?.();
+  source.start();
   return new Promise(resolve => { source.onended = resolve; });
 }
 
+const KAZAKH = /[әғқңөұүһі]/i;
 $('speak').addEventListener('click', async () => {
   if (!lastSummary) return;
   const button = $('speak');
   button.disabled = true; button.textContent = 'Готовим голос…';
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  const context = AudioContext ? new AudioContext() : null;
   try {
+    if (!context) throw new Error('no audio');
     const response = await fetch('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: lastSummary.slice(0, 400) }) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
     button.textContent = 'Говорит Gemini…';
-    await playPcm(data.data, data.sampleRate);
+    await playPcm(context, data.data, data.sampleRate);
   } catch {
     // The browser voice is the fallback; it may lack Kazakh.
-    if ('speechSynthesis' in window) speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(lastSummary), { lang: 'ru-RU' }));
-  } finally { button.disabled = false; button.textContent = 'Озвучить'; }
+    if ('speechSynthesis' in window) speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(lastSummary), { lang: KAZAKH.test(lastSummary) ? 'kk-KZ' : /[а-яё]/i.test(lastSummary) ? 'ru-RU' : 'en-US' }));
+  } finally { context?.close?.().catch(() => {}); button.disabled = false; button.textContent = 'Озвучить'; }
 });
 
 async function shrink(file) {
