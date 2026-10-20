@@ -3,6 +3,7 @@
 // The visitor's point never reaches Gemini: the server fills it into tool calls and strips coordinates from tool results.
 import { runTool, ToolError, CATEGORIES } from './tools.mjs';
 import { placeLinks, mapLinks } from './links.mjs';
+import { languageNote, languageProblem } from './language.mjs';
 
 // Latency budget: an answer within a few seconds, or an honest quick fallback. Usually two model calls: tools, then the answer.
 const MAX_TURNS = 3, MAX_TOOL_CALLS = 5, TOTAL_MS = 14000, ATTEMPT_MS = 7000;
@@ -15,7 +16,7 @@ const SYSTEM = 'Ты агент Aidem: подбираешь прогулку п�
   + 'ты координат не видишь и не спрашиваешь. Порядок: если человек пойдёт по улице или упомянул погоду, вызови get_weather; затем plan_walk с его временем и пожеланием '
   + '(при плохой погоде добавь в query «под крышей»); если просят несколько мест подряд, маршрут или «с ... а потом ...», вызови build_route с 2–3 id из результатов; '
   + 'search_places и place_details — только если без них нельзя ответить. Нужные инструменты вызывай одновременно в одном ходе (обычно get_weather и plan_walk вместе), затем сразу give_answer. '
-  + 'В give_answer: summary на языке answerLanguage (ru — русский, kk — казахский, en — английский), 2–3 коротких предложения до 450 символов; '
+  + 'В give_answer: summary целиком на языке answerLanguage (ru — русский, kk — казахский, en — английский), без русских слов в казахском и английском ответе, 2–3 коротких предложения до 450 символов; '
   + 'только факты из результатов инструментов: названия, категории, минуты, статус часов, погода; все минуты как оценку; «открыто» только если hours.status = open, и тогда со ссылкой на источник: «по часам из источника открыто до 23:00» (en: «open until 23:00 per the listed hours»), никогда просто «открыто»; '
   + 'если в plan_walk есть unconfirmed, одной короткой фразой скажи, что это источник не подтверждает (например: «розетки и тишину источник не подтверждает»); '
   + 'если есть beyondWalk, скажи, что пешком мест мало, назови beyondWalk.name и distanceKm и что дальше нужен транспорт; '
@@ -38,15 +39,6 @@ const FALLBACK_TEXT = {
 
 /** The transport hint in the visitor's language, for answers that leave it out. */
 export const farNote = (far, lang = 'ru') => (FALLBACK_TEXT.far[lang] || FALLBACK_TEXT.far.ru)(far);
-
-// Words in Cyrillic and in Latin letters, place names and «quotes» left out: what the summary itself is written in.
-function wrongLanguage(summary, language, names) {
-  let text = summary.replace(/«[^»]*»|"[^"]*"/g, ' ');
-  for (const name of names) if (name) text = text.split(name).join(' ');
-  const cyrillic = text.match(/[а-яёәғқңөұүһі]{3,}/giu)?.length || 0;
-  const latin = text.match(/[a-z]{3,}/gi)?.length || 0;
-  return language === 'en' ? cyrillic >= 3 && cyrillic > latin : latin >= 3 && latin > cyrillic;
-}
 
 const S = (description, extra = {}) => ({ type: 'STRING', description, ...extra });
 const N = description => ({ type: 'NUMBER', description });
@@ -243,11 +235,11 @@ export async function runAgent(input, deps) {
       const ids = Array.isArray(answer.place_ids) ? [...new Set(answer.place_ids.map(String))].slice(0, 3) : [];
       const summary = typeof answer.summary === 'string' ? answer.summary.trim() : '';
       const claim = summary.match(unsupported)?.[0];
-      const foreign = summary && wrongLanguage(summary, language, [...[...seen.values()].map(place => place.name), lastPlanBeyond?.name]);
+      const foreign = summary && languageProblem(summary, language, [...[...seen.values()].map(place => place.name), lastPlanBeyond?.name]);
       const problem = !summary || summary.length > 700 ? 'summary пустой или длиннее 700 символов'
         : !ids.length || ids.some(id => !seen.has(id)) ? `place_ids — только 1–3 id из результатов инструментов: ${[...seen.keys()].slice(0, 12).join(', ')}`
           : claim ? `в summary есть то, чего нет в данных («${claim}»): убери это слово и утверждение, оставь названия, минуты, часы и погоду`
-            : foreign ? `summary должен быть на языке answerLanguage = ${language}; названия мест можно оставить как есть` : null;
+            : foreign ? `summary: ${languageNote(language)}` : null;
       if (problem && (rejected || Date.now() > deadline - 3500)) return fallback(claim && ids.length ? 'unsupported_claim' : foreign ? 'language' : 'validation', model);
       if (problem) {
         rejected = true;
