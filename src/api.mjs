@@ -427,7 +427,7 @@ async function gemini(request, url, env, dataset) {
       const text = (value, limit) => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, limit) : '');
       const previous = body.previous && typeof body.previous === 'object' && text(body.previous.query, 300)
         ? { query: text(body.previous.query, 300), summary: text(body.previous.summary, 500) } : undefined;
-      return json(await runAgent({ query: body.query.trim(), lat, lon, minutes, withChild: body.withChild === true, lang: body.lang, reserveMinutes, excludeIds, previous },
+      return json(await runAgent({ query: body.query.trim(), lat, lon, minutes, withChild: body.withChild === true, lang: body.lang, uiLang: body.uiLang, reserveMinutes, excludeIds, previous },
         { env: agentEnv, dataset, limitedJson, answerLanguage, unsupported: UNSUPPORTED }));
     }
     if (url.pathname === '/api/vision') return json(await identifyPlace(body, { env: model, dataset, limitedJson }));
