@@ -69,6 +69,57 @@ function tokens(value) {
     .filter(token => token.length >= 3 && !STOP_WORDS.has(token) && !/^\d+$/.test(token));
 }
 
+// A place asked for by name is written in Latin or Cyrillic whatever the query's script («Мега» is «Mega Silk Way»),
+// so each name word of the query is also tried transliterated.
+const TO_LATIN = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p',
+  р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
+  ә: 'a', ғ: 'g', қ: 'k', ң: 'n', ө: 'o', ұ: 'u', ү: 'u', һ: 'h', і: 'i' };
+const TO_CYRILLIC = [['sch', 'щ'], ['zh', 'ж'], ['kh', 'х'], ['ch', 'ч'], ['sh', 'ш'], ['ts', 'ц'], ['yu', 'ю'], ['ya', 'я'], ['a', 'а'], ['b', 'б'],
+  ['c', 'к'], ['d', 'д'], ['e', 'е'], ['f', 'ф'], ['g', 'г'], ['h', 'х'], ['i', 'и'], ['j', 'дж'], ['k', 'к'], ['l', 'л'], ['m', 'м'], ['n', 'н'],
+  ['o', 'о'], ['p', 'п'], ['q', 'к'], ['r', 'р'], ['s', 'с'], ['t', 'т'], ['u', 'у'], ['v', 'в'], ['w', 'у'], ['x', 'кс'], ['y', 'й'], ['z', 'з']];
+const LATIN_TO_CYRILLIC = new RegExp(TO_CYRILLIC.map(([latin]) => latin).join('|'), 'g');
+// Kazakh letters are compared as their Russian neighbours: «Бәйтерек» and «Байтерек» are one name.
+const FOLD = { ә: 'а', ө: 'о', ү: 'у', ұ: 'у', қ: 'к', ғ: 'г', ң: 'н', һ: 'х', і: 'и' };
+const fold = word => word.replace(/[әөүұқғңһі]/gu, letter => FOLD[letter]);
+function spellings(term) {
+  const latin = [...term].map(letter => TO_LATIN[letter] ?? letter).join('');
+  const cyrillic = term.replace(LATIN_TO_CYRILLIC, match => TO_CYRILLIC.find(([from]) => from === match)[1]);
+  // A Latin «y» is «й» or «ы» («Shatyr» is «Шатыр»), and an «i» after a vowel is «й» («Baiterek» is «Байтерек»).
+  return [...new Set([term, latin, cyrillic, cyrillic.replace(/й(?![аеиоуыэюя])/gu, 'ы'), cyrillic.replace(/(?<=[аеоуыэюя])и/gu, 'й')].map(fold))];
+}
+
+// Query words that name a place rather than a category, kind or intent («Мега», «Хан Шатыр»), with their spellings.
+// A Russian case ending is dropped for the start of a name («в Мегу» still finds «Mega»).
+function nameTerms(query) {
+  return tokens(query).filter(term => !queryCategories(term).length && !queryKinds(term).length && !excludedCategories(term).length
+    && !Object.values(queryIntents(term)).includes(true) && !WALK_INTENT.test(term) && !INDOOR_INTENT.test(term))
+    .map(term => {
+      const stem = term.length >= 4 && /[а-яё][аеиоуыэюяй]$/u.test(term) ? term.slice(0, -1) : null;
+      return { whole: spellings(term), starts: [...new Set([...spellings(term), ...(stem ? spellings(stem) : [])])].filter(form => form.length >= 3) };
+    });
+}
+
+// How strongly a place's name answers those words: a whole name word beats a word's beginning, a name that has only some
+// of the words counts by that share twice over («Khan El Khalili» for «Khan Shatyr»), and a full match on the name's first word counts extra.
+const NAME_STRONG = 35;
+function nameScore(poi, terms) {
+  if (!terms.length) return 0;
+  const words = fold(normalize(poi.name)).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  let sum = 0, matched = 0, first = false;
+  for (const { whole, starts } of terms) {
+    let best = 0;
+    words.forEach((word, index) => {
+      const score = whole.includes(word) ? 40 : starts.some(form => word.length > form.length && word.startsWith(form)) ? 25 : 0;
+      if (score > best) best = score;
+      if (score && index === 0) first = true;
+    });
+    if (best) { sum += best; matched++; }
+  }
+  if (!matched) return 0;
+  const share = matched / terms.length;
+  return Math.round(sum / terms.length * share + (share === 1 && first ? 10 : 0));
+}
+
 function tagText(tags) {
   if (Array.isArray(tags)) return tags.map(tag => typeof tag === 'string' ? tag : '').join(' ');
   if (tags && typeof tags === 'object') {
@@ -692,7 +743,7 @@ function meaningFor(semantic, child, intents, excluded) {
 export function meaningWanted(result) {
   const { retrieval, constraints, intents } = result ?? {};
   return Boolean(constraints?.query && constraints.query.length >= 3 && !constraints.category && !intents?.length
-    && !retrieval?.requestedCategories?.length && !retrieval?.requestedKinds?.length);
+    && !retrieval?.requestedCategories?.length && !retrieval?.requestedKinds?.length && !retrieval?.nameMatches);
 }
 
 /**
@@ -733,6 +784,9 @@ export function recommend(dataset, input, context = {}) {
     ? ['park', 'attraction'].filter(category => !requested.includes(category) && !excluded.includes(category) && (!child || CHILD_ALLOWED.includes(category))) : [];
   requested = [...requested, ...walkToo];
   const terms = tokens(constraints.query);
+  const placeNames = nameTerms(constraints.query);
+  // The place the query names, when it is left out: closed at the visit or beyond the time; said above the list.
+  let namedMissed = null;
   const counters = { invalidRecords: 0, unsupportedCategory: 0, restrictedAccess: 0, duplicates: 0, gambling: 0, category: 0, walkBudget: 0, totalBudget: 0,
     closedByHours: 0, unknownHoursAtNight: 0, notAccessible: 0, excludedByUser: 0 };
   const hidden = new Set(constraints.excludeIds);
@@ -764,6 +818,7 @@ export function recommend(dataset, input, context = {}) {
       || (child && !CHILD_ALLOWED.includes(category))
       || (intents.night && !child && ['playground', 'family'].includes(category))) { counters.category++; continue; }
 
+    const nameHit = placeNames.length ? nameScore(poi, placeNames) : 0;
     const directDistance = haversineMeters(constraints.lat, constraints.lon, poi.lat, poi.lon);
     const walkMinutes = Math.ceil(directDistance * DETOUR / (SPEED_KMH * 1000 / 60));
     const returnMinutes = constraints.returnToStart ? walkMinutes : 0;
@@ -771,6 +826,10 @@ export function recommend(dataset, input, context = {}) {
     const totalMinutes = walkMinutes + visitMinutes + returnMinutes + reserve;
     if (walkMinutes > constraints.maxWalkMinutes || totalMinutes > constraints.minutes) {
       counters[walkMinutes > constraints.maxWalkMinutes ? 'walkBudget' : 'totalBudget']++;
+      // Beyond two hours on foot a name is more likely another place far away than the one meant.
+      if (nameHit >= NAME_STRONG && walkMinutes <= 120 && (!namedMissed || nameHit > namedMissed.score || (nameHit === namedMissed.score && walkMinutes < namedMissed.walkMinutes))) {
+        namedMissed = { poi, score: nameHit, reason: 'far', walkMinutes, totalMinutes };
+      }
       if ((requested.length || constraints.category) && !(intents.accessible && wheelchair === 'no')
         && !(intents.night && NEEDS_HOURS.includes(category) && !poi.openingHours) && (!nearest || walkMinutes < nearest.walkMinutes)) {
         nearest = { poi, walkMinutes, totalMinutes };
@@ -786,7 +845,11 @@ export function recommend(dataset, input, context = {}) {
       ? { ...checkVisit(poi.openingHours, new Date(reference.getTime() + walkMinutes * 60000), visitMinutes),
         arrivalAt: new Date(reference.getTime() + walkMinutes * 60000).toISOString() }
       : null;
-    if (hours && ['closed', 'closes_early'].includes(hours.status)) { counters.closedByHours++; continue; }
+    if (hours && ['closed', 'closes_early'].includes(hours.status)) {
+      counters.closedByHours++;
+      if (nameHit >= NAME_STRONG && (!namedMissed || nameHit >= namedMissed.score)) namedMissed = { poi, score: nameHit, reason: 'closed', walkMinutes, totalMinutes };
+      continue;
+    }
     // Late at night a roofed place is suggested only when its recorded hours cover the visit.
     if (intents.night && NEEDS_HOURS.includes(category) && hours?.status !== 'open') { counters.unknownHoursAtNight++; continue; }
 
@@ -795,6 +858,7 @@ export function recommend(dataset, input, context = {}) {
     const scoreBreakdown = {
       category: constraints.category === category || requested.includes(category) ? (walkToo.includes(category) ? 15 : 35) : 0,
       keywords: Math.min(20, matchedTerms.length * 5),
+      name: nameHit,
       proximity: Math.round(25 * (1 - Math.min(1, walkMinutes / constraints.maxWalkMinutes))),
       timeFit: Math.round(15 * (1 - totalMinutes / constraints.minutes)),
       childCategory: child ? 5 : 0,
@@ -802,10 +866,10 @@ export function recommend(dataset, input, context = {}) {
       intent: intentScore(poi, kind, hours, intents, wheelchair),
       userRatings: ratings ? ratingBonus(ratings.get(String(poi.id))) : 0,
     };
-    const score = scoreBreakdown.category + scoreBreakdown.keywords + scoreBreakdown.proximity + scoreBreakdown.timeFit
+    const score = scoreBreakdown.category + scoreBreakdown.keywords + scoreBreakdown.name + scoreBreakdown.proximity + scoreBreakdown.timeFit
       + scoreBreakdown.childCategory + scoreBreakdown.hoursConfirmed + scoreBreakdown.intent + scoreBreakdown.userRatings;
     candidates.push({ poi, kind, name, directDistance, walkMinutes, returnMinutes, visitMinutes, totalMinutes, hours,
-      matchedTerms, categoryIntent, scoreBreakdown, score });
+      matchedTerms, categoryIntent, nameMatch: scoreBreakdown.name >= NAME_STRONG, scoreBreakdown, score });
   }
 
   const kindMatches = kinds.length ? candidates.filter(candidate => kinds.includes(candidate.kind)) : [];
@@ -909,7 +973,7 @@ export function recommend(dataset, input, context = {}) {
       warnings: warningsFor(poi, constraints, hours), evidence, score, scoreBreakdown, matchedTerms,
       hoursCheck: hours ?? { status: poi.openingHours ? 'not_checked' : 'no_data' } };
   });
-  versusFor(recommendations.map((card, index) => ({ ...card, kindMatch: picks[index].kindMatch, categoryIntent: picks[index].categoryIntent })),
+  versusFor(recommendations.map((card, index) => ({ ...card, kindMatch: picks[index].kindMatch, categoryIntent: picks[index].categoryIntent || picks[index].nameMatch })),
     { weather, surprise, intents }).forEach((versus, index) => { recommendations[index].versus = versus; });
   const route = surprise ? null : microRoute(candidates, { ...constraints, foodFocus: requested.length > 0 && requested.every(category => FOOD.includes(category)), routeAsked: intents.route === true }, reference, walkBetween);
   const warnings = [
@@ -917,6 +981,12 @@ export function recommend(dataset, input, context = {}) {
     `Каждая карточка — отдельный вариант прогулки. В суммарное время входят путь, посещение, выбранный возврат и резерв ${reserve} минут.`,
     'Актуальное открытие мест, цены и наличие свободных мест не проверены.',
   ];
+  if (namedMissed && !recommendations.some(rec => rec.scoreBreakdown.name >= namedMissed.score)) {
+    const { poi, reason, walkMinutes, totalMinutes } = namedMissed;
+    warnings.push(reason === 'closed'
+      ? `«${poi.name}» по режиму работы из источника закрыто к моменту визита, поэтому его нет среди вариантов.`
+      : `«${poi.name}» не помещается: около ${walkMinutes} мин пешком в одну сторону, нужно примерно ${totalMinutes} мин${constraints.returnToStart ? ' с возвращением' : ''}.`);
+  }
   if (kinds.length && !kindMatches.length && recommendations.length) {
     warnings.push('Мест именно этого вида в пределах вашего времени не нашлось; ниже ближайшие варианты той же категории.');
   }
@@ -976,8 +1046,9 @@ export function recommend(dataset, input, context = {}) {
         + (meant.length ? ' Слова запроса словарь не узнал, поэтому категорию определили эмбеддинги Gemini по примерам запросов.' : ''),
       semantic: meant.length ? { model: context.semantic.model ?? null, categories: meant, ranking: context.semantic.ranking ?? [] } : null,
       inputRecords: pois.length, validUniqueRecords: prepared.unique.length, feasibleCandidates: candidates.length, returned: recommendations.length,
-      requestedCategories: requested, requestedKinds: kinds, excludedCategories: excluded, queryTerms: terms, rejected: counters,
-      scoring: { category: 35, keywordsPerMatch: 5, keywordsCap: 20, proximityMax: 25, timeFitMax: 15, childCategory: 5, hoursConfirmed: 5,
+      requestedCategories: requested, requestedKinds: kinds, excludedCategories: excluded, queryTerms: terms,
+      nameMatches: candidates.filter(candidate => candidate.nameMatch).length, rejected: counters,
+      scoring: { category: 35, keywordsPerMatch: 5, keywordsCap: 20, nameWord: 40, nameStart: 25, nameFirstWord: 10, proximityMax: 25, timeFitMax: 15, childCategory: 5, hoursConfirmed: 5,
         intentRange: [-32, 30], repeatCategoryPenalty: 8, repeatNamePenalty: 15,
         userRatings: { from: RATINGS.rankedFrom, prior: RATINGS.prior, priorWeight: RATINGS.priorWeight, range: [-RATINGS.maxBonus, RATINGS.maxBonus], used: Boolean(ratings) } },
       hoursReferenceTime: reference ? reference.toISOString() : null, hoursTimezone: 'UTC+05:00',

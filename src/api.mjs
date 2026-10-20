@@ -1,4 +1,4 @@
-import { recommend, placeCategory, meaningWanted, RESERVE_OPTIONS, DEFAULT_RESERVE } from './retrieval.mjs';
+import { recommend, placeCategory, meaningWanted, preparedPlaces, RESERVE_OPTIONS, DEFAULT_RESERVE } from './retrieval.mjs';
 import { semanticCategories } from './semantic.mjs';
 import { currentWeather } from './weather.mjs';
 import { handleTelegram } from './telegram.mjs';
@@ -246,15 +246,20 @@ async function callWithRetry(provider, input, env, maxAttempts = MAX_ATTEMPTS) {
 
 const memoryBuckets = new Map();
 // In-process budget for a single container (Cloud Run with max-instances=1). Same limits as the D1 budget.
+// Gemini: 8 requests a minute per address and 500 a day. Past that the walk is still answered from the place data, marked
+// as without the AI tip, so a jury or a class on one Wi-Fi never sees an error; only a flood (60 a minute) is refused.
 function memoryBudget(ip) {
   const now = Date.now();
   const minute = `minute:${Math.floor(now / 60000)}:${ip}`;
   const day = `day:${Math.floor(now / 86400000)}`;
-  if ((memoryBuckets.get(minute) || 0) >= 8 || (memoryBuckets.get(day) || 0) >= 500) return { allowed: false, generationAllowed: false };
-  for (const key of [minute, day]) memoryBuckets.set(key, (memoryBuckets.get(key) || 0) + 1);
+  const used = memoryBuckets.get(minute) || 0;
+  if (used >= 60) return { allowed: false, generationAllowed: false };
+  memoryBuckets.set(minute, used + 1);
   if (memoryBuckets.size > 5000) {
     for (const key of memoryBuckets.keys()) if (key !== day && !key.startsWith(`minute:${Math.floor(now / 60000)}:`)) memoryBuckets.delete(key);
   }
+  if (used >= 8 || (memoryBuckets.get(day) || 0) >= 500) return { allowed: true, generationAllowed: false };
+  memoryBuckets.set(day, (memoryBuckets.get(day) || 0) + 1);
   return { allowed: true, generationAllowed: true };
 }
 
@@ -297,14 +302,16 @@ function summaryOf(dataset, pois) {
   const bySource = {};
   const licenses = new Set();
   let updatedAt = dataset.retrievedAt || null;
-  for (const poi of pois) {
+  // Places are counted after merging duplicates and leaving out unsupported records: the same set the search and the map use.
+  const places = preparedPlaces(pois);
+  for (const poi of pois) if (typeof poi?.retrievedAt === 'string' && (!updatedAt || poi.retrievedAt > updatedAt)) updatedAt = poi.retrievedAt;
+  for (const poi of places) {
     const label = poi?.source?.label || 'OpenStreetMap';
     bySource[label] = (bySource[label] || 0) + 1;
     licenses.add(poi?.source?.license || poi?.license || 'ODbL-1.0');
-    if (typeof poi?.retrievedAt === 'string' && (!updatedAt || poi.retrievedAt > updatedAt)) updatedAt = poi.retrievedAt;
   }
   const sources = Object.keys(bySource).some(label => label.startsWith('Overture')) ? 'OpenStreetMap, Overture Maps' : 'OpenStreetMap';
-  summary = { poiCount: pois.length, updatedAt, source: sources, bySource, licenses: [...licenses].sort(),
+  summary = { poiCount: places.length, sourceRecords: pois.length, updatedAt, source: sources, bySource, licenses: [...licenses].sort(),
     attribution: sources === 'OpenStreetMap' ? '© OpenStreetMap contributors' : '© OpenStreetMap contributors, Overture Maps Foundation' };
   summaries.set(pois, summary);
   return summary;
@@ -484,7 +491,7 @@ export async function handleApi(request, env = {}, dataset = []) {
   if (url.pathname === '/api/status') {
     if (request.method !== 'GET') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'GET' });
     const summary = summaryOf(dataset, pois);
-    return json({ poiCount: summary.poiCount, updatedAt: summary.updatedAt,
+    return json({ poiCount: summary.poiCount, sourceRecords: summary.sourceRecords, updatedAt: summary.updatedAt,
       generationAvailable: Boolean(activeProvider(env)), generationProvider: activeProvider(env)?.name ?? null,
       source: summary.source, bySource: summary.bySource, licenses: summary.licenses, attribution: summary.attribution, version: '1.2.0',
       social: Boolean(env.SOCIAL || env.SOCIAL_LOCAL),
