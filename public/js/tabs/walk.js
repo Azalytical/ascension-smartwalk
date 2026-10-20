@@ -10,10 +10,11 @@ import * as layers from '../map/layers.js';
 import { setSnap, ensureAtLeast, getSnap } from '../ui/sheet.js';
 import { toast, announce } from '../ui/toast.js';
 import { timeRing } from '../ui/ring.js';
-import { art, categoryArt, categoryName, hoursStatus, hoursChip, share, returnBy, backButton, listenButton } from '../ui/common.js';
+import { art, categoryArt, categoryName, hoursStatus, hoursChip, share, backTime, confidenceChip, backButton, listenButton } from '../ui/common.js';
 import { placeView } from '../ui/place.js';
 import { understand, canListen, startListening } from '../core/voice.js';
 import { speakText, stopSpeaking, unlockAudio } from '../core/media.js';
+import { locateMe } from '../core/where.js';
 import { mountLive, startWalk } from '../ui/live.js';
 
 const MINUTES = [30, 45, 60, 90, 120];
@@ -35,10 +36,12 @@ let inflight = null;
 let root = null;
 let liveCleanup = null;
 let lastRoute = null;
-// Where the walk starts: the real location by default. A start the person picked by hand is kept for three hours.
-let locating = false;
+// Where the walk starts: a fresh GPS fix by default. A start picked by hand (a place, a map point, a shared link) is kept
+// for half an hour. A fix older than FRESH_MS is refreshed before planning, and one older than STALE_MS is never used.
+let locating = null;
 let locationNote = null;
-let autoLocated = false;
+// Set when «Найти» had no real start: the start screen explains why, and choosing a start runs the search.
+let startPrompt = null;
 // A search started by voice is answered aloud: the Gemini tip, or a short line when there is none.
 let speakNext = false;
 // Hands-free: after the spoken answer the mic listens again for a follow-up («второй», «поехали», «а на полчаса?»).
@@ -46,31 +49,52 @@ let speakNext = false;
 let voiceTurns = 0;
 let voice = null;
 const MAX_VOICE_TURNS = 5;
-const MANUAL_START_MS = 3 * 3600000;
+const MANUAL_START_MS = 30 * 60000;
+const FRESH_MS = 2 * 60000;
+const STALE_MS = 15 * 60000;
+// iPhone with «Точная геопозиция» off gives a fix within a few kilometres: say so instead of planning from it silently.
+const COARSE_M = 300;
 
 function presetStart(id) {
   const preset = PRESETS.find((item) => item.id === id) || PRESETS[0];
   return { kind: 'preset', id: preset.id, name: pick(preset.name), names: preset.name, lat: preset.lat, lon: preset.lon };
 }
-const startName = () => (start.names ? pick(start.names) : start.kind === 'gps' ? t('start.gps') : start.kind === 'map' ? t('start.picked') : start.name);
+const startName = () => (start.names ? pick(start.names) : start.kind === 'gps' ? t('start.here') : start.kind === 'map' ? t('start.picked') : start.name);
 function savePlan() { store.set('plan', plan); }
 function setStart(next, manual = true) { start = next; store.set('start', next); store.set('startManual', manual ? Date.now() : 0); store.rememberStart(next); }
 
-function autoLocate() {
-  if (autoLocated || !navigator.geolocation) return;
-  autoLocated = true;
-  if (Date.now() - (store.get('startManual') || 0) < MANUAL_START_MS) return;
-  locating = true;
+const isManual = () => Date.now() - (store.get('startManual') || 0) < MANUAL_START_MS;
+const fixAge = () => (start.kind === 'gps' ? Date.now() - (start.at || 0) : Infinity);
+// A start the app fell back to on its own (no fix and nothing picked) is never planned from without asking.
+const isFallback = () => start.kind !== 'gps' && !isManual();
+const gpsStart = (fix) => ({ kind: 'gps', lat: fix.lat, lon: fix.lon, accuracy: fix.accuracy, at: fix.at });
+
+/** Gets a fresh fix unless the start was picked by hand or the fix is still fresh; force asks again regardless. */
+function autoLocate(force = false) {
+  if (locating) return locating;
+  if (!force && (isManual() || fixAge() < FRESH_MS)) return Promise.resolve();
+  locationNote = null;
+  locating = locateMe().then((fix) => {
+    if (inAstana(fix.lat, fix.lon)) setStart(gpsStart(fix), false);
+    else { locationNote = 'outside'; fallBack(); }
+  }, (failure) => { locationNote = failure.reason || 'failed'; fallBack(); })
+    .finally(() => { locating = null; refreshStart(); });
   refreshStart();
-  navigator.geolocation.getCurrentPosition((position) => {
-    const { latitude: lat, longitude: lon } = position.coords;
-    locating = false;
-    if (inAstana(lat, lon)) { locationNote = null; setStart({ kind: 'gps', name: t('start.gps'), lat, lon }, false); }
-    else locationNote = 'outside';
-    refreshStart();
-  }, (failure) => { locating = false; locationNote = failure.code === 1 ? 'denied' : 'failed'; refreshStart(); },
-  { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
+  return locating;
 }
+// A GPS start too old to trust gives way to the city centre, which the start row and «Найти» then flag.
+function fallBack() { if (start.kind === 'gps' && fixAge() > STALE_MS) setStart(presetStart('baiterek'), false); }
+
+// The locate button on the map counts as "start from where I am".
+document.addEventListener('seruen:located', ({ detail: fix }) => {
+  if (!root || view !== 'plan' || !inAstana(fix.lat, fix.lon) || (start.kind === 'gps' && start.at === fix.at)) return;
+  locationNote = null;
+  setStart(gpsStart(fix), false);
+  refreshStart();
+});
+// Back from the background (the phone was in a pocket): the fix may be old, so ask again.
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && root && view === 'plan') autoLocate(); });
+
 // Only the start row and the map change, so a half-typed request stays as it is.
 function refreshStart() {
   if (view !== 'plan' || !root) return;
@@ -79,10 +103,21 @@ function refreshStart() {
   root.querySelector('.cta')?.dispatchEvent(new CustomEvent('refresh'));
 }
 function startRowView() {
-  const note = locating ? t('start.locating') : start.kind === 'gps' ? null : locationNote ? t(`start.note.${locationNote}`) : null;
-  return h('button', { class: 'row-button start-row', type: 'button', onclick: () => { view = 'start'; render(); } },
-    h('span', { class: 'row-icon start-icon', 'aria-hidden': 'true' }, icon(start.kind === 'gps' ? 'locate' : 'pin')),
-    h('span', { class: 'row-text' }, h('small', { text: t('plan.from') }), h('strong', { text: startName() }), note ? h('small', { class: 'start-note', text: note }) : null), icon('chevron', 'row-chevron'));
+  const here = start.kind === 'gps';
+  const age = fixAge();
+  const searching = locating && !(here && age < STALE_MS);
+  const detail = locating ? t('start.locating')
+    : here ? (age >= FRESH_MS ? t('start.age', { n: Math.max(1, Math.round(age / 60000)) }) : start.accuracy > COARSE_M ? t('start.coarse', { m: start.accuracy }) : start.accuracy ? t('start.accuracy', { m: start.accuracy }) : null)
+      : locationNote ? t(`start.note.${locationNote}`) : null;
+  const row = h('button', { class: 'row-button', type: 'button', onclick: () => { view = 'start'; render(); } },
+    h('span', { class: `row-icon start-icon${here ? ' is-here' : ''}`, 'aria-hidden': 'true' }, icon(here || searching ? 'locate' : 'pin')),
+    h('span', { class: 'row-text' }, h('small', { text: t('plan.from') }), h('strong', { text: searching ? t('start.locating') : startName() }),
+      detail && !searching ? h('small', { class: `start-note${(!here && locationNote) || (here && start.accuracy > COARSE_M) ? ' is-warn' : ''}`, text: detail }) : null), icon('chevron', 'row-chevron'));
+  // Not starting from a fresh fix: one tap brings the real location back.
+  const useMine = !locating && (!here || age >= FRESH_MS)
+    ? h('button', { class: 'btn btn-quiet btn-sm start-locate', type: 'button', onclick: () => autoLocate(true) }, icon('locate'), t(here ? 'start.refresh' : 'start.useMine'))
+    : null;
+  return h('div', { class: 'start-row' }, row, useMine);
 }
 
 function leaveAt() {
@@ -279,18 +314,21 @@ async function answer(text, finished) {
   if (root.querySelector('.mic:not([hidden])')) listen(true);
 }
 
+// One return time per option: the server's (it also wrote the «why»), else the same sum counted here.
+const backOf = (place) => place.plan?.backAt || backTime(place, leaveAt());
+
 const timingOf = (place) => ({ distanceMeters: place.distanceMeters, walkMinutes: place.walkMinutes, visitMinutes: place.visitMinutes, returnMinutes: place.returnMinutes, safetyReserveMinutes: place.safetyReserveMinutes, totalMinutes: place.totalMinutes });
 
 function startPlace(place, spoken) {
   const timing = timingOf(place);
   startWalk({ place, start, timing });
   view = 'live'; render();
-  if (spoken) speakText(t('voice.go', { name: place.name, time: returnBy(timing.totalMinutes) }));
+  if (spoken) speakText(t('voice.go', { name: place.name, time: backOf(place) }));
 }
 
 function drawPlanMap() {
   layers.hidePins(); layers.hideRoutes();
-  layers.showStart(start, startName());
+  layers.showStart(start, startName(), { tag: true });
   layers.showReach(start, reachMeters(plan.minutes, plan.maxWalk));
   const radius = reachMeters(plan.minutes, plan.maxWalk);
   const dLat = radius / 111320; const dLon = radius / (111320 * Math.cos(start.lat * Math.PI / 180));
@@ -299,15 +337,20 @@ function drawPlanMap() {
 
 // ---------- start point ----------
 function renderStart() {
-  const message = h('p', { class: 'inline-message', role: 'status', hidden: true });
-  const choose = (next) => { setStart(next); view = 'plan'; render(); };
+  const message = h('p', { class: 'inline-message', role: 'status', hidden: !startPrompt, text: startPrompt ? t(`start.prompt.${startPrompt}`) : '' });
+  // After «Найти» without a real start, choosing one runs the search that was asked for.
+  const choose = (next, manual = true) => {
+    setStart(next, manual);
+    if (startPrompt) { startPrompt = null; submit(); return; }
+    view = 'plan'; render();
+  };
   const gps = h('button', { class: 'list-row', type: 'button', onclick: () => locate(message, choose) },
     h('span', { class: 'row-icon is-sky', 'aria-hidden': 'true' }, icon('locate')), h('span', { class: 'row-text' }, h('strong', { text: t('start.gps') }), h('small', { text: t('start.gpsHint') })));
   const pickRow = h('button', { class: 'list-row', type: 'button', onclick: () => { view = 'pick'; render(); } },
     h('span', { class: 'row-icon', 'aria-hidden': 'true' }, icon('target')), h('span', { class: 'row-text' }, h('strong', { text: t('start.pick') }), h('small', { text: t('start.pickHint') })));
   const recent = (store.get('recentStarts') || []).filter((item) => item.kind === 'map');
   clear(root, h('section', { class: 'view start-view' },
-    h('div', { class: 'view-bar' }, backButton(t('common.back'), () => { view = 'plan'; render(); })),
+    h('div', { class: 'view-bar' }, backButton(t('common.back'), () => { startPrompt = null; view = 'plan'; render(); })),
     h('h2', { class: 'title-2', text: t('start.title') }),
     h('div', { class: 'list' }, gps, pickRow), message,
     recent.length ? h('h3', { class: 'block-title', text: t('start.recent') }) : null,
@@ -320,16 +363,13 @@ function renderStart() {
 
 function locate(message, choose) {
   const show = (text) => { message.textContent = text; message.hidden = false; };
-  if (!navigator.geolocation) { show(t('start.failed')); return; }
   show(t('start.locating'));
-  navigator.geolocation.getCurrentPosition((position) => {
-    const { latitude: lat, longitude: lon } = position.coords;
-    if (!inAstana(lat, lon)) { show(t('start.outside')); return; }
+  locateMe().then((fix) => {
+    if (!inAstana(fix.lat, fix.lon)) { show(t('start.outside')); return; }
     locationNote = null;
-    setStart({ kind: 'gps', name: t('start.gps'), lat, lon }, false);
-    view = 'plan'; render();
     toast(t('toast.locationShared'), { iconName: 'locate' });
-  }, (failure) => show(failure.code === 1 ? t('start.denied') : t('start.failed')), { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
+    choose(gpsStart(fix), false);
+  }, (failure) => show(t(failure.reason === 'denied' ? 'start.denied' : 'start.failed')));
 }
 
 function renderPick() {
@@ -362,11 +402,23 @@ function buildRequest() {
   return body;
 }
 
+function askForStart() {
+  startPrompt = locationNote || 'failed';
+  if (speakNext) speakText(t('start.promptVoice'));
+  speakNext = false; voiceTurns = 0;
+  view = 'start'; render();
+}
+
 async function submit(options) {
   speakNext = options?.spoken === true;
   if (!speakNext) voiceTurns = 0;
   const said = understand(plan.query);
   if (said.minutes) { plan.minutes = said.minutes; plan.query = said.query; plan.mood = null; savePlan(); }
+  // Plan only from a real start: a fresh fix, or a point the person chose. Without one, ask on the start screen.
+  if (!isManual() && fixAge() >= FRESH_MS) {
+    await autoLocate(true);
+    if (isFallback()) { askForStart(); return; }
+  }
   inflight?.abort();
   const controller = new AbortController();
   inflight = controller;
@@ -434,7 +486,7 @@ function renderResults() {
     categoryArt(place.category, 44, 'art'),
     h('span', { class: 'result-text' }, h('strong', { class: 'result-name', text: place.name }),
       h('span', { class: 'meta' }, categoryName(place.category), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }), t('explore.walk', { n: place.walkMinutes })),
-      hoursChip(status)),
+      h('span', { class: 'result-badges' }, hoursChip(status), confidenceChip(place.confidence))),
     h('span', { class: 'result-time' }, timeRing({ there: place.walkMinutes, visit: place.visitMinutes, back: place.returnMinutes, reserve: place.safetyReserveMinutes, size: 50, stroke: 6 }),
       h('span', { class: 'num result-total', text: t('plan.min', { n: place.totalMinutes }) })));
   });
@@ -453,7 +505,7 @@ function renderResults() {
     // The Gemini tip is read through its own «Слушать» button, so «Стоп» there also ends the conversation.
     const listen = llm && tip.querySelector('.listen-btn');
     if (listen?.play) answer(null, listen.play());
-    else answer(t('voice.answer', { n: recs.length, name: recs[0].name, walk: recs[0].walkMinutes, time: time(leave + recs[0].totalMinutes * 60000) }));
+    else answer(t('voice.answer', { n: recs.length, name: recs[0].name, walk: recs[0].walkMinutes, time: backOf(recs[0]) }));
   }
 }
 
@@ -570,10 +622,10 @@ function renderPlace() {
   clear(root, placeView({ place, timing, start, serverHours: place.hoursCheck, why: place.why, activities: place.activities || [], warnings: place.warnings || [],
     backLabel: t('common.back'), onBack: () => { view = 'results'; render(); },
     onStart: () => { voiceTurns = 0; startPlace(place); }, voice: voiceButton(),
-    routeInfo: lastRoute?.id === place.id ? lastRoute.route : null, shareUrl: url.href }));
+    routeInfo: lastRoute?.id === place.id ? lastRoute.route : null, shareUrl: url.href, backAt: backOf(place) }));
   // Opened by voice («второй»): say why it fits and how long it takes, then wait for «поехали».
   // The server's «why» is written for reading (all the minutes), so only Gemini's idea is said aloud.
-  if (speakNext) answer(`${place.name}. ${place.aiWhy || ''} ${t('voice.place', { walk: place.walkMinutes, time: returnBy(timing.totalMinutes) })}`);
+  if (speakNext) answer(`${place.name}. ${place.aiWhy || ''} ${t('voice.place', { walk: place.walkMinutes, time: backOf(place) })}`);
   layers.selectPin(selected);
   layers.selectRoute(selected);
   fitPoints([[start.lon, start.lat], [place.lon, place.lat]], { maxZoom: 17 });
@@ -607,7 +659,6 @@ function applyUrl() {
   if (params.get('from') && PRESETS.some((item) => item.id === params.get('from'))) setStart(presetStart(params.get('from')));
   const lat = Number(params.get('lat')); const lon = Number(params.get('lon'));
   if (params.has('lat') && inAstana(lat, lon)) setStart({ kind: 'map', name: t('start.picked'), lat, lon });
-  if (params.get('from') || params.has('lat')) autoLocated = true;
   savePlan();
   history.replaceState(null, '', location.pathname);
   return params.get('go') === '1';
@@ -625,7 +676,7 @@ registerTab({
     render();
     mapReady.then(() => { if (root === container && root.isConnected) render(); });
   },
-  reopen() { if (view !== 'live' && view !== 'loading') { view = 'plan'; render(); } },
+  reopen() { if (view !== 'live' && view !== 'loading') { view = 'plan'; render(); autoLocate(); } },
   unmount() {
     dropVoice();
     document.body.classList.remove('is-picking');

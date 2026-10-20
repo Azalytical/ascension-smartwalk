@@ -90,6 +90,14 @@ export function listenButton(getText) {
 }
 
 export const returnBy = (minutes, startAt = Date.now()) => time(new Date(startAt + minutes * 60000));
+/** «Вернётесь к …» everywhere: the way there, the visit and the way back, without the reserve (that is spare time). Same as the server's plan.backAt. */
+export const backTime = (timing, startAt = Date.now()) => returnBy(timing.walkMinutes + timing.visitMinutes + timing.returnMinutes, startAt);
+
+const CONFIDENCE = { high: 'conf.high', medium: 'conf.medium', low: 'conf.low' };
+/** How complete the data behind a place is (the server's confidence level); the reasons are under «Откуда эти данные». */
+export function confidenceChip(confidence) {
+  return CONFIDENCE[confidence?.level] ? h('span', { class: `confidence confidence-${confidence.level}` }, t(CONFIDENCE[confidence.level])) : null;
+}
 
 export function backButton(label, onClick) {
   return h('button', { class: 'btn btn-quiet btn-sm back-btn', type: 'button', onclick: onClick }, icon('back'), label);

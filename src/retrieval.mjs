@@ -452,8 +452,9 @@ function whyFor(pick, constraints, intents, reference) {
   if (intents.accessible && wheelchairOf(poi) === 'yes') match += ', в источнике отмечен доступ для коляски';
   const facts = factsFor(poi);
   if (facts.length) match += `; по данным источника: ${facts.join(', ')}`;
-  const time = `примерно ${walkMinutes} мин в одну сторону, ${totalMinutes} мин ${constraints.returnToStart ? 'с возвращением' : 'без возвращения'} и резервом ${RESERVE} мин`
-    + ` из ваших ${constraints.minutes}`;
+  // The clock time below is the same «вернётесь к» as plan.backAt and the app: the way there, the visit and back; the reserve is spare.
+  const time = `примерно ${walkMinutes} мин в одну сторону, ${totalMinutes - RESERVE} мин ${constraints.returnToStart ? 'туда, на месте и обратно' : 'туда и на месте'}`
+    + ` и ещё ${RESERVE} мин в запасе из ваших ${constraints.minutes}`;
   const open = hours?.status === 'open' ? `; по режиму работы из источника открыто ${hours.closesAt ? `до ${hours.closesAt}` : 'круглосуточно'}` : '';
   const back = reference ? `; ${constraints.returnToStart ? 'вернётесь' : 'закончите'} примерно к ${localClock(new Date(reference.getTime() + (totalMinutes - RESERVE) * 60000))}` : '';
   return `${match}; ${time}${open}${back}.`;

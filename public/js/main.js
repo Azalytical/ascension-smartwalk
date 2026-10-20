@@ -9,6 +9,7 @@ import { initSheet, setSnap } from './ui/sheet.js';
 import { askPhoto } from './ui/vision.js';
 import { initMap, setDark, setPadding, refreshOverlays, toggleTilt, getMap, mapReady, marker, flyTo, userDot } from './map/map.js';
 import { toast } from './ui/toast.js';
+import { locateMe } from './core/where.js';
 import './tabs/index.js';
 
 applyTheme();
@@ -31,14 +32,14 @@ mapReady.then(() => { if (lastSheet) applySheet(lastSheet); });
 on('theme', (dark) => { setDark(dark); setTimeout(refreshOverlays, 50); });
 
 // Map controls
+// A fresh fix (never a cached one); on the walk tab it also becomes the start.
 $('#fab-locate').addEventListener('click', () => {
-  if (!navigator.geolocation) return;
-  navigator.geolocation.getCurrentPosition((position) => {
-    const lngLat = [position.coords.longitude, position.coords.latitude];
+  locateMe().then((fix) => {
+    const lngLat = [fix.lon, fix.lat];
     locateMarker?.remove();
-    locateMarker = marker(userDot(), lngLat);
+    if (document.querySelector('#sheet-body')?.dataset.tab !== 'walk') locateMarker = marker(userDot(), lngLat);
     flyTo(lngLat, 15);
-  }, () => toast(t('start.denied'), { iconName: 'warning' }), { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
+  }, (failure) => toast(t(failure.reason === 'denied' ? 'start.denied' : 'start.failed'), { iconName: 'warning', duration: 6000 }));
 });
 let locateMarker = null;
 $('#fab-tilt').addEventListener('click', (event) => {

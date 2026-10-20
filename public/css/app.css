@@ -48,6 +48,11 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .result-pin.is-selected > span { color: var(--on-gold); }
 .user-dot { width: 20px; height: 20px; border-radius: 50%; background: color-mix(in srgb, var(--sky) 22%, transparent); display: grid; place-items: center; }
 .user-dot span { width: 14px; height: 14px; border-radius: 50%; background: var(--sky); border: 2.5px solid #fff; box-shadow: var(--shadow-1); }
+.here-pin { position: relative; width: 20px; height: 20px; }
+.here-pin .user-dot { animation: here-pulse 2s ease-out infinite; }
+.here-label { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); white-space: nowrap; padding: 3px 9px; border-radius: var(--r-pill); background: var(--sky); color: #fff; font-size: var(--fs-12); font-weight: 600; box-shadow: var(--shadow-1); }
+@keyframes here-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--sky) 45%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
+@media (prefers-reduced-motion: reduce) { .here-pin .user-dot { animation: none; } }
 .map-crosshair { display: none; position: fixed; left: 50%; top: calc((100dvh - var(--sheet-visible)) / 2); z-index: 4; transform: translate(-50%, -100%); pointer-events: none; }
 .map-crosshair span { display: block; width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--gold); border: 3px solid var(--ink); box-shadow: var(--shadow-2); }
 .is-picking .map-crosshair { display: block; }
@@ -253,6 +258,8 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .confidence { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-13); font-weight: 600; padding: 3px 9px; border-radius: var(--r-pill); background: var(--surface-2); color: var(--ink-2); }
 .confidence-high { background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); }
 .confidence-low { background: var(--amber-soft); color: var(--amber); }
+.result-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.result-badges .confidence { font-size: var(--fs-12); padding: 2px 8px; }
 .place-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .place-actions:empty { display: none; }
 .plan-steps { display: grid; gap: 10px; counter-reset: step; padding: 14px 16px; border-radius: var(--r-lg); background: var(--surface); }
