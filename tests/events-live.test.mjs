@@ -99,6 +99,7 @@ test('a collection run reads the listing page by page and the site, walks and th
   assert.equal(data.fetchedAt, new Date(morning).toISOString());
   assert.equal(data.collectedAt, '2026-10-22');
   assert.deepEqual(data.collection.lastAttempt.stats, { pages: 8, failedPages: 6, cards: 16, dated: 12, located: 8 });
+  assert.deepEqual(data.collection.parser, { used: PARSER_VERSION, current: PARSER_VERSION }, 'the response says which parser read the listing');
   assert.ok(data.events.some(event => event.title === 'Квиз, плиз! (новички) #804'));
 
   const request = new Request('https://demo.example/api/recommend', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://demo.example' },
@@ -127,6 +128,7 @@ test('when the site refuses, the walk keeps the saved snapshot and the failure i
   assert.equal(data.collectedAt, '2026-10-20');
   assert.equal(data.collection.lastAttempt.ok, false);
   assert.equal(data.collection.lastAttempt.problem, 'http_403');
+  assert.equal(data.collection.parser.used, null, 'the snapshot was not read by the Worker');
   await cityEventsState({ CITY_EVENTS_LOCAL: store });
   assert.equal(store.storage.alarmAt, null, 'no new run within the hour after a failed one');
 });

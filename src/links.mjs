@@ -11,7 +11,7 @@ function astanaClock(date) {
 
 const calendarTime = date => date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
 
-/** A walk as a Google Calendar event: leave now (or at the requested time), come back with the 5-minute reserve. */
+/** A walk as a Google Calendar event: leave now (or at the requested time), come back with the reserve the visitor chose. */
 export function calendarLink(place, { start = new Date(), sourceLabel = 'OpenStreetMap' } = {}) {
   const total = Number(place.totalMinutes);
   if (!Number.isFinite(total) || total <= 0) return null;
@@ -21,7 +21,7 @@ export function calendarLink(place, { start = new Date(), sourceLabel = 'OpenStr
   const parts = [`Прогулка Aidem: ${place.name}.`];
   if (Number.isFinite(place.walkMinutes)) {
     parts.push(`Туда ~${place.walkMinutes} мин, на месте ~${place.visitMinutes} мин`
-      + (place.returnMinutes ? `, обратно ~${place.returnMinutes} мин` : '') + ', запас 5 мин.');
+      + (place.returnMinutes ? `, обратно ~${place.returnMinutes} мин` : '') + `, запас ${place.safetyReserveMinutes ?? 5} мин.`);
   }
   parts.push(`Вернуться к ${astanaClock(end)} (Астана). Время — оценка, не обещание.`);
   if (place.sourceUrl) parts.push(`Источник данных: ${sourceLabel}, ${place.sourceUrl}`);

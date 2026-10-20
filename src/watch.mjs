@@ -143,9 +143,12 @@ export async function handleWatch(request, env, pois) {
   if (!Object.hasOwn(MOODS, mood)) return failure(say('mood', lang), 400, text);
   const query = [MOODS[mood].query, (url.searchParams.get('q') || '').slice(0, 200)].filter(Boolean).join(' ');
   const total = url.searchParams.has('minutes') ? number('minutes') : 45;
+  // The reserve and «Больше не предлагать» from the phone's settings: reserve=10, exclude=id1,id2.
   const input = { lat: point('lat'), lon: point('lon'), minutes: total, query, category: 'any', returnToStart: true,
     maxWalkMinutes: Number.isFinite(total) ? Math.min(30, Math.max(5, Math.round(total / 3))) : 15,
-    withChild: Boolean(MOODS[mood].withChild) || url.searchParams.get('child') === '1' };
+    withChild: Boolean(MOODS[mood].withChild) || url.searchParams.get('child') === '1',
+    ...(url.searchParams.has('reserve') ? { reserveMinutes: number('reserve') } : {}),
+    excludeIds: (url.searchParams.get('exclude') || '').split(',').map(id => id.trim()).filter(Boolean).slice(0, 200) };
   const ratings = await placeRatings(env);
   let result;
   try { result = recommend(pois, input, { ratings }); }
@@ -159,13 +162,13 @@ export async function handleWatch(request, env, pois) {
     places: result.recommendations.map(place => ({
       id: place.id, name: place.name, category: place.category, lat: place.lat, lon: place.lon,
       distanceMeters: place.distanceMeters, walkMinutes: place.walkMinutes, visitMinutes: place.visitMinutes,
-      returnMinutes: place.returnMinutes, totalMinutes: place.totalMinutes,
+      returnMinutes: place.returnMinutes, safetyReserveMinutes: place.safetyReserveMinutes, totalMinutes: place.totalMinutes, versus: place.versus.text,
       hours: { status: place.hoursCheck?.status || 'no_data', closesAt: place.hoursCheck?.closesAt || null },
       sourceUrl: place.sourceUrl, source: sourceOf(place),
       confidence: place.confidence ? { level: place.confidence.level, label: place.confidence.label } : null,
       ...(place.userRating ? { userRating: { count: place.userRating.count, average: place.userRating.average, state: place.userRating.state } } : {})
     })),
-    attribution: ATTRIBUTION, estimate: 'Время пешком — оценка по прямой ×1,35 при 4,2 км/ч, с резервом 5 минут.'
+    attribution: ATTRIBUTION, estimate: `Время пешком — оценка по прямой ×1,35 при 4,2 км/ч, с резервом ${result.constraints.safetyReserveMinutes} минут.`
   };
   if (text) return new Response(spokenPlan(plan, new Date(), lang), { headers: { ...HEADERS, 'Content-Type': 'text/plain; charset=utf-8' } });
   return new Response(JSON.stringify(plan), { headers: { ...HEADERS, 'Content-Type': 'application/json; charset=utf-8' } });

@@ -25,6 +25,7 @@ const common = (r, input) => [
   ['Не больше трёх мест', r.recommendations.length <= 3],
   ['Время каждого варианта в пределах бюджета', r.recommendations.every(p => p.totalMinutes <= input.minutes && p.walkMinutes <= input.maxWalkMinutes)],
   ['У каждого места есть «почему», время на месте и план «что делать»', r.recommendations.every(p => p.why && p.visitMinutes > 0 && p.plan?.text)],
+  ['У каждого места сказано, чем оно отличается от других вариантов, по данным', r.recommendations.every(p => p.versus?.reasons?.length >= 1 && p.versus.origin === 'computed_from_poi')],
   ['У каждого места есть источник и уровень уверенности', r.recommendations.every(p => /^https:\/\//.test(p.sourceUrl) && ['high', 'medium', 'low'].includes(p.confidence?.level))],
   ['Идея «чем заняться» помечена как идея, факты как данные POI', r.recommendations.every(p => p.provenance?.activities?.origin === 'generated_idea' && p.provenance?.facts?.origin === 'poi_data')],
   ['Нет утверждения «открыто сейчас» и гарантий', r.recommendations.every(p => !/открыт[а-я]* сейчас|гарантир/i.test(`${p.why} ${p.plan?.text} ${p.aiWhy ?? ''} ${p.aiTodo ?? ''}`))],
@@ -140,6 +141,7 @@ async function run(scenario) {
     understood: (result.understood ?? []).map(item => item.label),
     answer: result.recommendations.map(p => ({ name: p.name, category: p.category, walkMinutes: p.walkMinutes, totalMinutes: p.totalMinutes,
       hours: p.hoursCheck?.status, confidence: p.confidence?.label, why: p.aiWhy ?? p.why, whyBy: p.aiWhy ? 'Gemini' : 'расчёт', plan: p.aiTodo ?? p.plan?.text,
+      versus: p.aiVersus ?? p.versus?.text, versusBy: p.aiVersus ? 'Gemini' : 'расчёт',
       source: p.sourceUrl })),
     route: result.route?.summary ?? null, nearest: result.nearestBeyondLimits?.name ?? null,
     warnings: result.warnings.filter(w => !/^Расстояние указано по прямой|^Каждая карточка|^Актуальное открытие/.test(w)),
@@ -157,7 +159,7 @@ writeFileSync(new URL('docs/test-protocol.json', root), JSON.stringify(protocol,
 const md = [`# Протокол тестовых сценариев Aidem (ранее SmartWalk)`, '',
   `Команда Ascension, Build with AI Hackathon 2026, задача НИЦ Smart City «ИИ-помощник по прогулкам в городе Астана».`, '',
   `Прогон: ${protocol.mode}, коммит \`${commit}\`, база ${places.length} мест, день визита ${DAY} (Астана, UTC+5), ${protocol.date.slice(0, 16).replace('T', ' ')} UTC. Итог: **${passed} из ${results.length} сценариев Pass.**`, '',
-  'Pass ставится, только если выполнены все проверки сценария и общие проверки формата ответа из задания: не больше трёх мест, время в бюджете, «почему», время и план у каждого места, источник и уровень уверенности, идея помечена как идея, нет «открыто сейчас», показано, что учтено. Повторить: `node scripts/scenario-protocol.mjs` (движок) или `node scripts/scenario-protocol.mjs --live <адрес сайта>`.', '',
+  'Pass ставится, только если выполнены все проверки сценария и общие проверки формата ответа из задания: не больше трёх мест, время в бюджете, «почему», «чем отличается», время и план у каждого места, источник и уровень уверенности, идея помечена как идея, нет «открыто сейчас», показано, что учтено. Повторить: `node scripts/scenario-protocol.mjs` (движок) или `node scripts/scenario-protocol.mjs --live <адрес сайта>`.', '',
   ...(live ? [] : ['Сценарий M1 (смысловой поиск на эмбеддингах Gemini) идёт только на живом сайте: движку без сети модель недоступна.', '']),
   '| Сценарий | Откуда | Итог |', '|---|---|---|',
   ...results.map(r => `| ${r.id}. ${r.title} | ${r.source} | ${r.pass ? 'Pass' : 'Fail'} |`), ''];
@@ -168,7 +170,7 @@ for (const r of results) {
     `**Система учла:** ${r.understood.join('; ') || '—'}`, '', '**Ответ:**', '');
   if (!r.answer.length) md.push(`- пусто${r.nearest ? `; ближайшее подходящее: ${r.nearest}` : ''}`);
   r.answer.forEach((p, i) => md.push(`${i + 1}. **${p.name}** (${p.category}), ${p.walkMinutes} мин туда, ${p.totalMinutes} мин всего; часы: ${p.hours}; ${p.confidence}.`,
-    `   Почему (${p.whyBy}): ${p.why}`, `   Что делать: ${p.plan}`));
+    `   Почему (${p.whyBy}): ${p.why}`, `   Чем отличается (${p.versusBy}): ${p.versus}`, `   Что делать: ${p.plan}`));
   if (r.route) md.push('', `**Мини-маршрут:** ${r.route}`);
   if (r.warnings.length) md.push('', `**Предупреждения ответа:** ${r.warnings.join(' ')}`);
   md.push('', '**Проверки:**', '', ...r.checks.map(c => `- ${c.pass ? '✅' : '❌'} ${c.name}`), '');

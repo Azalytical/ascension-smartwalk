@@ -1,6 +1,6 @@
 // One set of tools over the Aidem place base, shared by the MCP server (/mcp) and the Gemini agent (/api/agent).
 // Every tool is deterministic and read-only except get_weather, which asks Open-Meteo for the weather around a rounded point.
-import { recommend, preparedPlaces, haversineMeters, VISIT } from './retrieval.mjs';
+import { recommend, preparedPlaces, haversineMeters, VISIT, RESERVE_OPTIONS, DEFAULT_RESERVE } from './retrieval.mjs';
 import { checkVisit } from './hours.mjs';
 import { placeLinks, mapLinks } from './links.mjs';
 import { astanaWeather } from './weather.mjs';
@@ -9,7 +9,7 @@ import { cityEventsState } from './events-live.mjs';
 import { placeRatings } from './ratings-api.mjs';
 
 export const CATEGORIES = Object.keys(VISIT);
-const DETOUR = 1.35, SPEED_M_PER_MIN = 4200 / 60, RESERVE = 5;
+const DETOUR = 1.35, SPEED_M_PER_MIN = 4200 / 60;
 // Places come from OpenStreetMap and Overture Maps; each place carries its own source label.
 const SOURCE = { sources: 'OpenStreetMap, Overture Maps', licenses: 'ODbL-1.0 (OpenStreetMap), CDLA-Permissive-2.0 (Overture Maps)' };
 const sourceOf = poi => poi.source?.label || 'OpenStreetMap';
@@ -44,6 +44,14 @@ function visitTime(args) {
   const date = new Date(String(raw));
   if (Number.isNaN(date.getTime())) throw new ToolError('visit_time: нужна дата и время ISO 8601, например 2026-10-20T18:30:00+05:00.');
   return date;
+}
+
+function reserveOf(args) {
+  const raw = args?.reserve_minutes;
+  if (raw === undefined || raw === null || raw === '') return DEFAULT_RESERVE;
+  const value = Number(raw);
+  if (!RESERVE_OPTIONS.includes(value)) throw new ToolError('reserve_minutes: 5, 10 или 15.');
+  return value;
 }
 
 function category(args) {
@@ -86,6 +94,7 @@ function planWalk(args, { dataset, now, ratings = null, cityEvents = null }) {
   try {
     result = recommend(dataset, { ...start, minutes, query, category: category(args) || 'any', withChild: Boolean(args?.with_child),
       returnToStart: args?.return_to_start !== false, maxWalkMinutes: number(args, 'max_walk_minutes', { min: 1, max: 60, fallback: Math.min(30, Math.max(5, Math.round(minutes / 3))) }),
+      reserveMinutes: reserveOf(args), excludeIds: args?.exclude_ids, surprise: args?.surprise === true, surpriseSeed: args?.surprise_seed,
       ...(at ? { visitDate: at.toISOString() } : {}) }, { ratings });
   } catch (error) {
     if (error?.code === 'INVALID_INPUT') throw new ToolError(error.message);
@@ -97,11 +106,12 @@ function planWalk(args, { dataset, now, ratings = null, cityEvents = null }) {
     start, minutes, query,
     places: result.recommendations.map(p => ({ id: String(p.id), name: p.name, category: p.category, lat: p.lat, lon: p.lon,
       distanceMeters: p.distanceMeters, walkMinutes: p.walkMinutes, visitMinutes: p.visitMinutes, returnMinutes: p.returnMinutes,
-      totalMinutes: p.totalMinutes, hours: { status: p.hoursCheck?.status || 'no_data', closesAt: p.hoursCheck?.closesAt ?? null },
-      why: p.why, ...(p.plan?.text ? { plan: p.plan.text } : {}), ...(p.confidence ? { confidence: { level: p.confidence.level, reasons: p.confidence.reasons } } : {}),
+      safetyReserveMinutes: p.safetyReserveMinutes, totalMinutes: p.totalMinutes, hours: { status: p.hoursCheck?.status || 'no_data', closesAt: p.hoursCheck?.closesAt ?? null },
+      why: p.why, ...(p.versus ? { versus: p.versus.text } : {}), ...(p.plan?.text ? { plan: p.plan.text } : {}), ...(p.confidence ? { confidence: { level: p.confidence.level, reasons: p.confidence.reasons } } : {}),
       ...(p.notability && p.notability.level !== 'low' ? { notability: p.notability.label } : {}),
       activities: p.activities, warnings: p.warnings.slice(0, 2), dataSource: sourceOf(p), sourceUrl: p.sourceUrl,
       links: placeLinks(p, { start: begin, sourceLabel: sourceOf(p) }) })),
+    reserveMinutes: result.constraints.safetyReserveMinutes, ...(result.surprise ? { surprise: result.surprise } : {}),
     ...(result.route ? { microRoute: { summary: result.route.summary, totalMinutes: result.route.totalMinutes, stops: result.route.stops.map(stop => ({ id: String(stop.id), name: stop.name, category: stop.category })) } } : {}),
     ...(result.nearestBeyondLimits ? { nearestBeyondLimits: { id: String(result.nearestBeyondLimits.id), name: result.nearestBeyondLimits.name, category: result.nearestBeyondLimits.category,
       walkMinutes: result.nearestBeyondLimits.walkMinutes, neededMinutes: result.nearestBeyondLimits.neededMinutes } } : {}),
@@ -113,7 +123,7 @@ function planWalk(args, { dataset, now, ratings = null, cityEvents = null }) {
     ...(events.length ? { cityEvents: events.map(event => ({ title: event.title, venue: event.venue, when: event.whenLabel, walkMinutes: event.walkMinutes,
       fitsWindow: event.fitsWindow, price: event.price, from: 'афиша sxodim.com', check: 'время и билеты уточнять на странице события', sourceUrl: event.url })) } : {}),
     notes: result.warnings, rejected: result.retrieval.rejected, ...SOURCE,
-    method: 'Отбор по расстоянию, категории, времени и часам работы из OSM; время пешком — оценка по прямой ×1,35 при 4,2 км/ч, резерв 5 минут.'
+    method: `Отбор по расстоянию, категории, времени и часам работы из OSM; время пешком — оценка по прямой ×1,35 при 4,2 км/ч, резерв ${result.constraints.safetyReserveMinutes} минут.`
   };
 }
 
@@ -193,14 +203,15 @@ function buildRoute(args, { dataset, now }) {
     clock += stay * 60000; walking += walk; visiting += stay; from = poi;
   }
   const returnMinutes = back ? walkMinutes(haversineMeters(from.lat, from.lon, start.lat, start.lon)) : 0;
-  const totalMinutes = walking + returnMinutes + visiting + RESERVE;
+  const reserve = reserveOf(args);
+  const totalMinutes = walking + returnMinutes + visiting + reserve;
   const closed = legs.filter(leg => ['closed', 'closes_early'].includes(leg.hours.status)).map(leg => leg.name);
   const points = [start, ...best.map(i => stops[i]), ...(back ? [start] : [])];
   // Google Maps takes the waypoints between origin and destination; the start stays out of the link when the walk is one-way.
   const route = back
     ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${start.lat},${start.lon}`)}&waypoints=${encodeURIComponent(best.map(i => `${stops[i].lat},${stops[i].lon}`).join('|'))}&travelmode=walking`
     : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${stops[best.at(-1)].lat},${stops[best.at(-1)].lon}`)}&waypoints=${encodeURIComponent(best.slice(0, -1).map(i => `${stops[i].lat},${stops[i].lon}`).join('|'))}&travelmode=walking`;
-  return { stops: legs, walkMinutes: walking + returnMinutes, visitMinutes: visiting, returnMinutes, reserveMinutes: RESERVE, totalMinutes,
+  return { stops: legs, walkMinutes: walking + returnMinutes, visitMinutes: visiting, returnMinutes, reserveMinutes: reserve, totalMinutes,
     fits: totalMinutes <= minutes && !closed.length, minutes, closedOnArrival: closed,
     finishAt: new Date(begin.getTime() + totalMinutes * 60000).toISOString(), path: points.map(p => [p.lat, p.lon]),
     googleMapsRoute: route, ...SOURCE,
@@ -219,14 +230,18 @@ const categoryField = { type: 'string', enum: CATEGORIES, description: 'Кате
 
 export const TOOLS = [
   { name: 'plan_walk', title: 'Подобрать прогулку',
-    description: 'Подбирает до 3 отдельных мест рядом с точкой старта, на которые хватит времени: дорога туда, время на месте, дорога обратно и запас 5 минут. Отсеивает места, закрытые к моменту прихода по часам работы из источника. Для каждого места даёт «почему», план с часами, уверенность, предупреждения, источник и ссылки Google Maps, 2ГИС и Google Календарь.',
+    description: 'Подбирает до 3 отдельных мест рядом с точкой старта, на которые хватит времени: дорога туда, время на месте, дорога обратно и запас (5, 10 или 15 минут, по умолчанию 5). Отсеивает места, закрытые к моменту прихода по часам работы из источника, и места, которые человек скрыл. Для каждого места даёт «почему», versus (чем отличается от других вариантов, только по данным), план с часами, уверенность, предупреждения, источник и ссылки Google Maps, 2ГИС и Google Календарь. surprise = true даёт одно случайное место из прошедших эти проверки.',
     inputSchema: { type: 'object', properties: { lat, lon,
       minutes: { type: 'number', description: 'Сколько всего времени на прогулку, минут (10–180). По умолчанию 60.' },
       query: { type: 'string', description: 'Пожелание своими словами на русском, казахском или английском: «тихое кафе», «с ребёнком», «под крышей».' },
       category: categoryField,
       with_child: { type: 'boolean', description: 'С ребёнком: только парки и детские площадки.' },
       max_walk_minutes: { type: 'number', description: 'Сколько максимум идти в одну сторону, минут.' },
-      return_to_start: { type: 'boolean', description: 'Нужно ли вернуться к точке старта. По умолчанию да.' }, visit_time },
+      return_to_start: { type: 'boolean', description: 'Нужно ли вернуться к точке старта. По умолчанию да.' },
+      reserve_minutes: { type: 'number', enum: RESERVE_OPTIONS, description: 'Запас времени сверх дороги и посещения: 5, 10 или 15 минут. По умолчанию 5.' },
+      exclude_ids: { type: 'array', items: { type: 'string' }, description: 'id мест, которые человек попросил больше не предлагать (до 200).' },
+      surprise: { type: 'boolean', description: '«Удиви меня»: одно случайное место из подходящих по времени, часам и условиям.' },
+      surprise_seed: { type: 'number', description: 'Целое число: тот же seed даёт то же случайное место.' }, visit_time },
     required: ['lat', 'lon'] }, run: planWalk },
   { name: 'search_places', title: 'Найти места',
     description: 'Ищет места в базе Aidem (места Астаны из OpenStreetMap и Overture Maps) по названию или словам, категории и близости к точке. Возвращает координаты, расстояние, часы работы и статус по часам на сейчас.',
@@ -240,7 +255,8 @@ export const TOOLS = [
     description: 'Собирает мини-маршрут из 2–3 мест: выбирает порядок с самой короткой ходьбой, считает время каждого отрезка, время на местах и возвращение, проверяет часы работы на момент прихода и говорит, помещается ли маршрут в заданное время. Даёт ссылку на весь маршрут в Google Maps.',
     inputSchema: { type: 'object', properties: { lat, lon, place_ids: { type: 'array', items: { type: 'string' }, description: '2–3 id мест.' },
       minutes: { type: 'number', description: 'Сколько всего времени, минут (15–240). По умолчанию 120.' },
-      return_to_start: { type: 'boolean', description: 'Вернуться к старту. По умолчанию да.' }, visit_time },
+      return_to_start: { type: 'boolean', description: 'Вернуться к старту. По умолчанию да.' },
+      reserve_minutes: { type: 'number', enum: RESERVE_OPTIONS, description: 'Запас времени: 5, 10 или 15 минут. По умолчанию 5.' }, visit_time },
     required: ['lat', 'lon', 'place_ids'] }, run: buildRoute },
   { name: 'get_weather', title: 'Погода сейчас',
     description: 'Погода в Астане сейчас по Open-Meteo: температура, как ощущается, ветер, осадки, закат и совет, стоит ли выбирать места под крышей. Координаты округляются примерно до 5 км.',

@@ -12,7 +12,10 @@ import { ratingBonus, ratingSummary, RATINGS } from './ratings.mjs';
 const BOUNDS = Object.freeze({ minLat: 51, maxLat: 51.35, minLon: 71.25, maxLon: 71.65 });
 const DETOUR = 1.35;
 const SPEED_KMH = 4.2;
-const RESERVE = 5;
+// Spare minutes on top of the way there, the visit and the way back. The visitor picks one of these; 5 by default.
+export const RESERVE_OPTIONS = Object.freeze([5, 10, 15]);
+export const DEFAULT_RESERVE = 5;
+const MAX_HIDDEN = 200;
 export const VISIT = { park: 15, cafe: 20, museum: 35, playground: 20, attraction: 15, restaurant: 45, mall: 40, culture: 60, family: 60, nightlife: 60 };
 const LABELS = { park: 'парк', cafe: 'кафе', museum: 'музей', playground: 'площадка', attraction: 'достопримечательность',
   restaurant: 'место, где поесть', mall: 'торговый центр', culture: 'место для культурного досуга', family: 'место для семейного отдыха', nightlife: 'бар или паб' };
@@ -140,9 +143,23 @@ function constraintsFor(input) {
       || Number.isNaN(Date.parse(input.visitDate))) invalid('Некорректная дата посещения.');
     visitDate = input.visitDate;
   }
+  const reserve = input.reserveMinutes === undefined || input.reserveMinutes === null || input.reserveMinutes === '' ? DEFAULT_RESERVE
+    : typeof input.reserveMinutes === 'number' || typeof input.reserveMinutes === 'string' ? Number(input.reserveMinutes) : NaN;
+  if (!RESERVE_OPTIONS.includes(reserve)) invalid('Запас времени: 5, 10 или 15 минут.');
+  // «Больше не предлагать»: places the visitor hid on this device. Unknown ids are simply not found.
+  const hidden = input.excludeIds ?? [];
+  if (!Array.isArray(hidden) || hidden.length > MAX_HIDDEN
+    || hidden.some(id => !['string', 'number'].includes(typeof id) || String(id).length > 120)) invalid(`excludeIds: список до ${MAX_HIDDEN} id мест.`);
+  if (input.surprise !== undefined && typeof input.surprise !== 'boolean') invalid('surprise должен быть логическим значением.');
+  let surpriseSeed = null;
+  if (input.surpriseSeed !== undefined && input.surpriseSeed !== null && input.surpriseSeed !== '') {
+    surpriseSeed = typeof input.surpriseSeed === 'number' || /^\d+$/.test(String(input.surpriseSeed)) ? Number(input.surpriseSeed) : NaN;
+    if (!Number.isInteger(surpriseSeed) || surpriseSeed < 0 || surpriseSeed > 4294967295) invalid('surpriseSeed: целое число от 0 до 4294967295.');
+  }
   return { lat, lon, minutes, maxWalkMinutes, query, category, withChild: input.withChild ?? false,
     returnToStart: input.returnToStart ?? true, visitDate, timezone: 'Asia/Qyzylorda',
-    safetyReserveMinutes: RESERVE, detourFactor: DETOUR, walkingSpeedKmh: SPEED_KMH,
+    safetyReserveMinutes: reserve, reserveOptions: RESERVE_OPTIONS, excludeIds: [...new Set(hidden.map(String))],
+    surprise: input.surprise === true, surpriseSeed, detourFactor: DETOUR, walkingSpeedKmh: SPEED_KMH,
     distanceMethod: 'haversine', walkTimeIsEstimate: true, alternativesAreSeparate: true };
 }
 
@@ -270,6 +287,7 @@ function provenanceFor(poi) {
     facts: { origin: 'poi_data', label: `Данные POI · ${sourceLabel(poi)}` },
     why: { origin: 'computed_from_poi', label: 'Рассчитано по данным POI и вашим условиям' },
     plan: { origin: 'computed_from_poi', label: 'Рассчитано по данным POI и вашим условиям' },
+    versus: { origin: 'computed_from_poi', label: 'Рассчитано по данным POI и другим вариантам' },
     activities: { origin: 'generated_idea', label: 'Идея сервиса, а не сведения из источника' },
   };
 }
@@ -281,9 +299,13 @@ function planFor(pick, constraints, reference, pairing) {
   const steps = [`${walkMinutes} мин пешком до «${poi.name}»`, `${visitMinutes} мин на месте: ${activity.charAt(0).toLocaleLowerCase('ru')}${activity.slice(1)}`];
   if (pairing) steps.push(`если останется время, ${pairing.label} «${pairing.name}» в ${pairing.distanceMeters} м (+${pairing.extraMinutes} мин)`);
   if (constraints.returnToStart) steps.push(`${returnMinutes} мин обратно`);
-  const backAt = reference ? localClock(new Date(reference.getTime() + (walkMinutes + visitMinutes + returnMinutes) * 60000)) : null;
+  const busy = walkMinutes + visitMinutes + returnMinutes;
+  const reserve = constraints.safetyReserveMinutes;
+  const backAt = reference ? localClock(new Date(reference.getTime() + busy * 60000)) : null;
+  // «С запасом до»: the same clock time plus the reserve the visitor chose.
+  const spareUntil = reference ? localClock(new Date(reference.getTime() + (busy + reserve) * 60000)) : null;
   return { steps, text: `План: ${steps.join(' → ')}.${backAt ? ` ${constraints.returnToStart ? 'Вернётесь' : 'Закончите'} примерно к ${backAt}.` : ''}`,
-    leaveAt: reference ? localClock(reference) : null, backAt, isEstimate: true };
+    leaveAt: reference ? localClock(reference) : null, backAt, spareUntil, reserveMinutes: reserve, isEstimate: true };
 }
 
 function hoursWarning(poi, hours) {
@@ -511,10 +533,11 @@ function whyFor(pick, constraints, intents, reference) {
   const facts = factsFor(poi).filter(fact => fact !== format);
   if (facts.length) match += `; ${format ? 'также' : 'по данным источника'}: ${facts.join(', ')}`;
   // The clock time below is the same «вернётесь к» as plan.backAt and the app: the way there, the visit and back; the reserve is spare.
-  const time = `примерно ${walkMinutes} мин в одну сторону, ${totalMinutes - RESERVE} мин ${constraints.returnToStart ? 'туда, на месте и обратно' : 'туда и на месте'}`
-    + ` и ещё ${RESERVE} мин в запасе из ваших ${constraints.minutes}`;
+  const reserve = constraints.safetyReserveMinutes;
+  const time = `примерно ${walkMinutes} мин в одну сторону, ${totalMinutes - reserve} мин ${constraints.returnToStart ? 'туда, на месте и обратно' : 'туда и на месте'}`
+    + ` и ещё ${reserve} мин в запасе из ваших ${constraints.minutes}`;
   const open = hours?.status === 'open' ? `; по режиму работы из источника открыто ${hours.closesAt ? `до ${hours.closesAt}` : 'круглосуточно'}` : '';
-  const back = reference ? `; ${constraints.returnToStart ? 'вернётесь' : 'закончите'} примерно к ${localClock(new Date(reference.getTime() + (totalMinutes - RESERVE) * 60000))}` : '';
+  const back = reference ? `; ${constraints.returnToStart ? 'вернётесь' : 'закончите'} примерно к ${localClock(new Date(reference.getTime() + (totalMinutes - reserve) * 60000))}` : '';
   return `${match}; ${time}${open}${back}.`;
 }
 
@@ -539,7 +562,7 @@ function pairingFor(pick, prepared, constraints, reference, taken) {
   const start = { lat: constraints.lat, lon: constraints.lon };
   let best = null;
   for (const { poi: other } of prepared.unique) {
-    if (!wanted.includes(other.category) || other.nameIsGenerated || taken.has(other.id)) continue;
+    if (!wanted.includes(other.category) || other.nameIsGenerated || taken.has(String(other.id))) continue;
     if (Math.abs(other.lat - poi.lat) > 0.003 || Math.abs(other.lon - poi.lon) > 0.005) continue;
     const meters = haversineMeters(poi.lat, poi.lon, other.lat, other.lon);
     if (meters > 300 || (best && meters >= best.meters)) continue;
@@ -558,11 +581,87 @@ function pairingFor(pick, prepared, constraints, reference, taken) {
     origin: 'poi_data' };
 }
 
+const fewOf = (n, one, few, many) => (n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? few : many);
+
+/**
+ * Why this card rather than the other one or two: only differences the data confirms (minutes, roof, hours from the
+ * source, wheelchair mark, users' ratings), never a guess. Every card gets at least one reason; the text is the first two.
+ */
+function versusFor(cards, { weather, surprise, intents }) {
+  const roofed = card => INDOOR.includes(card.category);
+  const outdoor = card => OUTDOOR.includes(card.category);
+  const matches = card => Boolean(card.kindMatch || card.categoryIntent);
+  return cards.map((card, index) => {
+    const others = cards.filter((_, other) => other !== index);
+    const reasons = [];
+    const add = (key, text, params = {}) => reasons.push({ key, text, params });
+    if (surprise) add('surprise', `случайный выбор из ${surprise.poolSize} ${fewOf(surprise.poolSize, 'места', 'мест', 'мест')}, которые подходят по времени и часам работы`, { poolSize: surprise.poolSize });
+    else if (!others.length) add('only', 'единственный вариант, который помещается в ваше время и условия');
+    if (others.length) {
+      if (matches(card) && others.some(other => !matches(other))) add('requestMatch', 'точнее других под ваш запрос');
+      if (weather?.bad && roofed(card) && others.some(outdoor)) add('roof', `под крышей: сейчас ${weather.text}`, { weather: weather.text });
+      if (intents.accessible && card.wheelchair === 'yes' && others.some(other => other.wheelchair !== 'yes')) add('wheelchair', 'в источнике отмечен доступ для коляски');
+      const closer = Math.min(...others.map(other => other.walkMinutes)) - card.walkMinutes;
+      if (closer >= 2) add('closer', `ближе остальных на ${closer} мин пешком`, { minutes: closer });
+      const shorter = Math.min(...others.map(other => other.totalMinutes)) - card.totalMinutes;
+      if (closer < 2 && shorter >= 5) add('shorter', `вся прогулка на ${shorter} мин короче`, { minutes: shorter });
+      if (card.hoursCheck?.status === 'open' && others.some(other => other.hoursCheck?.status !== 'open')) {
+        add('hoursConfirmed', `по часам из источника открыто на всё время визита${card.hoursCheck.closesAt ? ` (до ${card.hoursCheck.closesAt})` : ', круглосуточно'}`,
+          { closesAt: card.hoursCheck.closesAt ?? null });
+      }
+      // Minutes from arrival to closing, by the source's hours (a window is at most a day, so the clock wraps once).
+      const openFor = other => {
+        if (other.hoursCheck?.status !== 'open') return null;
+        if (!other.hoursCheck.closesAt) return 1440;
+        const [hours, mins] = other.hoursCheck.closesAt.split(':').map(Number);
+        const arrival = new Date(Date.parse(other.hoursCheck.arrivalAt) + 5 * 3600000);
+        return ((hours * 60 + mins - arrival.getUTCHours() * 60 - arrival.getUTCMinutes()) % 1440 + 1440) % 1440 || 1440;
+      };
+      const longest = Math.max(...others.map(other => openFor(other) ?? Infinity));
+      if (openFor(card) !== null && openFor(card) - longest >= 60) {
+        add('later', `по часам из источника открыто дольше остальных${card.hoursCheck.closesAt ? `, до ${card.hoursCheck.closesAt}` : ', круглосуточно'}`,
+          { closesAt: card.hoursCheck.closesAt ?? null });
+      }
+      if (!intents.accessible && card.wheelchair === 'yes' && others.some(other => other.wheelchair !== 'yes')) add('wheelchair', 'в источнике отмечен доступ для коляски');
+      const average = card.userRating?.average;
+      if (average >= 4 && others.every(other => !(other.userRating?.average >= average - 0.2))) {
+        add('rated', `оценки пользователей Aidem: ${String(average).replace('.', ',')} из 5`, { average });
+      }
+      if (card.notability?.level === 'high' && others.every(other => other.notability?.level !== 'high')) add('notable', 'известное место по открытым данным');
+      // A fact from the record (Wi-Fi, a terrace, a cuisine) that none of the other cards has.
+      const theirs = new Set(others.flatMap(other => factsFor(other)));
+      const own = factsFor(card).find(fact => !theirs.has(fact));
+      if (own) add('feature', `по данным источника: ${own}`, { fact: own });
+      if (!weather?.bad && roofed(card) && others.some(outdoor)) add('roof', 'под крышей, подойдёт и в непогоду');
+      if (!weather?.bad && outdoor(card) && others.some(roofed)) add('outdoor', 'на свежем воздухе');
+      const longer = card.visitMinutes - Math.max(...others.map(other => other.visitMinutes));
+      if (longer >= 15) add('longerVisit', `больше времени на месте: ${card.visitMinutes} мин`, { minutes: card.visitMinutes });
+      if (!card.nameIsGenerated && others.some(other => other.nameIsGenerated)) add('named', 'есть название в источнике, проще найти на месте');
+      if (!reasons.length && others.every(other => other.category !== card.category)) add('otherKind', `другой формат: ${CATEGORY_NAMES[card.category]}`, { category: card.category });
+      if (!reasons.length) add('similar', 'по времени и условиям похоже на остальные варианты');
+    }
+    const text = reasons.slice(0, 2).map(reason => reason.text).join('; ');
+    return { text: `${capitalize(text)}.`, reasons, origin: 'computed_from_poi' };
+  });
+}
+
+// «Удиви меня» picks with a seeded generator, so the same seed gives the same place (mulberry32).
+function seeded(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6D2B79F5) >>> 0;
+    let value = Math.imul(state ^ (state >>> 15), state | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 /** What the system used to answer: shown to the visitor, as the task requires. */
 function understoodFor(constraints, requested, excluded, intents, reference, nightShift, weather, weatherRoof, meant) {
   const items = [
     { key: 'location', label: 'Точка старта: используется только для расчёта, не сохраняется и не передаётся модели' },
-    { key: 'time', label: `${constraints.minutes} мин всего, до ${constraints.maxWalkMinutes} мин пешком в одну сторону${constraints.returnToStart ? ', с возвращением' : ''}` },
+    { key: 'time', label: `${constraints.minutes} мин всего, до ${constraints.maxWalkMinutes} мин пешком в одну сторону${constraints.returnToStart ? ', с возвращением' : ''}`
+      + `, запас ${constraints.safetyReserveMinutes} мин` },
   ];
   if (requested.length) items.push({ key: 'categories', label: `Категории: ${requested.map(category => CATEGORY_NAMES[category]).join(', ')}` });
   if (meant.length) items.push({ key: 'semantic', label: `Смысл запроса по эмбеддингам Gemini: ${meant.map(category => CATEGORY_NAMES[category]).join(', ')}` });
@@ -635,7 +734,9 @@ export function recommend(dataset, input, context = {}) {
   requested = [...requested, ...walkToo];
   const terms = tokens(constraints.query);
   const counters = { invalidRecords: 0, unsupportedCategory: 0, restrictedAccess: 0, duplicates: 0, gambling: 0, category: 0, walkBudget: 0, totalBudget: 0,
-    closedByHours: 0, unknownHoursAtNight: 0, notAccessible: 0 };
+    closedByHours: 0, unknownHoursAtNight: 0, notAccessible: 0, excludedByUser: 0 };
+  const hidden = new Set(constraints.excludeIds);
+  const reserve = constraints.safetyReserveMinutes;
   // The nearest place that matched the request but not the time limits, offered when nothing fits.
   let nearest = null;
   const nearestByCategory = new Map();
@@ -654,6 +755,8 @@ export function recommend(dataset, input, context = {}) {
   const candidates = [];
   for (const { poi, kind, text, name, wheelchair } of prepared.unique) {
     const { category } = poi;
+    // Hidden places are dropped before anything else, so they are not offered even as «ближе всего подходит».
+    if (hidden.size && hidden.has(String(poi.id))) { counters.excludedByUser++; continue; }
     if ((constraints.category && category !== constraints.category)
       || (!constraints.category && requested.length > 0 && !requested.includes(category))
       || excluded.includes(category)
@@ -665,7 +768,7 @@ export function recommend(dataset, input, context = {}) {
     const walkMinutes = Math.ceil(directDistance * DETOUR / (SPEED_KMH * 1000 / 60));
     const returnMinutes = constraints.returnToStart ? walkMinutes : 0;
     const visitMinutes = VISIT[category];
-    const totalMinutes = walkMinutes + visitMinutes + returnMinutes + RESERVE;
+    const totalMinutes = walkMinutes + visitMinutes + returnMinutes + reserve;
     if (walkMinutes > constraints.maxWalkMinutes || totalMinutes > constraints.minutes) {
       counters[walkMinutes > constraints.maxWalkMinutes ? 'walkBudget' : 'totalBudget']++;
       if ((requested.length || constraints.category) && !(intents.accessible && wheelchair === 'no')
@@ -737,7 +840,18 @@ export function recommend(dataset, input, context = {}) {
     const landmark = landmarks.get(c);
     return landmark ? `${c.poi.name} у «${landmark.name}»` : c.poi.name;
   };
-  while (picks.length < 3 && taken.size < candidates.length) {
+  // «Удиви меня»: one place at random among those that passed the time, hours, child, night and category checks.
+  // Named places that are not a chain go first, so a surprise is rarely a nameless bench or a fast-food outlet.
+  let surprise = null;
+  if (constraints.surprise) {
+    const withName = candidates.filter(candidate => !candidate.poi.nameIsGenerated);
+    const local = withName.filter(candidate => !(candidate.poi.brand || (candidate.poi.tags && !Array.isArray(candidate.poi.tags) && candidate.poi.tags.brand)));
+    const pool = local.length ? local : withName.length ? withName : candidates;
+    const seed = constraints.surpriseSeed ?? Math.floor(Math.random() * 4294967296);
+    if (pool.length) picks.push(pool[Math.floor(seeded(seed)() * pool.length)]);
+    surprise = { seed, poolSize: pool.length };
+  }
+  while (!surprise && picks.length < 3 && taken.size < candidates.length) {
     const roundScores = new Map();
     const adjusted = c => {
       let value = roundScores.get(c);
@@ -762,7 +876,8 @@ export function recommend(dataset, input, context = {}) {
     if (label && picks.some(pick => labelOf(pick) === label)) continue;
     picks.push(best);
   }
-  const pickedIds = new Set(picks.map(pick => pick.poi.id));
+  // A second stop is never a hidden place or another card.
+  const pickedIds = new Set([...picks.map(pick => String(pick.poi.id)), ...hidden]);
   const recommendations = picks.map(pick => {
     const { directDistance, walkMinutes, returnMinutes, visitMinutes, totalMinutes, hours, matchedTerms, scoreBreakdown, score } = pick;
     // A nameless record is shown with the nearest named place, as in «Фонтан у «Mega Silk Way»».
@@ -785,7 +900,7 @@ export function recommend(dataset, input, context = {}) {
     }
     const pairing = pairingFor(pick, prepared, constraints, reference, pickedIds);
     return { ...poi, kind: pick.kind, distanceMeters: Math.ceil(directDistance), estimatedWalkDistanceMeters: Math.ceil(directDistance * DETOUR),
-      walkMinutes, visitMinutes, returnMinutes, safetyReserveMinutes: RESERVE, totalMinutes,
+      walkMinutes, visitMinutes, returnMinutes, safetyReserveMinutes: reserve, totalMinutes,
       why: whyFor({ ...pick, weather }, constraints, intents, reference), activities: activitiesFor(category), activitiesAreSuggestions: true,
       plan: planFor({ ...pick, poi }, constraints, reference, pairing), pairing,
       confidence: confidenceFor(poi, hours, constraints), notability: notabilityFor(poi), provenance: provenanceFor(poi), wheelchair: wheelchairOf(poi),
@@ -794,10 +909,12 @@ export function recommend(dataset, input, context = {}) {
       warnings: warningsFor(poi, constraints, hours), evidence, score, scoreBreakdown, matchedTerms,
       hoursCheck: hours ?? { status: poi.openingHours ? 'not_checked' : 'no_data' } };
   });
-  const route = microRoute(candidates, { ...constraints, foodFocus: requested.length > 0 && requested.every(category => FOOD.includes(category)), routeAsked: intents.route === true }, reference, walkBetween);
+  versusFor(recommendations.map((card, index) => ({ ...card, kindMatch: picks[index].kindMatch, categoryIntent: picks[index].categoryIntent })),
+    { weather, surprise, intents }).forEach((versus, index) => { recommendations[index].versus = versus; });
+  const route = surprise ? null : microRoute(candidates, { ...constraints, foodFocus: requested.length > 0 && requested.every(category => FOOD.includes(category)), routeAsked: intents.route === true }, reference, walkBetween);
   const warnings = [
     'Расстояние указано по прямой. Время пешком — оценка: расстояние × 1,35 при 4,2 км/ч; переходы, ограждения, входы и погода не проверены.',
-    'Каждая карточка — отдельный вариант прогулки. В суммарное время входят путь, посещение, выбранный возврат и резерв 5 минут.',
+    `Каждая карточка — отдельный вариант прогулки. В суммарное время входят путь, посещение, выбранный возврат и резерв ${reserve} минут.`,
     'Актуальное открытие мест, цены и наличие свободных мест не проверены.',
   ];
   if (kinds.length && !kindMatches.length && recommendations.length) {
@@ -844,9 +961,14 @@ export function recommend(dataset, input, context = {}) {
     warnings.unshift(`Пешком отсюда мест для осмотра мало. Ближайшее за пределами вашего времени: «${nearestSight.poi.name}», около ${km} км по прямой, `
       + `примерно ${nearestSight.walkMinutes} мин пешком в одну сторону. Дальше нужен транспорт; его время сервис не считает.`);
   }
+  const understood = understoodFor(constraints, requested, excluded, intents, reference, nightShift, weather, weatherRoof, meant);
+  if (counters.excludedByUser) {
+    const n = counters.excludedByUser;
+    understood.push({ key: 'hidden', label: `Не предлагаем ${n} ${fewOf(n, 'место', 'места', 'мест')}, ${fewOf(n, 'которое', 'которые', 'которые')} вы скрыли` });
+  }
+  if (surprise) understood.push({ key: 'surprise', label: `Удиви меня: одно случайное место из ${surprise.poolSize} подходящих по времени и часам работы` });
   return { recommendations, route, nearestBeyondLimits, nearestMissing, beyondWalk, constraints, warnings, unconfirmed: unconfirmedFor(constraints, recommendations),
-    intents: Object.keys(intents).filter(key => intents[key] === true),
-    understood: understoodFor(constraints, requested, excluded, intents, reference, nightShift, weather, weatherRoof, meant),
+    intents: Object.keys(intents).filter(key => intents[key] === true), understood, surprise,
     weather: weather ? { ...context.weather, condition: weather.label, text: weather.text, roofOnly: weatherRoof } : null,
     retrieval: { method: meant.length ? 'geo_keyword_retrieval_with_gemini_embeddings' : 'deterministic_geo_keyword_retrieval',
       usesEmbeddings: meant.length > 0, usesLanguageModel: false,
