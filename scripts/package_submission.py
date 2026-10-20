@@ -10,9 +10,9 @@ files = [ROOT / name for name in ['README.md', 'LICENSE', 'package.json', 'packa
 for folder in ['public', 'src', 'data', 'tests', 'scripts', 'drizzle']:
     files += [p for p in (ROOT / folder).rglob('*') if p.is_file() and '__pycache__' not in p.parts]
 for name in ['ascension-smartwalk-presentation.pptx', 'ascension-smartwalk-presentation.pdf',
-             'ascension-smartwalk-tests-and-limitations.pdf', 'ascension-smartwalk-defense-and-screencast.pdf', 'START-HERE.txt']:
+             'ascension-smartwalk-tests-and-limitations.pdf', 'START-HERE.txt']:
     files.append(ROOT / 'deliverables' / name)
-for name in ['runtime-verification.json', 'verified-evidence.json', 'deliverables-manifest.json', 'test-scenarios-source.txt', 'defense-and-screencast.txt']:
+for name in ['concept.md', 'ethics.md', 'integrations.md', 'watch.md', 'test-protocol.md', 'test-protocol.json', 'runtime-verification.json', 'verified-evidence.json']:
     p = ROOT / 'docs' / name
     if p.exists(): files.append(p)
 for name in ['video-qa.json', 'captions-ru.srt', 'narration-ru.txt']:
