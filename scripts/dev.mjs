@@ -26,7 +26,7 @@ createServer(async (req, res) => {
     const request = new Request(url, { method: req.method, headers: req.headers, ...(['GET', 'HEAD'].includes(req.method) ? {} : { body: Buffer.concat(chunks) }) });
     const api = await handleApi(request, env, dataset);
     if (api) { res.writeHead(api.status, Object.fromEntries(api.headers)); res.end(Buffer.from(await api.arrayBuffer())); return; }
-    const path = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname).replace(/^\/+/, '');
+    const path = url.pathname === '/' ? 'index.html' : url.pathname === '/watch' ? 'watch.html' : decodeURIComponent(url.pathname).replace(/^\/+/, '');
     const target = resolve(root, 'public', path);
     if (!target.startsWith(resolve(root, 'public') + '\\') && !target.startsWith(resolve(root, 'public') + '/')) { res.writeHead(403); res.end(); return; }
     const body = await readFile(target);
