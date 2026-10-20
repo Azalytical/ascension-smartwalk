@@ -6,7 +6,7 @@ import { formatDistance } from '../core/geo.js';
 import { lang } from '../core/i18n.js';
 import * as store from '../core/store.js';
 import { timeRing } from './ring.js';
-import { categoryArt, categoryName, hoursStatus, hoursChip, navLinks, share, returnBy, backButton, watchButton } from './common.js';
+import { categoryArt, categoryName, hoursStatus, hoursChip, navLinks, share, returnBy, backButton, watchButton, listenButton } from './common.js';
 import { toast } from './toast.js';
 
 const WHEELCHAIR = { yes: 'place.wheelchair.yes', limited: 'place.wheelchair.limited', no: 'place.wheelchair.no' };
@@ -70,9 +70,10 @@ export function placeView({ place, timing, start, serverHours, why, activities =
       h('div', { class: 'time-card-side' }, h('ul', { class: 'legend' }, legend), h('p', { class: 'return-by' }, icon('return'), t('place.returnNow', { time: returnBy(total) })))),
     routeLine,
     h('button', { class: 'btn btn-gold btn-xl', type: 'button', onclick: onStart }, icon('play'), t('place.start')),
-    h('div', { class: 'place-actions' }, watchButton({ place, start, walk: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, minutes: timing.totalMinutes }), friends),
-    start ? navLinks(start, place) : null,
-    place.aiWhy ? section(t('place.why'), h('p', { class: 'prose', text: place.aiWhy }), gemini('aiWhy'))
+    h('div', { class: 'place-actions' }, watchButton({ place, start, walk: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, minutes: timing.totalMinutes }), friends,
+      safeUrl(place.links?.googleCalendar) ? h('a', { class: 'btn btn-quiet btn-sm', href: safeUrl(place.links.googleCalendar), target: '_blank', rel: 'noopener noreferrer' }, icon('calendar'), t('place.calendar')) : null),
+    start ? navLinks(start, place, place.links) : null,
+    place.aiWhy ? section(t('place.why'), h('p', { class: 'prose', text: place.aiWhy }), gemini('aiWhy'), listenButton(() => [place.aiWhy, place.aiTodo].filter(Boolean).join(' ')))
       : why ? section(t('place.why'), h('p', { class: 'prose', text: why }), origin('why')) : null,
     place.aiTodo || steps.length ? section(t('place.plan'), place.aiTodo ? h('p', { class: 'prose', text: place.aiTodo }) : null, place.aiTodo ? gemini('aiTodo') : null,
       steps.length ? h('ol', { class: 'plan-steps' }, steps.map((step) => h('li', { text: step }))) : null, steps.length ? origin('plan') : null) : null,
