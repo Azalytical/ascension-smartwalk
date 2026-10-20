@@ -270,6 +270,11 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .origin.is-idea { color: var(--sky-ink, var(--sky)); }
 .origin.is-ai { color: var(--ink-3); }
 .ai-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--r-pill); background: var(--gold-soft); color: var(--gold-ink); font-weight: 650; }
+.notices { display: grid; gap: 6px; }
+.notice { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--amber-soft); color: var(--ink-2); font-size: var(--fs-13); line-height: 1.45; text-wrap: pretty; }
+.notice .icon-xs { flex: none; margin-top: 2px; color: var(--amber); }
+.disclosure.unchecked { margin-top: 0; }
+.state-view .notices, .state-view .disclosure { justify-self: stretch; text-align: left; }
 .understood { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
 .understood-title { font-size: var(--fs-13); font-weight: 650; color: var(--ink-3); }
 /* «Мы учли» is information, not a picker: the chips wrap onto new lines (long ones wrap inside) instead of scrolling off the edge. */
