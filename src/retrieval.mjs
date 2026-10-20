@@ -8,7 +8,7 @@ const BOUNDS = Object.freeze({ minLat: 51, maxLat: 51.35, minLon: 71.25, maxLon:
 const DETOUR = 1.35;
 const SPEED_KMH = 4.2;
 const RESERVE = 5;
-const VISIT = { park: 15, cafe: 20, museum: 35, playground: 20, attraction: 15, restaurant: 45, mall: 40, culture: 60, family: 60, nightlife: 60 };
+export const VISIT = { park: 15, cafe: 20, museum: 35, playground: 20, attraction: 15, restaurant: 45, mall: 40, culture: 60, family: 60, nightlife: 60 };
 const LABELS = { park: 'парк', cafe: 'кафе', museum: 'музей', playground: 'площадка', attraction: 'достопримечательность',
   restaurant: 'место, где поесть', mall: 'торговый центр', culture: 'место для культурного досуга', family: 'место для семейного отдыха', nightlife: 'бар или паб' };
 // Categories that keep a visitor under a roof. Used for rain, cold and "indoor" requests.

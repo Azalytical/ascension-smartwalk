@@ -90,6 +90,15 @@ gcloud run deploy smartwalk --source . --region europe-west1 --allow-unauthentic
 
 API: `GET /api/social/state|events|event|invite`, `POST /api/social/<действие>` с `Authorization: Bearer <токен>`, `GET /api/social/places?q=` для поиска мест. Описание действий — `src/social/store.mjs`, проверки — `tests/social.test.mjs`.
 
+## Интеграции: Gemini-агент, MCP, Google
+
+Подробно: [docs/integrations.md](docs/integrations.md).
+
+- **ИИ-агент на Gemini** (`/agent`): Gemini сам вызывает инструменты (погода, подбор мест, поиск, карточка места, мини-маршрут из 3 мест) и показывает каждый шаг. Координаты человека в модель не уходят.
+- **«Что это за здание?»** по фото и **ответ голосом** через Gemini (русский, казахский, английский).
+- **MCP-сервер** `/mcp` с теми же инструментами: `gemini extensions install https://github.com/Azalytical/ascension-smartwalk` подключает Seruen к Gemini CLI; пример агента на Google ADK — `integrations/adk/`.
+- У каждого места ссылки **Google Maps** (пешком, без точки старта в ссылке), **2ГИС** и **Google Календарь** на время прогулки; погода и закат из Open-Meteo.
+
 ## Как работает RAG
 
 1. Скрипт импорта получает POI из OpenStreetMap через Overpass и нормализует их (`scripts/import_osm_pois.py`). `scripts/fetch_overture.py` берёт из публичного бакета Overture Maps только части файлов, пересекающие Астану. `scripts/build_places.py` объединяет источники в `data/places.json`: записи OSM в приоритете, совпавшее место из Overture только дополняет пустые контакты с указанием источника каждого поля, отчёт по слиянию в `data/places-report.json`.

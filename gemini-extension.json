@@ -1,0 +1,12 @@
+{
+  "name": "seruen",
+  "version": "2.0.0",
+  "description": "Seruen: walks around Astana that fit your time. Plans, micro-routes, opening hours and weather for 2,000+ Astana places from OpenStreetMap and Overture Maps, as MCP tools.",
+  "mcpServers": {
+    "seruen": {
+      "httpUrl": "https://ascension-smartwalk.azamatbreach.workers.dev/mcp",
+      "timeout": 20000
+    }
+  },
+  "contextFileName": "GEMINI.md"
+}

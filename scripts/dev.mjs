@@ -22,14 +22,16 @@ const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=
 createServer(async (req, res) => {
   try {
     const chunks = []; let count = 0;
-    for await (const chunk of req) { count += chunk.length; if (count > 8192) { res.writeHead(413); res.end(); return; } chunks.push(chunk); }
+    // Photos for /api/vision are the only large bodies.
+    const limit = req.url.startsWith('/api/vision') ? 1500000 : req.url.startsWith('/mcp') ? 65536 : 8192;
+    for await (const chunk of req) { count += chunk.length; if (count > limit) { res.writeHead(413); res.end(); return; } chunks.push(chunk); }
     // Behind Cloud Run the public origin comes from Host and X-Forwarded-Proto; the API compares it with Origin.
     const proto = production && req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
     const url = new URL(req.url, `${proto}://${req.headers.host || `localhost:${port}`}`);
     const request = new Request(url, { method: req.method, headers: req.headers, ...(['GET', 'HEAD'].includes(req.method) ? {} : { body: Buffer.concat(chunks) }) });
     const api = await handleApi(request, env, dataset);
     if (api) { res.writeHead(api.status, Object.fromEntries(api.headers)); res.end(Buffer.from(await api.arrayBuffer())); return; }
-    const path = url.pathname === '/' ? 'index.html' : url.pathname === '/watch' ? 'watch.html' : decodeURIComponent(url.pathname).replace(/^\/+/, '');
+    const path = url.pathname === '/' ? 'index.html' : url.pathname === '/watch' ? 'watch.html' : url.pathname === '/agent' ? 'agent.html' : decodeURIComponent(url.pathname).replace(/^\/+/, '');
     const target = resolve(root, 'public', path);
     if (!target.startsWith(resolve(root, 'public') + '\\') && !target.startsWith(resolve(root, 'public') + '/')) { res.writeHead(403); res.end(); return; }
     const body = await readFile(target);
