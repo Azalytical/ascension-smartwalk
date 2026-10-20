@@ -36,6 +36,18 @@ const FALLBACK_TEXT = {
     en: far => `Few places are within walking range: the nearest beyond it is «${far.name}», about ${far.distanceKm} km away, so you would need transport.` },
 };
 
+/** The transport hint in the visitor's language, for answers that leave it out. */
+export const farNote = (far, lang = 'ru') => (FALLBACK_TEXT.far[lang] || FALLBACK_TEXT.far.ru)(far);
+
+// Words in Cyrillic and in Latin letters, place names and «quotes» left out: what the summary itself is written in.
+function wrongLanguage(summary, language, names) {
+  let text = summary.replace(/«[^»]*»|"[^"]*"/g, ' ');
+  for (const name of names) if (name) text = text.split(name).join(' ');
+  const cyrillic = text.match(/[а-яёәғқңөұүһі]{3,}/giu)?.length || 0;
+  const latin = text.match(/[a-z]{3,}/gi)?.length || 0;
+  return language === 'en' ? cyrillic >= 3 && cyrillic > latin : latin >= 3 && latin > cyrillic;
+}
+
 const S = (description, extra = {}) => ({ type: 'STRING', description, ...extra });
 const N = description => ({ type: 'NUMBER', description });
 const DECLARATIONS = [
@@ -170,7 +182,7 @@ export async function runAgent(input, deps) {
     const places = ids.map(id => seen.get(id)).filter(Boolean).map(place => ({ ...place,
       links: Number.isFinite(place.totalMinutes) ? placeLinks(place, { start: now }) : mapLinks(place) }));
     const route = extra.route && lastRoute && ids.every(id => lastRoute.stops.some(stop => stop.id === id)) ? lastRoute : null;
-    return { mode, summary, places, route, steps, modelCalls, toolCalls, elapsedMs: Date.now() - startedAt,
+    return { mode, summary, places, route, ...(lastPlanBeyond ? { beyondWalk: lastPlanBeyond } : {}), steps, modelCalls, toolCalls, elapsedMs: Date.now() - startedAt,
       privacy: 'Gemini не получал ваши координаты: точку старта подставлял в инструменты сервер, а из ответов инструментов координаты убраны.',
       ...(extra.reason ? { reason: extra.reason } : {}), ...(extra.model ? { provider: 'gemini', model: extra.model } : {}) };
   };
@@ -184,7 +196,7 @@ export async function runAgent(input, deps) {
     const lang = ['ru', 'kk', 'en'].includes(input.lang) ? input.lang : answerLanguage(input.query);
     let summary = (plan.length ? FALLBACK_TEXT.some : FALLBACK_TEXT.none)[lang];
     const far = walk?.beyondWalk ?? lastPlanBeyond;
-    if (plan.length && far) summary += ` ${FALLBACK_TEXT.far[lang](far)}`;
+    if (plan.length && far) summary += ` ${farNote(far, lang)}`;
     return finish('fallback', summary, plan.map(place => place.id), { reason, model });
   }
 
@@ -231,19 +243,24 @@ export async function runAgent(input, deps) {
       const ids = Array.isArray(answer.place_ids) ? [...new Set(answer.place_ids.map(String))].slice(0, 3) : [];
       const summary = typeof answer.summary === 'string' ? answer.summary.trim() : '';
       const claim = summary.match(unsupported)?.[0];
+      const foreign = summary && wrongLanguage(summary, language, [...[...seen.values()].map(place => place.name), lastPlanBeyond?.name]);
       const problem = !summary || summary.length > 700 ? 'summary пустой или длиннее 700 символов'
         : !ids.length || ids.some(id => !seen.has(id)) ? `place_ids — только 1–3 id из результатов инструментов: ${[...seen.keys()].slice(0, 12).join(', ')}`
-          : claim ? `в summary есть то, чего нет в данных («${claim}»): убери это слово и утверждение, оставь названия, минуты, часы и погоду` : null;
-      if (problem && (rejected || Date.now() > deadline - 3500)) return fallback(claim && ids.length ? 'unsupported_claim' : 'validation', model);
+          : claim ? `в summary есть то, чего нет в данных («${claim}»): убери это слово и утверждение, оставь названия, минуты, часы и погоду`
+            : foreign ? `summary должен быть на языке answerLanguage = ${language}; названия мест можно оставить как есть` : null;
+      if (problem && (rejected || Date.now() > deadline - 3500)) return fallback(claim && ids.length ? 'unsupported_claim' : foreign ? 'language' : 'validation', model);
       if (problem) {
         rejected = true;
-        steps.push({ tool: 'check', args: {}, label: 'Сервер вернул ответ на доработку', summary: claim ? `Нет в данных: «${claim}»` : 'Места только из найденных', ms: 0 });
+        steps.push({ tool: 'check', args: {}, label: 'Сервер вернул ответ на доработку',
+          summary: claim ? `Нет в данных: «${claim}»` : foreign ? 'Ответ не на языке вопроса' : 'Места только из найденных', ms: 0 });
         contents.push({ role: 'user', parts: calls.map(({ functionCall: { name, id } }) => ({ functionResponse: { name, ...(id ? { id } : {}),
           response: { error: name === 'give_answer' ? `Ответ отклонён проверкой: ${problem}. Вызови give_answer ещё раз.` : 'Не выполнено: сначала исправь ответ.' } } })) });
         continue;
       }
       steps.push({ tool: 'give_answer', args: {}, label: 'Сформулировал ответ', summary: `Gemini выбрал: ${ids.map(id => seen.get(id).name).join(', ')}`, ms: 0 });
-      return finish('agent', summary, ids, { route: answer.route === true, model });
+      // Few places within walking range: the hint about transport stays even when Gemini leaves it out.
+      const far = lastPlanBeyond && !summary.includes(lastPlanBeyond.name) && !/транспорт|такси|автобус|көлік|transport|taxi|bus/iu.test(summary);
+      return finish('agent', far ? `${summary} ${farNote(lastPlanBeyond, language)}` : summary, ids, { route: answer.route === true, model });
     }
     const responses = [];
     for (const part of calls) {
