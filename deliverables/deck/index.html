@@ -406,7 +406,7 @@ h1 em,h2 em{font-style:normal;color:var(--gold)}
   <h2 data-a="words">Модель объясняет только то, <em>что нашёл поиск</em>.</h2>
   <div class="pipe">
     <div class="rail" data-a="grow" data-t="0.3"><i></i><i></i><i></i><i></i><i></i><span class="pulse"></span></div>
-    <div class="step glass" data-a="up" data-t="0.45"><span class="n">01 · ДАННЫЕ</span><h3>OSM + Overture</h3><p>Сбор скриптами, дубли сведены, источник у каждой записи</p><div class="fig"><span data-a="count" data-t="0.6" data-dur="2.2">2255</span><small>мест</small></div></div>
+    <div class="step glass" data-a="up" data-t="0.45"><span class="n">01 · ДАННЫЕ</span><h3>OSM + Overture</h3><p>Сбор скриптами из 2255 записей, дубли сведены, источник у каждой</p><div class="fig"><span data-a="count" data-t="0.6" data-dur="2.2">2058</span><small>мест</small></div></div>
     <div class="step glass" data-a="up" data-t="0.6"><span class="n">02 · ПОИСК</span><h3>Отбор кандидатов</h3><p>Смысл запроса через Gemini Embeddings, категория и расстояние, RU/KZ/EN</p><div class="fig"><span data-a="count" data-t="0.8">3</span><small>языка</small></div></div>
     <div class="step glass" data-a="up" data-t="0.75"><span class="n">03 · ПРОВЕРКА</span><h3>Время и часы</h3><p>Бюджет прогулки и часы работы на весь визит; непонятный формат часов — «неизвестно», не угадываем</p><div class="fig wide"><span data-a="count" data-t="0.95" data-dur="1.8">145</span> из 146<small>форматов часов OSM</small></div></div>
     <div class="step glass ai" data-a="up" data-t="0.9"><svg class="spark" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="gem" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4796E3"/><stop offset=".55" stop-color="#9177C7"/><stop offset="1" stop-color="#CA6673"/></linearGradient></defs><path d="M12 0C12.6 6.4 17.6 11.4 24 12C17.6 12.6 12.6 17.6 12 24C11.4 17.6 6.4 12.6 0 12C6.4 11.4 11.4 6.4 12 0Z" fill="url(#gem)"/></svg><span class="n">04 · GEMINI</span><h3>Объяснение «почему»</h3><p>Видит только найденные записи; ID источников сверяются</p><div class="fig">3.5 Flash-Lite</div></div>
@@ -459,11 +459,11 @@ h1 em,h2 em{font-style:normal;color:var(--gold)}
   <div class="crit" data-a="fade"><span>Завершённость</span><span>Этика и приватность</span></div>
   <div>
     <div class="kicker" data-a="up">09 <b>/ Проверки</b></div>
-    <div class="score" data-a="up"><span data-a="count" data-dur="1.8">145</span><small>/145</small></div>
+    <div class="score" data-a="up"><span data-a="count" data-dur="1.8">187</span><small>/187</small></div>
     <div class="bar"><i data-a="grow" data-t="0.2" data-dur="1.8"></i></div>
     <p class="cap" data-a="up">автотестов проходят: поиск, часы и погода, друзья и встречи, часы на руке, приватность и лимиты</p>
     <div class="facts">
-      <div class="fact glass" data-a="up"><strong data-a="count" data-dur="1.6">2255</strong><span>мест после сведения дублей</span></div>
+      <div class="fact glass" data-a="up"><strong data-a="count" data-dur="1.6">2058</strong><span>мест в подборе после сведения дублей</span></div>
       <div class="fact glass" data-a="up"><strong><span data-a="count">15</span>/15</strong><span>сценариев протокола приёмки Pass</span></div>
     </div>
   </div>
@@ -501,7 +501,7 @@ h1 em,h2 em{font-style:normal;color:var(--gold)}
   <h2 data-a="words">Из прогулки в инструмент <em>для города</em>.</h2>
   <div class="road">
     <div class="line" data-a="grow" data-t="0.4" data-dur="1.6"></div>
-    <div class="stop"><div class="dot" data-a="pop" data-t="0.5"></div><div data-a="up" data-t="0.6"><span>Уже работает</span><h3>Сегодня в городе</h3><p>Афишу дня сервер собирает сам, у события ссылка на источник. Плюс «Перед&nbsp;выходом», «Удиви&nbsp;меня», «На&nbsp;улице»</p></div></div>
+    <div class="stop"><div class="dot" data-a="pop" data-t="0.5"></div><div data-a="up" data-t="0.6"><span>Уже работает</span><h3>Сегодня в городе</h3><p>Афишу дня сервер собирает сам, у события ссылка на источник. Плюс «Перед&nbsp;выходом», «Удиви&nbsp;меня», «На&nbsp;улице», «Больше&nbsp;не&nbsp;предлагать»</p></div></div>
     <div class="stop"><div class="dot" data-a="pop" data-t="1.0"></div><div data-a="up" data-t="1.1"><span>Следом</span><h3>Точнее время</h3><p>Пешеходные маршруты вместо оценки по прямой, больше проверенных полей о местах</p></div></div>
     <div class="stop"><div class="dot" data-a="pop" data-t="1.5"></div><div data-a="up" data-t="1.6"><span>Пилот</span><h3>Карта спроса для НИЦ</h3><p>Обезличенные запросы показывают, каких мест городу не хватает. Пилот с кампусами и гостиницами</p></div></div>
   </div>
