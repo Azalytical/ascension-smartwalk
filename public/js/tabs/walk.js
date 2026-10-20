@@ -321,7 +321,7 @@ const timingOf = (place) => ({ distanceMeters: place.distanceMeters, walkMinutes
 
 function startPlace(place, spoken) {
   const timing = timingOf(place);
-  startWalk({ place, start, timing });
+  startWalk({ place, start, timing, backAt: backOf(place) });
   view = 'live'; render();
   if (spoken) speakText(t('voice.go', { name: place.name, time: backOf(place) }));
 }
