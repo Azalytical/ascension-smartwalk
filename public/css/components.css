@@ -77,7 +77,8 @@ button, a, [role="button"], .chip, .seg { touch-action: manipulation; -webkit-us
 .field-input::placeholder { color: var(--ink-3); opacity: 1; }
 .field-input::-webkit-search-cancel-button { -webkit-appearance: none; }
 .search-field:focus-within { box-shadow: 0 0 0 2px var(--sky); background: var(--surface); }
-.search-field .mic { margin-right: 6px; width: 42px; height: 42px; flex: none; border-radius: 50%; background: var(--gold); color: var(--on-gold); position: relative; }
+.mic { position: relative; border-radius: 50%; background: var(--gold); color: var(--on-gold); }
+.search-field .mic { margin-right: 6px; width: 42px; height: 42px; flex: none; }
 .mic.is-listening { background: var(--red); color: #fff; }
 .mic.is-listening::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--red); animation: mic-pulse 1.2s ease-out infinite; pointer-events: none; }
 .mic.is-thinking { background: var(--surface); color: var(--gold-ink); }

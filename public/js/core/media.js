@@ -30,7 +30,7 @@ let audio = null;
 export function unlockAudio() {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) return null;
-  audio ||= new AudioContext();
+  if (!audio || audio.state === 'closed') audio = new AudioContext();
   audio.resume?.().catch(() => {});
   try {
     const source = audio.createBufferSource();
@@ -38,10 +38,19 @@ export function unlockAudio() {
     source.connect(audio.destination);
     source.start();
   } catch { /* nothing to unlock */ }
+  // The browser voice (the fallback) needs the same tap on iOS: an empty phrase unlocks it.
+  if ('speechSynthesis' in window && !unlockAudio.voice) { unlockAudio.voice = true; speechSynthesis.speak(new SpeechSynthesisUtterance('')); }
   return audio;
 }
 
+// The fallback voice follows the letters of the answer, so a Kazakh answer is read in Kazakh even in the Russian interface.
+const voiceLang = (text) => (/[әғқңөұүһі]/i.test(text) ? 'kk-KZ' : /[а-яё]/i.test(text) ? 'ru-RU' : /[a-z]/i.test(text) ? 'en-US' : ({ ru: 'ru-RU', kk: 'kk-KZ', en: 'en-US' }[lang()] || 'ru-RU'));
+
+// Bumped by every new phrase and by stop, so a voice that is still loading never starts late over the mic.
+let speech = 0;
+
 export function stopSpeaking() {
+  speech++;
   playing?.stop();
   playing = null;
   if ('speechSynthesis' in window) speechSynthesis.cancel();
@@ -50,12 +59,14 @@ export function stopSpeaking() {
 /** Reads the text with Gemini TTS (24 kHz 16-bit PCM); falls back to the browser voice. Resolves when done. */
 export async function speakText(text) {
   stopSpeaking();
+  const id = speech;
   const clean = String(text || '').slice(0, 400);
   if (!clean) return;
   const context = audio || unlockAudio();
   try {
     if (!context) throw new Error('no audio');
     const data = await post('/api/speak', { text: clean, lang: lang() }, 30000);
+    if (id !== speech) return;
     const bytes = Uint8Array.from(atob(data.data), (char) => char.charCodeAt(0));
     // A WAV answer starts with a RIFF header; the samples after it are the same 16-bit PCM.
     const offset = bytes.length > 44 && String.fromCharCode(...bytes.subarray(0, 4)) === 'RIFF' ? 44 : 0;
@@ -67,21 +78,24 @@ export async function speakText(text) {
     source.buffer = buffer;
     source.connect(context.destination);
     await context.resume?.();
+    // A context that was never unlocked by a tap stays silent on iOS without an error: use the browser voice instead.
+    if (context.state !== 'running') throw new Error('audio locked');
+    if (id !== speech) return;
     source.start();
     await new Promise((resolve) => {
       playing = { stop: () => { try { source.stop(); } catch { /* already stopped */ } resolve(); } };
       source.onended = resolve;
     });
   } catch {
-    if (!('speechSynthesis' in window)) return;
+    if (id !== speech || !('speechSynthesis' in window)) return;
     await new Promise((resolve) => {
       const utterance = new SpeechSynthesisUtterance(clean);
-      utterance.lang = { ru: 'ru-RU', kk: 'kk-KZ', en: 'en-US' }[lang()] || 'ru-RU';
+      utterance.lang = voiceLang(clean);
       utterance.onend = resolve; utterance.onerror = resolve;
       playing = { stop: () => { speechSynthesis.cancel(); resolve(); } };
       speechSynthesis.speak(utterance);
     });
   } finally {
-    playing = null;
+    if (id === speech) playing = null;
   }
 }

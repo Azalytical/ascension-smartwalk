@@ -329,7 +329,7 @@ async function weather(request, url, env) {
 }
 
 // Gemini features beyond the walk summary. Each request counts once against the same demo budget as /api/recommend.
-const BODY_LIMITS = { '/api/agent': 4096, '/api/vision': 1500000, '/api/speak': 4096, '/api/listen': 1100000 };
+const BODY_LIMITS = { '/api/agent': 8192, '/api/vision': 1500000, '/api/speak': 4096, '/api/listen': 1100000 };
 const agentDays = new Map();
 async function gemini(request, url, env, dataset) {
   if (request.method !== 'POST') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'POST' });
@@ -356,7 +356,11 @@ async function gemini(request, url, env, dataset) {
       const used = (agentDays.get(day) || 0) + 1;
       agentDays.clear(); agentDays.set(day, used);
       const agentEnv = used <= Number(env.AGENT_DAILY_LIMIT || 150) ? model : { ...model, GEMINI_API_KEY: undefined };
-      return json(await runAgent({ query: body.query.trim(), lat, lon, minutes, withChild: body.withChild === true },
+      // A spoken follow-up ("а поближе?") carries the previous question and answer; both are short plain text.
+      const text = (value, limit) => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, limit) : '');
+      const previous = body.previous && typeof body.previous === 'object' && text(body.previous.query, 300)
+        ? { query: text(body.previous.query, 300), summary: text(body.previous.summary, 500) } : undefined;
+      return json(await runAgent({ query: body.query.trim(), lat, lon, minutes, withChild: body.withChild === true, lang: body.lang, previous },
         { env: agentEnv, dataset, limitedJson, answerLanguage, unsupported: UNSUPPORTED }));
     }
     if (url.pathname === '/api/vision') return json(await identifyPlace(body, { env: model, dataset, limitedJson }));

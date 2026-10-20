@@ -1,18 +1,18 @@
 """Aidem agent on Google ADK: Gemini plans walks in Astana through the Aidem MCP server.
 
-Run locally:  adk web   (from integrations/adk, with GOOGLE_API_KEY in ulger_agent/.env)
-Deploy later: adk deploy agent_engine ulger_agent   (needs a Google Cloud project with Vertex AI)
+Run locally:  adk web   (from integrations/adk, with GOOGLE_API_KEY in aidem_agent/.env)
+Deploy later: adk deploy agent_engine aidem_agent   (needs a Google Cloud project with Vertex AI)
 """
 import os
 
 from google.adk.agents import Agent
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
 
-MCP_URL = os.getenv("ULGER_MCP_URL", "https://ascension-smartwalk.azamatbreach.workers.dev/mcp")
+MCP_URL = os.getenv("AIDEM_MCP_URL", "https://ascension-smartwalk.azamatbreach.workers.dev/mcp")
 
 root_agent = Agent(
     name="aidem",
-    model=os.getenv("ULGER_MODEL", "gemini-3.5-flash-lite"),
+    model=os.getenv("AIDEM_MODEL", "gemini-3.5-flash-lite"),
     description="Plans walks around Astana that fit the visitor's time, from OpenStreetMap and Overture Maps places.",
     instruction=(
         "Ты агент Aidem: подбираешь прогулку по Астане ровно под время человека. "

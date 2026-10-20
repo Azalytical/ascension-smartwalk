@@ -41,6 +41,11 @@ let locationNote = null;
 let autoLocated = false;
 // A search started by voice is answered aloud: the Gemini tip, or a short line when there is none.
 let speakNext = false;
+// Hands-free: after the spoken answer the mic listens again for a follow-up («второй», «поехали», «а на полчаса?»).
+// It ends when nothing is said, on «хватит», after MAX_VOICE_TURNS, or when the person types or stops the voice.
+let voiceTurns = 0;
+let voice = null;
+const MAX_VOICE_TURNS = 5;
 const MANUAL_START_MS = 3 * 3600000;
 
 function presetStart(id) {
@@ -103,6 +108,7 @@ function greeting() {
 // ---------- rendering ----------
 function render() {
   if (!root) return;
+  if (voice && voice.view !== view) dropVoice();
   if (view !== 'live' && liveCleanup) { liveCleanup(); liveCleanup = null; }
   const renderers = { plan: renderPlan, start: renderStart, pick: renderPick, loading: renderLoading, results: renderResults, place: renderPlace, live: renderLive };
   (renderers[view] || renderPlan)();
@@ -117,9 +123,9 @@ function renderPlan() {
 
   const query = h('input', { id: 'query', class: 'field-input', type: 'search', enterkeyhint: 'search', autocomplete: 'off', spellcheck: 'false', maxlength: 400,
     placeholder: t('plan.queryPlaceholder'), value: plan.query, 'aria-label': t('plan.queryLabel') });
-  query.addEventListener('input', () => { plan.query = query.value; plan.mood = MOODS.find(([id]) => t(`moodQuery.${id}`) === query.value)?.[0] || null; savePlan(); syncMoods(); });
+  query.addEventListener('input', () => { voiceTurns = 0; plan.query = query.value; plan.mood = MOODS.find(([id]) => t(`moodQuery.${id}`) === query.value)?.[0] || null; savePlan(); syncMoods(); });
   query.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); query.blur(); submit(); } });
-  const mic = voiceButton(query, () => { query.blur(); submit({ spoken: true }); });
+  const mic = voiceButton();
 
   const moods = h('div', { class: 'chip-row no-drag', role: 'group', 'aria-label': t('plan.queryLabel') },
     MOODS.map(([id, file]) => h('button', { type: 'button', class: 'chip', dataset: { mood: id }, 'aria-pressed': String(plan.mood === id),
@@ -181,34 +187,105 @@ async function renderWeather(host, onIndoor) {
 }
 
 // The mic: say "час, кофе и парк" and the walk is planned right away; the time is taken out of the phrase.
-function voiceButton(input, onDone) {
+// The plan, the results and the place card each have one; they share one phrase at a time (`voice`).
+function voiceButton() {
   const button = h('button', { class: 'icon-btn mic', type: 'button', 'aria-label': t('plan.voice') }, icon('mic'));
   if (!canListen()) { button.hidden = true; return button; }
-  let session = null;
-  const setState = (state) => {
+  button.addEventListener('click', () => listen(false));
+  return button;
+}
+
+function showVoiceState(state) {
+  root?.querySelectorAll('.mic').forEach((button) => {
     button.classList.toggle('is-listening', state === 'listening');
     button.classList.toggle('is-thinking', state === 'thinking');
     button.setAttribute('aria-label', t(state === 'listening' ? 'plan.voiceStop' : 'plan.voice'));
-    input.placeholder = t(state === 'listening' ? 'plan.voiceListening' : state === 'thinking' ? 'plan.voiceThinking' : 'plan.queryPlaceholder');
-  };
-  button.addEventListener('click', async () => {
-    if (session) { session.stop(); return; }
-    stopSpeaking();
-    unlockAudio();
-    input.value = '';
-    session = startListening({ onState: setState, onText: (text) => { input.value = text; } });
-    try {
-      const text = (await session.promise).trim();
-      if (!text) { toast(t('plan.voiceNothing'), { iconName: 'mic' }); return; }
-      input.value = text;
-      plan.query = text; plan.mood = null; savePlan();
-      root?.querySelectorAll('.chip[data-mood]').forEach((chip) => chip.setAttribute('aria-pressed', 'false'));
-      onDone();
-    } catch (failure) {
-      toast(failure?.message === 'unsupported' ? t('plan.voiceUnsupported') : failure?.name === 'NotAllowedError' ? t('plan.voiceDenied') : t('plan.voiceFailed'), { iconName: 'warning' });
-    } finally { session = null; }
   });
-  return button;
+  const input = root?.querySelector('#query');
+  if (input) input.placeholder = t(state === 'listening' ? 'plan.voiceListening' : state === 'thinking' ? 'plan.voiceThinking' : 'plan.queryPlaceholder');
+}
+
+// Leaving the screen (or the tab) drops the phrase being heard and ends the conversation.
+function dropVoice() {
+  if (voice) { voice.cancelled = true; voice.session.stop(); voice = null; }
+  voiceTurns = 0;
+}
+
+async function listen(followUp) {
+  // A tap while listening ends the phrase early; a follow-up never interrupts a phrase already being heard.
+  if (voice) { if (!followUp) voice.session.stop(); return; }
+  voiceTurns = followUp ? voiceTurns + 1 : 1;
+  stopSpeaking();
+  if (!followUp) unlockAudio();
+  const field = () => root?.querySelector('#query');
+  if (field()) field().value = '';
+  if (followUp) toast(t('voice.followUp'), { iconName: 'mic', duration: 6000 });
+  const mine = { view, cancelled: false, session: null };
+  voice = mine;
+  mine.session = startListening({ onState: (state) => { if (!mine.cancelled) showVoiceState(state); },
+    onText: (text) => { if (!mine.cancelled && field()) field().value = text; }, ...(followUp ? { silentStartMs: 7000 } : {}) });
+  try {
+    const text = (await mine.session.promise).trim();
+    if (voice === mine) voice = null;
+    if (mine.cancelled) return;
+    // Silence after an answer simply ends the conversation; silence after a tap gets a hint.
+    if (!text) { voiceTurns = 0; if (!followUp) toast(t('plan.voiceNothing'), { iconName: 'mic' }); return; }
+    if (field()) { field().value = text; field().blur(); }
+    onPhrase(text);
+  } catch (failure) {
+    if (mine.cancelled) return;
+    voiceTurns = 0;
+    toast(failure?.message === 'unsupported' ? t('plan.voiceUnsupported') : failure?.name === 'NotAllowedError' ? t('plan.voiceDenied') : t('plan.voiceFailed'), { iconName: 'warning' });
+  } finally { if (voice === mine) voice = null; }
+}
+
+// What a spoken phrase asks for: 'stop', 'go', a result number (0-2), or null for a new search.
+const STOP_WORDS = /^(?:(?:нет,?\s+)?(?:спасибо|хватит|стоп|всё|все|отмена|пока)|(?:no\s+)?(?:thanks|thank you|stop|cancel|that's all|bye)|рақмет|болды|тоқта|жоқ)$/iu;
+const GO_WORDS = /^(?:ну\s+|давай(?:те)?\s+|so\s+|ok\s+)?(?:поехали|пошли|идём|идем|айда|айдём|айдем|начинаем|начать|старт|погнали|go|let'?s go|start|кеттік|жүрдік|бастау|бастаймыз)$/iu;
+const ORDINALS = [/(?<!\p{L})(?:перв|first|бірінші|(?:1|один|one|бір)(?![\p{L}\d]))/iu, /(?<!\p{L})(?:втор|second|екінші|(?:2|два|two|екі)(?![\p{L}\d]))/iu, /(?<!\p{L})(?:трет|third|үшінші|(?:3|три|three|үш)(?![\p{L}\d]))/iu];
+function voiceCommand(text) {
+  const phrase = text.toLowerCase().replace(/[.!?,«»"]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (STOP_WORDS.test(phrase)) return 'stop';
+  if (GO_WORDS.test(phrase)) return 'go';
+  // "второй", "давай первый", "расскажи про третий": short phrases only, so "два часа в парке" stays a search.
+  if (phrase.split(' ').length <= 4 && !understand(phrase).minutes) {
+    const index = ORDINALS.findIndex((pattern) => pattern.test(phrase));
+    if (index >= 0) return index;
+  }
+  return null;
+}
+
+function onPhrase(text) {
+  const command = voiceCommand(text);
+  const recs = (result?.recommendations || []).slice(0, 3);
+  const hasResults = (view === 'results' || view === 'place') && recs.length;
+  if (command === 'stop') { voiceTurns = 0; stopSpeaking(); return; }
+  if (command === 'go' && hasResults) { voiceTurns = 0; startPlace(recs[selected] || recs[0], true); return; }
+  if (typeof command === 'number' && hasResults && recs[command]) { speakNext = true; openResult(command); return; }
+  // A follow-up that only changes the time ("а на полчаса?") keeps the previous wishes.
+  const said = understand(text);
+  if (said.minutes && voiceTurns > 1 && said.query.replace(/[^\p{L}\d]+/gu, '').length < 3) plan.minutes = said.minutes;
+  else { plan.query = text; plan.mood = null; root?.querySelectorAll('.chip[data-mood]').forEach((chip) => chip.setAttribute('aria-pressed', 'false')); }
+  savePlan();
+  submit({ spoken: true });
+}
+
+// Reads the answer, then listens for a follow-up if the conversation is still on and the person is still here.
+async function answer(text, finished) {
+  speakNext = false;
+  const at = view;
+  const heard = await (finished || speakText(text).then(() => true));
+  if (!heard || !voiceTurns || voiceTurns >= MAX_VOICE_TURNS || view !== at || document.visibilityState !== 'visible' || !root?.isConnected) { if (!heard) voiceTurns = 0; return; }
+  if (root.querySelector('.mic:not([hidden])')) listen(true);
+}
+
+const timingOf = (place) => ({ distanceMeters: place.distanceMeters, walkMinutes: place.walkMinutes, visitMinutes: place.visitMinutes, returnMinutes: place.returnMinutes, safetyReserveMinutes: place.safetyReserveMinutes, totalMinutes: place.totalMinutes });
+
+function startPlace(place, spoken) {
+  const timing = timingOf(place);
+  startWalk({ place, start, timing });
+  view = 'live'; render();
+  if (spoken) speakText(t('voice.go', { name: place.name, time: returnBy(timing.totalMinutes) }));
 }
 
 function drawPlanMap() {
@@ -287,6 +364,7 @@ function buildRequest() {
 
 async function submit(options) {
   speakNext = options?.spoken === true;
+  if (!speakNext) voiceTurns = 0;
   const said = understand(plan.query);
   if (said.minutes) { plan.minutes = said.minutes; plan.query = said.query; plan.mood = null; savePlan(); }
   inflight?.abort();
@@ -362,7 +440,8 @@ function renderResults() {
   });
 
   clear(root, h('section', { class: 'view results-view', 'aria-labelledby': 'results-title' },
-    h('div', { class: 'view-bar' }, back, h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: 'Aidem', text: t('results.title', { min: request.minutes }), url: shareLink() }) }, icon('share'))),
+    h('div', { class: 'view-bar' }, back, h('div', { class: 'view-bar-actions' }, voiceButton(),
+      h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: 'Aidem', text: t('results.title', { min: request.minutes }), url: shareLink() }) }, icon('share')))),
     h('h2', { id: 'results-title', class: 'title-1', text: t('results.title', { min: request.minutes }) }),
     h('p', { class: 'meta' }, icon('pin', 'icon-xs'), t('results.start', { name: startName() }), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }), t('plan.returnBy', { time: time(leave + request.minutes * 60000) })),
     tip,
@@ -371,9 +450,10 @@ function renderResults() {
     routeCard(result.route)));
   drawResultsMap(recs);
   if (speakNext) {
-    speakNext = false;
-    if (llm) tip.querySelector('.listen-btn')?.click();
-    else speakText(t('voice.answer', { n: recs.length, name: recs[0].name, walk: recs[0].walkMinutes, time: time(leave + recs[0].totalMinutes * 60000) }));
+    // The Gemini tip is read through its own «Слушать» button, so «Стоп» there also ends the conversation.
+    const listen = llm && tip.querySelector('.listen-btn');
+    if (listen?.play) answer(null, listen.play());
+    else answer(t('voice.answer', { n: recs.length, name: recs[0].name, walk: recs[0].walkMinutes, time: time(leave + recs[0].totalMinutes * 60000) }));
   }
 }
 
@@ -454,18 +534,19 @@ function renderEmpty(back) {
     actions.unshift(h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { plan.minutes = minutes; plan.maxWalk = Math.max(plan.maxWalk, Math.min(60, nearest.walkMinutes)); savePlan(); submit(); } },
       icon('plus'), t('results.empty.take', { n: minutes })));
   }
-  clear(root, h('section', { class: 'view state-view' }, h('div', { class: 'view-bar' }, back),
+  clear(root, h('section', { class: 'view state-view' }, h('div', { class: 'view-bar' }, back, voiceButton()),
     h('div', { class: 'state-icon', 'aria-hidden': 'true' }, icon('compass')),
     h('h2', { class: 'title-2', text: t('results.empty.title') }), h('p', { class: 'lead', text: t('results.empty.text') }),
     nearest ? h('div', { class: 'pairing nearest' }, categoryArt(nearest.category, 36, 'art'), h('span', { class: 'row-text' }, h('small', { text: t('results.nearest') }), h('strong', { text: nearest.name }),
       h('small', { text: t('results.nearestValue', { walk: nearest.walkMinutes, n: nearest.neededMinutes }) }))) : null,
     h('div', { class: 'stack' }, actions)));
   layers.hidePins(); layers.hideRoutes(); layers.showReach(start, reachMeters(plan.minutes, plan.maxWalk));
-  if (speakNext) { speakNext = false; speakText(`${t('results.empty.title')} ${nearest?.name ? t('voice.nearest', { name: nearest.name, n: nearest.neededMinutes }) : ''}`); }
+  if (speakNext) answer(`${t('results.empty.title')} ${nearest?.name ? t('voice.nearest', { name: nearest.name, n: nearest.neededMinutes }) : ''}`);
 }
 
 function renderError(back) {
   speakNext = false;
+  voiceTurns = 0;
   const kind = error?.kind;
   const text = kind === 'offline' ? t('error.offline') : kind === 'timeout' ? t('error.timeout') : error?.message && kind !== 'server' ? error.message : (error?.message || t('error.server'));
   clear(root, h('section', { class: 'view state-view' }, h('div', { class: 'view-bar' }, back),
@@ -484,12 +565,15 @@ function openResult(index) {
 function renderPlace() {
   const place = result?.recommendations?.[selected];
   if (!place) { view = 'results'; render(); return; }
-  const timing = { distanceMeters: place.distanceMeters, walkMinutes: place.walkMinutes, visitMinutes: place.visitMinutes, returnMinutes: place.returnMinutes, safetyReserveMinutes: place.safetyReserveMinutes, totalMinutes: place.totalMinutes };
+  const timing = timingOf(place);
   const url = new URL(shareLink());
   clear(root, placeView({ place, timing, start, serverHours: place.hoursCheck, why: place.why, activities: place.activities || [], warnings: place.warnings || [],
     backLabel: t('common.back'), onBack: () => { view = 'results'; render(); },
-    onStart: () => { startWalk({ place, start, timing }); view = 'live'; render(); },
+    onStart: () => { voiceTurns = 0; startPlace(place); }, voice: voiceButton(),
     routeInfo: lastRoute?.id === place.id ? lastRoute.route : null, shareUrl: url.href }));
+  // Opened by voice («второй»): say why it fits and how long it takes, then wait for «поехали».
+  // The server's «why» is written for reading (all the minutes), so only Gemini's idea is said aloud.
+  if (speakNext) answer(`${place.name}. ${place.aiWhy || ''} ${t('voice.place', { walk: place.walkMinutes, time: returnBy(timing.totalMinutes) })}`);
   layers.selectPin(selected);
   layers.selectRoute(selected);
   fitPoints([[start.lon, start.lat], [place.lon, place.lat]], { maxZoom: 17 });
@@ -543,6 +627,7 @@ registerTab({
   },
   reopen() { if (view !== 'live' && view !== 'loading') { view = 'plan'; render(); } },
   unmount() {
+    dropVoice();
     document.body.classList.remove('is-picking');
     liveCleanup?.(); liveCleanup = null;
     layers.clearWalkLayers(); layers.hideStart();

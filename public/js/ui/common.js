@@ -72,12 +72,19 @@ export function watchButton(options) {
 export function listenButton(getText) {
   const button = h('button', { class: 'btn btn-quiet btn-sm listen-btn', type: 'button', 'aria-pressed': 'false' }, icon('speaker'), h('span', { text: t('common.listen') }));
   const label = button.querySelector('span');
-  button.addEventListener('click', async () => {
-    if (button.getAttribute('aria-pressed') === 'true') { stopSpeaking(); return; }
+  let stopped = false;
+  // play() reads the text aloud and resolves true when it was heard to the end, false when «Стоп» cut it short.
+  button.play = async () => {
     unlockAudio();
+    stopped = false;
     button.setAttribute('aria-pressed', 'true'); label.textContent = t('common.stop');
     try { await speakText(typeof getText === 'function' ? getText() : getText); }
     finally { button.setAttribute('aria-pressed', 'false'); label.textContent = t('common.listen'); }
+    return !stopped;
+  };
+  button.addEventListener('click', () => {
+    if (button.getAttribute('aria-pressed') === 'true') { stopped = true; stopSpeaking(); return; }
+    button.play();
   });
   return button;
 }

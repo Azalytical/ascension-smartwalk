@@ -12,7 +12,7 @@ for folder in ['public', 'src', 'data', 'tests', 'scripts', 'drizzle']:
 for name in ['ascension-smartwalk-presentation.pptx', 'ascension-smartwalk-presentation.pdf',
              'ascension-smartwalk-tests-and-limitations.pdf', 'START-HERE.txt']:
     files.append(ROOT / 'deliverables' / name)
-for name in ['concept.md', 'ethics.md', 'integrations.md', 'watch.md', 'test-protocol.md', 'test-protocol.json', 'runtime-verification.json', 'verified-evidence.json']:
+for name in ['concept.md', 'ethics.md', 'integrations.md', 'watch.md', 'test-protocol.md', 'test-protocol.json', 'runtime-verification.json']:
     p = ROOT / 'docs' / name
     if p.exists(): files.append(p)
 for name in ['video-qa.json', 'captions-ru.srt', 'narration-ru.txt']:
