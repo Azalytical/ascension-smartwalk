@@ -161,7 +161,7 @@ export async function refreshCityEvents(env) {
   return (await store.fetch(new Request('https://events.internal/refresh', { method: 'POST' }))).json();
 }
 
-const SNAPSHOT = Object.freeze({ mode: 'snapshot', events: CITY_EVENTS, collectedAt: EVENTS_COLLECTED_AT, fetchedAt: null, stats: null, lastAttempt: null });
+const SNAPSHOT = Object.freeze({ mode: 'snapshot', events: CITY_EVENTS, collectedAt: EVENTS_COLLECTED_AT, fetchedAt: null, parser: null, stats: null, lastAttempt: null });
 
 // The events in use, cached per isolate for five minutes. A slow or missing store never holds up a walk: after the
 // timeout the last copy, or the snapshot, is used. The snapshot also wins when it was collected later than the store.
@@ -180,7 +180,7 @@ export async function cityEventsState(env = {}, { timeoutMs = 700 } = {}) {
     if (!response.ok) throw new Error(`events_${response.status}`);
     const { live, lastAttempt } = await response.json();
     const state = live?.events?.length && live.collectedAt >= EVENTS_COLLECTED_AT
-      ? { mode: 'live', events: live.events, collectedAt: live.collectedAt, fetchedAt: live.fetchedAt, stats: live.stats, lastAttempt }
+      ? { mode: 'live', events: live.events, collectedAt: live.collectedAt, fetchedAt: live.fetchedAt, parser: live.parser ?? null, stats: live.stats, lastAttempt }
       : { ...SNAPSHOT, lastAttempt };
     // Until the first collection lands, ask again after a minute.
     states.set(env, { at: Date.now(), ttl: state.mode === 'live' ? STATE_TTL : RETRY_TTL, state });
