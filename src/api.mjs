@@ -1,4 +1,4 @@
-import { recommend } from './retrieval.mjs';
+import { recommend, placeCategory } from './retrieval.mjs';
 import { handleTelegram } from './telegram.mjs';
 import { handleSocial } from './social/routes.mjs';
 import { handleWatch } from './watch.mjs';
@@ -184,14 +184,99 @@ async function rateLimit(request, env) {
   }
 }
 
+// Dataset summaries and the map layer do not depend on the request, so they are computed once per dataset.
+const summaries = new WeakMap();
+const MAP_FIELDS = ['id', 'name', 'lat', 'lon', 'category', 'kind', 'source', 'generatedName'];
+
+function summaryOf(dataset, pois) {
+  let summary = summaries.get(pois);
+  if (summary) return summary;
+  const bySource = {};
+  const licenses = new Set();
+  let updatedAt = dataset.retrievedAt || null;
+  for (const poi of pois) {
+    const label = poi?.source?.label || 'OpenStreetMap';
+    bySource[label] = (bySource[label] || 0) + 1;
+    licenses.add(poi?.source?.license || poi?.license || 'ODbL-1.0');
+    if (typeof poi?.retrievedAt === 'string' && (!updatedAt || poi.retrievedAt > updatedAt)) updatedAt = poi.retrievedAt;
+  }
+  const sources = Object.keys(bySource).some(label => label.startsWith('Overture')) ? 'OpenStreetMap, Overture Maps' : 'OpenStreetMap';
+  summary = { poiCount: pois.length, updatedAt, source: sources, bySource, licenses: [...licenses].sort(),
+    attribution: sources === 'OpenStreetMap' ? '© OpenStreetMap contributors' : '© OpenStreetMap contributors, Overture Maps Foundation' };
+  summaries.set(pois, summary);
+  return summary;
+}
+
+const mapLayers = new WeakMap();
+
+function mapLayer(pois) {
+  let layer = mapLayers.get(pois);
+  if (layer) return layer;
+  const places = [];
+  const byId = new Map();
+  for (const poi of pois) {
+    if (!poi || typeof poi !== 'object' || !Number.isFinite(poi.lat) || !Number.isFinite(poi.lon) || typeof poi.name !== 'string') continue;
+    const place = { id: String(poi.id), name: poi.name, lat: poi.lat, lon: poi.lon, category: placeCategory(poi),
+      kind: typeof poi.category === 'string' ? poi.category : null, source: poi.source?.id || 'osm', generatedName: poi.nameIsGenerated === true };
+    places.push(place);
+    byId.set(place.id, poi);
+  }
+  layer = { places, byId, body: null };
+  mapLayers.set(pois, layer);
+  return layer;
+}
+
+function placesResponse(url, dataset, pois) {
+  const layer = mapLayer(pois);
+  const categories = url.searchParams.get('category')?.split(',').map(value => value.trim()).filter(Boolean) ?? [];
+  const bboxParam = url.searchParams.get('bbox');
+  const bbox = bboxParam ? bboxParam.split(',').map(Number) : null;
+  if (bbox && (bbox.length !== 4 || bbox.some(value => !Number.isFinite(value)))) {
+    return json({ error: 'bbox: передайте south,west,north,east' }, 400);
+  }
+  const headers = { 'Cache-Control': 'public, max-age=300' };
+  const meta = { ...summaryOf(dataset, pois), fields: MAP_FIELDS };
+  if (!categories.length && !bbox) {
+    // The full layer is serialized once and reused: the map loads it on every visit.
+    layer.body ??= JSON.stringify({ ...summaryOf(dataset, pois), fields: MAP_FIELDS, count: layer.places.length, places: layer.places });
+    return new Response(layer.body, { status: 200, headers: { ...HEADERS, ...headers } });
+  }
+  const places = layer.places.filter(place => (!categories.length || categories.includes(place.category) || categories.includes(place.kind))
+    && (!bbox || (place.lat >= bbox[0] && place.lon >= bbox[1] && place.lat <= bbox[2] && place.lon <= bbox[3])));
+  return json({ ...meta, count: places.length, places }, 200, headers);
+}
+
+/**
+ * Build the per-dataset caches at Worker startup, which has its own CPU budget, so the first
+ * request does not pay for serializing the map layer or compiling the retrieval path.
+ */
+export function prepareApi(dataset) {
+  const pois = Array.isArray(dataset) ? dataset : dataset?.pois || [];
+  const summary = summaryOf(dataset, pois);
+  const layer = mapLayer(pois);
+  layer.body ??= JSON.stringify({ ...summary, fields: MAP_FIELDS, count: layer.places.length, places: layer.places });
+  recommend(pois, { lat: 51.1283, lon: 71.4304, minutes: 60, maxWalkMinutes: 20, query: 'кофе' });
+}
+
 export async function handleApi(request, env = {}, dataset = []) {
   const url = new URL(request.url);
   const pois = Array.isArray(dataset) ? dataset : dataset.pois || [];
   if (url.pathname === '/api/status') {
     if (request.method !== 'GET') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'GET' });
-    return json({ poiCount: pois.length, updatedAt: dataset.retrievedAt || pois[0]?.retrievedAt || null,
+    const summary = summaryOf(dataset, pois);
+    return json({ poiCount: summary.poiCount, updatedAt: summary.updatedAt,
       generationAvailable: Boolean(activeProvider(env)), generationProvider: activeProvider(env)?.name ?? null,
-      source: 'OpenStreetMap', version: '1.1.0', social: Boolean(env.SOCIAL || env.SOCIAL_LOCAL) });
+      source: summary.source, bySource: summary.bySource, licenses: summary.licenses, attribution: summary.attribution, version: '1.2.0',
+      social: Boolean(env.SOCIAL || env.SOCIAL_LOCAL) });
+  }
+  if (url.pathname === '/api/places' || url.pathname.startsWith('/api/places/')) {
+    if (request.method !== 'GET') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'GET' });
+    if (url.pathname === '/api/places') return placesResponse(url, dataset, pois);
+    let id;
+    try { id = decodeURIComponent(url.pathname.slice('/api/places/'.length)); } catch { return json({ error: 'Некорректный идентификатор' }, 400); }
+    const poi = mapLayer(pois).byId.get(id);
+    if (!poi) return json({ error: 'Место не найдено' }, 404);
+    return json({ ...poi, category: placeCategory(poi), kind: poi.category ?? null }, 200, { 'Cache-Control': 'public, max-age=300' });
   }
   if (url.pathname.startsWith('/api/watch/')) return handleWatch(request, env, pois) ?? json({ error: 'Не найдено' }, 404);
   if (url.pathname === '/telegram/webhook') {
@@ -218,8 +303,9 @@ export async function handleApi(request, env = {}, dataset = []) {
     const generation = budget.generationAllowed
       ? await generate(result, body.query, env)
       : { mode: 'fallback', summary: safeSummary(result), references: [], reason: 'request_budget_unavailable' };
-    return json({ ...result, generation, dataset: { source: 'OpenStreetMap', poiCount: pois.length,
-      updatedAt: dataset.retrievedAt || pois[0]?.retrievedAt || null, license: 'ODbL-1.0' } });
+    const summary = summaryOf(dataset, pois);
+    return json({ ...result, generation, dataset: { source: summary.source, poiCount: summary.poiCount,
+      updatedAt: summary.updatedAt, license: summary.licenses.join(', '), attribution: summary.attribution } });
   } catch (error) {
     if (error?.code === 'INVALID_INPUT' || error instanceof SyntaxError) return json({ error: error?.code === 'INVALID_INPUT' ? error.message : 'Некорректный JSON' }, 400);
     if (error?.message === 'RESPONSE_TOO_LARGE') return json({ error: 'Запрос слишком большой' }, 413);

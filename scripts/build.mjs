@@ -31,13 +31,14 @@ async function collectMedia(directory) {
 await collectMedia(resolve(publicRoot, 'assets'));
 assets['/'] = assets['/index.html'];
 assets['/watch'] = assets['/watch.html'];
-const data = JSON.parse(await readFile(resolve(root, 'data/pois.json'), 'utf8'));
-const code = `import {handleApi} from './src/api.mjs';
+const data = JSON.parse(await readFile(resolve(root, 'data/places.json'), 'utf8'));
+const code = `import {handleApi,prepareApi} from './src/api.mjs';
 import {prepareDataset} from './src/retrieval.mjs';
 export {SocialHub} from './src/social/hub.mjs';
 const assets=${JSON.stringify(assets)};
 const data=${JSON.stringify(data)};
 prepareDataset(data);
+prepareApi(data);
 export default {async fetch(request,env,ctx){
   const api=await handleApi(request,env,data);if(api)return api;
   const url=new URL(request.url);const asset=assets[url.pathname];

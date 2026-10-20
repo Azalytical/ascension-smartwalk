@@ -1,0 +1,48 @@
+{
+  "source": "Overture Maps Foundation",
+  "release": "2026-09-23.1",
+  "bucket": "s3://overturemaps-us-west-2/release/2026-09-23.1/",
+  "retrievedAt": "2026-10-20T09:34:42Z",
+  "bbox": {
+    "south": 50.95,
+    "west": 71.1,
+    "north": 51.32,
+    "east": 71.85
+  },
+  "attribution": "© OpenStreetMap contributors, Overture Maps Foundation",
+  "attributionUrl": "https://docs.overturemaps.org/attribution/",
+  "files": [
+    {
+      "file": "places.json",
+      "theme": "theme=places/type=place",
+      "rows": 1544,
+      "sha256": "43906f5a949639636648a636a831cfd4b2687b0cbf146c0cc74b44005e9f8c2b",
+      "filter": "named rows whose basic_category matches PLACE_CATEGORIES",
+      "license": "Per source: Meta, Microsoft, PinMeTo CDLA-Permissive-2.0; Foursquare Apache-2.0; AllThePlaces CC0-1.0"
+    },
+    {
+      "file": "land_use.json",
+      "theme": "theme=base/type=land_use",
+      "rows": 582,
+      "sha256": "38bce561e9fc236ba1514e56099900ed0c665281950bba9c3665ba9a10f80601",
+      "filter": "subtype/class pairs in LAND_USE, named or not",
+      "license": "ODbL-1.0 (derived from OpenStreetMap)"
+    },
+    {
+      "file": "infrastructure.json",
+      "theme": "theme=base/type=infrastructure",
+      "rows": 469,
+      "sha256": "7a502ba5ac9d4ced0810043e69c82145e691a0613eca3295f73bd637ac2c49a7",
+      "filter": "class in INFRASTRUCTURE, named or not",
+      "license": "ODbL-1.0 (derived from OpenStreetMap)"
+    },
+    {
+      "file": "buildings.json",
+      "theme": "theme=buildings/type=building",
+      "rows": 32,
+      "sha256": "766773924b2f465daa24da628fd1ac6fdaa2978b5be9253d355b2703d131389d",
+      "filter": "named landmark buildings (worship, museum, theatre, palace, library), not residential or transport",
+      "license": "ODbL-1.0 for OpenStreetMap-derived buildings"
+    }
+  ]
+}

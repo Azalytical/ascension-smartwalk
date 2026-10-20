@@ -5,22 +5,41 @@ const BOUNDS = Object.freeze({ minLat: 51, maxLat: 51.35, minLon: 71.25, maxLon:
 const DETOUR = 1.35;
 const SPEED_KMH = 4.2;
 const RESERVE = 5;
-const VISIT = { park: 15, cafe: 20, museum: 35, playground: 20, attraction: 15, restaurant: 45, mall: 40, culture: 60 };
+const VISIT = { park: 15, cafe: 20, museum: 35, playground: 20, attraction: 15, restaurant: 45, mall: 40, culture: 60, family: 60 };
 const LABELS = { park: 'парк', cafe: 'кафе', museum: 'музей', playground: 'площадка', attraction: 'достопримечательность',
-  restaurant: 'место, где поесть', mall: 'торговый центр', culture: 'место для культурного досуга' };
+  restaurant: 'место, где поесть', mall: 'торговый центр', culture: 'место для культурного досуга', family: 'место для семейного отдыха' };
 // Categories that keep a visitor under a roof. Used for rain, cold and "indoor" requests.
 const INDOOR = ['mall', 'museum', 'cafe', 'restaurant', 'culture'];
+const CHILD = ['park', 'playground', 'family'];
 const SYNONYMS = {
   park: ['park', 'парк', 'сквер', 'сад', 'саябақ', 'garden'],
   cafe: ['cafe', 'café', 'coffee', 'кофе', 'кафе', 'кофейн', 'кофехана', 'кафехана', 'кофеіш'],
   museum: ['museum', 'музей', 'мұражай', 'выставк', 'exhibition'],
   playground: ['playground', 'площадк', 'ойыналаң', 'ойын алаң', 'children play'],
-  attraction: ['attraction', 'достопримечатель', 'көрікті', 'monument', 'памятник', 'ескерткіш', 'memorial', 'viewpoint', 'смотров'],
+  attraction: ['attraction', 'достопримечатель', 'көрікті', 'monument', 'памятник', 'ескерткіш', 'memorial', 'viewpoint', 'смотров',
+    'мечет', 'мешіт', 'mosque', 'собор', 'храм', 'church', 'фонтан', 'субұрқақ', 'fountain', 'набережн', 'sights'],
   restaurant: ['restaurant', 'ресторан', 'поесть', 'пообед', 'поужин', 'обед', 'ужин', 'покуш', 'еда', 'food', 'eat', 'lunch', 'dinner',
     'тамақ', 'мейрамхана', 'фастфуд', 'бургер', 'пицц'],
   mall: ['mall', 'трц', 'торгов', 'молл', 'shopping', 'сауда орталы'],
   culture: ['theatre', 'theater', 'театр', 'кино', 'cinema', 'movie', 'фильм', 'библиотек', 'library', 'кітапхана', 'концерт', 'спектакл'],
+  family: ['зоопарк', 'zoo', 'аттракцион', 'amusement', 'развлекат', 'батут', 'аквапарк', 'океанариум', 'aquarium', 'хайуанаттар', 'ойын-сауық'],
 };
+// Narrower than a category: «мечеть» asks for a mosque, not for any sight. Used only when such a place fits the limits.
+const KIND_INTENT = [
+  [/мечет|мешіт|mosque|собор|храм|церк|church|cathedral/u, ['place_of_worship']],
+  [/фонтан|субұрқақ|fountain/u, ['fountain']],
+  [/зоопарк|(?:^|[^\p{L}])zoo|хайуанаттар/u, ['zoo']],
+  [/пекарн|выпечк|bakery/u, ['bakery']],
+  [/десерт|кондитер|торт|dessert|морожен|ice cream/u, ['dessert', 'ice_cream']],
+  [/кино|cinema|movie|фильм/u, ['cinema']],
+  [/театр|theat|спектакл/u, ['theatre']],
+  [/библиотек|library|кітапхана/u, ['library']],
+  [/концерт|филармон|concert/u, ['concert_hall']],
+  [/галере|gallery/u, ['gallery']],
+  [/памятник|ескерткіш|monument|мемориал|memorial/u, ['monument', 'memorial']],
+  [/(?:^|[^\p{L}])мост|көпір|bridge/u, ['bridge']],
+  [/аттракцион|amusement|развлекат/u, ['amusement_park', 'theme_park']],
+];
 const INDOOR_INTENT = /дожд|ливень|rain|под крыш|в помещен|indoor|жаңбыр|мороз|холодн|cold|снег|snow|қар/;
 const STOP_WORDS = new Set(['хочу', 'нужен', 'нужна', 'нужно', 'рядом', 'меня', 'есть', 'сейчас', 'что', 'как', 'для', 'куда', 'можно', 'минут', 'час', 'часа', 'with', 'the', 'near', 'want', 'and', 'мен', 'үшін']);
 
@@ -45,8 +64,11 @@ function categoryOf(poi) {
   const direct = normalize(poi.category).trim();
   if (Object.hasOwn(VISIT, direct)) return direct;
   const aliases = { garden: 'park', monument: 'attraction', memorial: 'attraction', viewpoint: 'attraction',
-    artwork: 'attraction', gallery: 'attraction', theme_park: 'attraction', fast_food: 'restaurant', ice_cream: 'cafe',
-    theatre: 'culture', cinema: 'culture', arts_centre: 'culture', library: 'culture', exhibition_centre: 'culture' };
+    artwork: 'attraction', gallery: 'attraction', fast_food: 'restaurant', ice_cream: 'cafe',
+    theatre: 'culture', cinema: 'culture', arts_centre: 'culture', library: 'culture', exhibition_centre: 'culture',
+    fountain: 'attraction', plaza: 'attraction', bridge: 'attraction', place_of_worship: 'attraction', bakery: 'cafe',
+    dessert: 'cafe', food_court: 'restaurant', concert_hall: 'culture', theme_park: 'family', amusement_park: 'family',
+    zoo: 'family', aquarium: 'family', water_park: 'family', beach: 'park' };
   if (aliases[direct]) return aliases[direct];
   // Never inspect a name, brand, or description for structural classification.
   // For example, the cinema name "Кинопарк" does not make it a park.
@@ -130,6 +152,11 @@ function queryCategories(query) {
   return categories;
 }
 
+function queryKinds(query) {
+  const positive = normalize(query).replace(/(?:^|[^\p{L}\p{N}])(?:не|без|not|no|without)\s+[\p{L}]+/gu, '');
+  return KIND_INTENT.filter(([pattern]) => pattern.test(positive)).flatMap(([, kinds]) => kinds);
+}
+
 function excludedCategories(query) {
   const negativePhrases = normalize(query).match(/(?:^|[^\p{L}\p{N}])(?:не|без|not|no|without)\s+[\p{L}]+/gu) ?? [];
   return Object.entries(SYNONYMS).filter(([, words]) => negativePhrases.some(phrase => words.some(word => phrase.includes(word)))).map(([category]) => category);
@@ -178,6 +205,7 @@ function activitiesFor(category) {
     restaurant: ['Пообедать или перекусить; меню, цены и наличие мест уточнить у заведения.'],
     mall: ['Переждать погоду под крышей и пройтись по галереям; режим входа уточнить заранее.'],
     culture: ['Проверить афишу или расписание сеансов и выбрать то, что помещается в ваше время.'],
+    family: ['Проверить билеты, возрастные ограничения и режим работы до выхода; условия для ребёнка оценить на месте.'],
   })[category];
 }
 
@@ -198,6 +226,10 @@ function warningsFor(poi, constraints, hours) {
   const access = normalize(poi.access ?? (poi.tags && !Array.isArray(poi.tags) ? poi.tags.access : null));
   if (!access) warnings.push('Условия входа и доступ на территорию неизвестны; уточните перед выходом.');
   else warnings.push(`Условия доступа в источнике: ${access}. Актуальные ограничения на вход не проверены.`);
+  if (poi.source?.id && poi.source.id !== 'osm') {
+    warnings.push(`Место из ${poi.source.label ?? 'внешнего источника'}: координаты и актуальность взяты из страниц бизнеса, режим работы неизвестен.`);
+  }
+  if (poi.nameIsGenerated) warnings.push('Название в источнике не указано; ориентируйтесь по точке на карте.');
   if (constraints.withChild) warnings.push('Категория подходит для поиска прогулки с ребёнком; безопасность, возрастные ограничения и доступность не проверены.');
   if (/розет|socket|outlet|қуат|заряд/i.test(constraints.query)) warnings.push('Наличие доступных посетителю розеток не подтверждено.');
   if (/тих|quiet|тыныш|спокой/i.test(constraints.query)) warnings.push('Тишина и текущий уровень шума не подтверждены.');
@@ -223,11 +255,13 @@ function prepare(pois) {
     }
     if (!category) { counters.unsupportedCategory++; continue; }
     const poi = { ...row, category, sourceUrl };
+    const kind = normalize(row.category).trim() || category;
     const access = normalize(poi.access ?? (poi.tags && !Array.isArray(poi.tags) ? poi.tags.access : null));
     if (['private', 'no', 'military'].includes(access)) { counters.restrictedAccess++; continue; }
     if (seen.has(poi)) { counters.duplicates++; continue; }
     seen.add(poi);
-    unique.push({ poi, text: normalize(`${poi.name} ${poi.description ?? ''} ${tagText(poi.tags)}`) });
+    const names = [poi.nameRu, poi.nameKk, poi.nameEn, ...(Array.isArray(poi.aliases) ? poi.aliases : [])].filter(name => typeof name === 'string');
+    unique.push({ poi, kind, text: normalize(`${poi.name} ${names.join(' ')} ${poi.keywords ?? ''} ${poi.description ?? ''} ${tagText(poi.tags)}`) });
   }
   const result = { unique, counters };
   preparedDatasets.set(pois, result);
@@ -236,6 +270,15 @@ function prepare(pois) {
 
 function poisOf(dataset) {
   return Array.isArray(dataset) ? dataset : Array.isArray(dataset?.pois) ? dataset.pois : [];
+}
+
+const SERVICE_KINDS = new Set(['toilets', 'drinking_water', 'bicycle_rental']);
+
+/** App category of a record for map layers: a recommendable category, 'service' for walker amenities, or 'other'. */
+export function placeCategory(poi) {
+  const category = poi && typeof poi === 'object' ? categoryOf(poi) : null;
+  if (category) return category;
+  return SERVICE_KINDS.has(normalize(poi?.category).trim()) ? 'service' : 'other';
 }
 
 /** Prepare a dataset ahead of the first request, e.g. at Worker startup, which has its own CPU budget. */
@@ -258,6 +301,7 @@ export function recommend(dataset, input) {
   const requested = queryCategories(constraints.query);
   const excluded = excludedCategories(constraints.query);
   const terms = tokens(constraints.query);
+  const kinds = queryKinds(constraints.query);
   const counters = { invalidRecords: 0, unsupportedCategory: 0, restrictedAccess: 0, duplicates: 0, category: 0, walkBudget: 0, totalBudget: 0, closedByHours: 0 };
   // Hours are checked against the requested visit time, or against now when no time was given.
   // A date without a time cannot be checked; minutes are dropped so equal requests give equal answers.
@@ -266,14 +310,15 @@ export function recommend(dataset, input) {
     : new Date(Math.floor(Date.now() / 60000) * 60000);
   const prepared = prepare(pois);
   Object.assign(counters, prepared.counters);
+  // Only cheap numbers are computed per record; cards with evidence and warnings are built for the three picks.
+  // With thousands of records this keeps a request well inside the Workers CPU limit.
   const candidates = [];
-
-  for (const { poi, text } of prepared.unique) {
-    const { category, sourceUrl } = poi;
+  for (const { poi, kind, text } of prepared.unique) {
+    const { category } = poi;
     if ((constraints.category && category !== constraints.category)
       || (!constraints.category && requested.length > 0 && !requested.includes(category))
       || excluded.includes(category)
-      || (constraints.withChild && !['park', 'playground'].includes(category))) { counters.category++; continue; }
+      || (constraints.withChild && !CHILD.includes(category))) { counters.category++; continue; }
 
     const directDistance = haversineMeters(constraints.lat, constraints.lon, poi.lat, poi.lon);
     const walkMinutes = Math.ceil(directDistance * DETOUR / (SPEED_KMH * 1000 / 60));
@@ -298,7 +343,33 @@ export function recommend(dataset, input) {
       childCategory: constraints.withChild ? 5 : 0,
       hoursConfirmed: hours?.status === 'open' ? 5 : 0,
     };
-    const score = Object.values(scoreBreakdown).reduce((a, b) => a + b, 0);
+    const score = scoreBreakdown.category + scoreBreakdown.keywords + scoreBreakdown.proximity + scoreBreakdown.timeFit
+      + scoreBreakdown.childCategory + scoreBreakdown.hoursConfirmed;
+    candidates.push({ poi, kind, directDistance, walkMinutes, returnMinutes, visitMinutes, totalMinutes, hours,
+      matchedTerms, categoryIntent, scoreBreakdown, score });
+  }
+
+  const kindMatches = kinds.length ? candidates.filter(candidate => kinds.includes(candidate.kind)) : [];
+  if (kindMatches.length) candidates.splice(0, candidates.length, ...kindMatches);
+
+  // Greedy diversity: a modest penalty only; intent and proximity remain the main signals.
+  const picks = [];
+  const taken = new Set();
+  while (picks.length < 3 && picks.length < candidates.length) {
+    const adjusted = c => c.score - (picks.some(pick => pick.poi.category === c.poi.category) ? 8 : 0);
+    let best = null;
+    for (const candidate of candidates) {
+      if (taken.has(candidate)) continue;
+      if (!best || adjusted(candidate) > adjusted(best) || (adjusted(candidate) === adjusted(best)
+        && (candidate.walkMinutes < best.walkMinutes || (candidate.walkMinutes === best.walkMinutes
+          && String(candidate.poi.id).localeCompare(String(best.poi.id), 'en') < 0)))) best = candidate;
+    }
+    taken.add(best);
+    picks.push(best);
+  }
+  const recommendations = picks.map(({ poi, directDistance, walkMinutes, returnMinutes, visitMinutes, totalMinutes, hours,
+    matchedTerms, categoryIntent, scoreBreakdown, score }) => {
+    const { category, sourceUrl } = poi;
     const reason = `${LABELS[category]}${categoryIntent ? ' соответствует выбранной категории' : ' рядом с выбранной точкой'}; `
       + `примерно ${walkMinutes} мин в одну сторону, ${totalMinutes} мин ${constraints.returnToStart ? 'с возвращением' : 'без возвращения'} и резервом ${RESERVE} мин`
       + (hours?.status === 'open' ? `; по режиму работы из источника открыто ${hours.closesAt ? `до ${hours.closesAt}` : 'круглосуточно'}.` : '.');
@@ -309,28 +380,26 @@ export function recommend(dataset, input) {
     ];
     if (poi.description) evidence.push({ field: 'description', label: 'Описание из данных POI', value: String(poi.description), sourceUrl, retrievedAt: poi.retrievedAt ?? null });
     if (poi.openingHours) evidence.push({ field: 'openingHours', label: 'Режим работы из источника, без проверки открытия', value: String(poi.openingHours), sourceUrl, retrievedAt: poi.retrievedAt ?? null });
-    candidates.push({ ...poi, distanceMeters: Math.ceil(directDistance), estimatedWalkDistanceMeters: Math.ceil(directDistance * DETOUR),
+    if (typeof poi.address === 'string' && poi.address) {
+      // A field filled from another source cites that source, not the main record.
+      const filledFrom = Array.isArray(poi.alsoIn) ? poi.alsoIn.find(item => item.id === poi.fieldSources?.address) : null;
+      const addressUrl = safeSourceUrl(filledFrom?.sourceUrl) ?? sourceUrl;
+      evidence.push({ field: 'address', label: 'Адрес из источника', value: poi.address, sourceUrl: addressUrl, retrievedAt: poi.retrievedAt ?? null });
+    }
+    return { ...poi, distanceMeters: Math.ceil(directDistance), estimatedWalkDistanceMeters: Math.ceil(directDistance * DETOUR),
       walkMinutes, visitMinutes, returnMinutes, safetyReserveMinutes: RESERVE, totalMinutes,
       why: reason, activities: activitiesFor(category), activitiesAreSuggestions: true,
       warnings: warningsFor(poi, constraints, hours), evidence, score, scoreBreakdown, matchedTerms,
-      hoursCheck: hours ?? { status: poi.openingHours ? 'not_checked' : 'no_data' } });
-  }
-
-  candidates.sort((a, b) => b.score - a.score || a.walkMinutes - b.walkMinutes || String(a.id).localeCompare(String(b.id), 'en'));
-  // Greedy diversity: a modest penalty only; intent and proximity remain the main signals.
-  const recommendations = [];
-  const remaining = [...candidates];
-  while (remaining.length && recommendations.length < 3) {
-    remaining.sort((a, b) => (b.score - (recommendations.some(r => r.category === b.category) ? 8 : 0))
-      - (a.score - (recommendations.some(r => r.category === a.category) ? 8 : 0))
-      || a.walkMinutes - b.walkMinutes || String(a.id).localeCompare(String(b.id), 'en'));
-    recommendations.push(remaining.shift());
-  }
+      hoursCheck: hours ?? { status: poi.openingHours ? 'not_checked' : 'no_data' } };
+  });
   const warnings = [
     'Расстояние указано по прямой. Время пешком — оценка: расстояние × 1,35 при 4,2 км/ч; переходы, ограждения, входы и погода не проверены.',
     'Каждая карточка — отдельный вариант прогулки. В суммарное время входят путь, посещение, выбранный возврат и резерв 5 минут.',
     'Актуальное открытие мест, цены и наличие свободных мест не проверены.',
   ];
+  if (kinds.length && !kindMatches.length && recommendations.length) {
+    warnings.push('Мест именно этого вида в пределах вашего времени не нашлось; ниже ближайшие варианты той же категории.');
+  }
   if (constraints.visitDate && !reference) warnings.push('Указана дата без времени: режим работы на эту дату автоматически не проверяется.');
   if (counters.closedByHours) warnings.push(`Исключено мест, закрытых к моменту визита по режиму работы из источника: ${counters.closedByHours}.`);
   if (!recommendations.length) warnings.unshift('В текущем наборе данных нет подтверждённых вариантов под все ограничения. Увеличьте время или измените категорию и точку старта.');
@@ -338,7 +407,7 @@ export function recommend(dataset, input) {
     retrieval: { method: 'deterministic_geo_keyword_retrieval', usesEmbeddings: false, usesLanguageModel: false,
       summary: 'Фильтры по географии, категории, времени и режиму работы из OSM; поиск по словам и словарю ru/kk/en; объяснение по данным POI.',
       inputRecords: pois.length, validUniqueRecords: prepared.unique.length, feasibleCandidates: candidates.length, returned: recommendations.length,
-      requestedCategories: requested, excludedCategories: excluded, queryTerms: terms, rejected: counters,
+      requestedCategories: requested, requestedKinds: kinds, excludedCategories: excluded, queryTerms: terms, rejected: counters,
       scoring: { category: 35, keywordsPerMatch: 5, keywordsCap: 20, proximityMax: 25, timeFitMax: 15, childCategory: 5, hoursConfirmed: 5, repeatCategoryPenalty: 8 },
       hoursReferenceTime: reference ? reference.toISOString() : null, hoursTimezone: 'UTC+05:00',
       scoreIsConfidence: false } };
