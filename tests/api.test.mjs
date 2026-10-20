@@ -157,7 +157,8 @@ test('a busy Gemini is retried, and client errors are not', async () => {
     globalThis.fetch = async () => { calls++; throw new TypeError('network'); };
     data = await (await handleApi(request(valid), env, [poi])).json();
     assert.equal(data.generation.mode, 'fallback');
-    assert.equal(calls, 3);
+    assert.equal(calls, 2);
+    assert.deepEqual(data.generation.diagnostics.attempts.map(item => item.error), ['network', 'network']);
 
     calls = 0;
     globalThis.fetch = async () => { calls++; return new Response('{}', { status: 400 }); };
@@ -237,6 +238,6 @@ test('a failing Gemini hands over to OpenAI once when its key is set', async () 
     };
     const data = await (await handleApi(request(valid), env, [poi])).json();
     assert.equal(data.generation.mode, 'llm'); assert.equal(data.generation.provider, 'openai');
-    assert.deepEqual(hosts, ['generativelanguage.googleapis.com', 'generativelanguage.googleapis.com', 'generativelanguage.googleapis.com', 'api.openai.com']);
+    assert.deepEqual(hosts, ['generativelanguage.googleapis.com', 'generativelanguage.googleapis.com', 'api.openai.com']);
   } finally { globalThis.fetch = original; }
 });

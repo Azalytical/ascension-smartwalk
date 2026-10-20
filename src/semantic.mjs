@@ -8,9 +8,10 @@
 
 export const DEFAULT_EMBEDDING_MODEL = 'gemini-embedding-001';
 const DIMENSIONS = 768;
-// The first call of an isolate also embeds the examples, so it may take longer than later ones.
-const TIMEOUT_MS = 1200;
-const FIRST_TIMEOUT_MS = 3000;
+// The first call of an isolate also embeds the ~70 examples, so it takes longer than later ones; on the live site
+// 3 seconds were often not enough for that batch, and Workers start fresh isolates often.
+const TIMEOUT_MS = 2000;
+const FIRST_TIMEOUT_MS = 4500;
 const RETRY_MS = 60000;
 // The winner must beat the generic examples and stand out from the other categories; a flat profile means "no meaning found".
 const LEAD_OVER_GENERIC = 0.02;
@@ -50,13 +51,14 @@ function unit(values) {
 
 const dot = (a, b) => a.reduce((sum, value, index) => sum + value * b[index], 0);
 
-async function embed(texts, model, env, fetcher, signal) {
+async function embed(texts, model, env, fetcher, signal, report = {}) {
   const response = await fetcher(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:batchEmbedContents`, {
     method: 'POST', signal,
     headers: { 'x-goog-api-key': env.GEMINI_API_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({ requests: texts.map(text => ({ model: `models/${model}`, content: { parts: [{ text }] },
       taskType: 'SEMANTIC_SIMILARITY', outputDimensionality: DIMENSIONS })) }),
   });
+  report.status = response.status;
   if (!response.ok) throw new Error(`embedding_${response.status}`);
   const vectors = (await response.json())?.embeddings?.map(item => Array.isArray(item?.values) ? unit(item.values) : null);
   if (!Array.isArray(vectors) || vectors.length !== texts.length || vectors.some(vector => !vector)) throw new Error('embedding_shape');
@@ -85,28 +87,35 @@ export function pickCategories(ranking) {
 /**
  * Categories a request means, from Gemini embeddings, or null when the key is missing or the call fails.
  * Example vectors are fetched once per isolate together with the first request; later requests embed only the query.
+ * `report`, when given, receives what happened, safe to show: { model, cold, ms, status, error } (never the key or the text).
  */
-export async function semanticCategories(query, env = {}, { fetcher = fetch, now = Date.now(), timeoutMs } = {}) {
+export async function semanticCategories(query, env = {}, { fetcher = fetch, now = Date.now(), timeoutMs, report = {} } = {}) {
   const text = String(query ?? '').trim();
-  if (!env.GEMINI_API_KEY || text.length < 3) return null;
+  if (!env.GEMINI_API_KEY || text.length < 3) { report.error = env.GEMINI_API_KEY ? 'short_query' : 'no_key'; return null; }
   const model = env.GEMINI_EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
-  if (cache?.failedAt && now - cache.failedAt < RETRY_MS && cache.model === model) return null;
+  report.model = model;
+  if (cache?.failedAt && now - cache.failedAt < RETRY_MS && cache.model === model) { report.error = 'recent_failure'; return null; }
   let examples = cache?.model === model ? cache.examples : null;
+  report.cold = !examples;
   const controller = new AbortController();
+  const began = Date.now();
   const timer = setTimeout(() => controller.abort(), timeoutMs ?? (examples ? TIMEOUT_MS : FIRST_TIMEOUT_MS));
   try {
     let vector;
-    if (examples) [vector] = await embed([text], model, env, fetcher, controller.signal);
+    if (examples) [vector] = await embed([text], model, env, fetcher, controller.signal, report);
     else {
       const labelled = Object.entries(EXAMPLES).flatMap(([category, texts]) => texts.map(example => ({ category, text: example })));
-      const vectors = await embed([...labelled.map(item => item.text), text], model, env, fetcher, controller.signal);
+      const vectors = await embed([...labelled.map(item => item.text), text], model, env, fetcher, controller.signal, report);
       vector = vectors.pop();
       examples = labelled.map((item, index) => ({ category: item.category, vector: vectors[index] }));
       cache = { model, examples };
     }
     const ranking = rankCategories(vector, examples);
+    report.ms = Date.now() - began;
     return { model, categories: pickCategories(ranking), ranking: ranking.slice(0, 3).map(item => ({ ...item, score: Math.round(item.score * 1000) / 1000 })) };
-  } catch {
+  } catch (error) {
+    report.ms = Date.now() - began;
+    report.error = controller.signal.aborted ? 'timeout' : /^embedding_\d+$/.test(error?.message) ? 'http' : error?.message === 'embedding_shape' ? 'shape' : 'network';
     if (!cache?.examples) cache = { model, failedAt: now };
     return null;
   } finally { clearTimeout(timer); }
