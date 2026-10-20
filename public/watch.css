@@ -46,6 +46,10 @@ p,h1,h2{margin:0}
 .card{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:var(--h);padding:calc(var(--k)*7) calc(var(--k)*5) calc(var(--k)*8);scroll-snap-align:start}
 .round .card{padding:calc(var(--k)*11) calc(var(--k)*13) calc(var(--k)*12)}
 .round .card .action{width:84%}
+.start-note{margin-bottom:calc(var(--k)*1.5);font-size:calc(var(--k)*4.8);font-weight:650;color:var(--muted)}
+.start-note.from-watch,.start-note.from-phone{color:var(--sky)}
+.start-note.warn{color:var(--amber)}
+.demo-badge.gps-off{color:var(--amber)}
 .card-top{display:flex;align-items:center;gap:calc(var(--k)*1.6);font-size:calc(var(--k)*5.4);color:var(--muted);font-weight:650;letter-spacing:.03em;text-transform:uppercase}
 .card-top img{width:calc(var(--k)*10);height:calc(var(--k)*10)}
 .card-name{margin-top:calc(var(--k)*1);font-size:calc(var(--k)*8.6);font-weight:750;line-height:1.08;letter-spacing:-.01em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
