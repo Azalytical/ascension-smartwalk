@@ -113,4 +113,10 @@ API: `GET /api/social/state|events|event|invite`, `POST /api/social/<дейст�
 
 Обновить данные: `python scripts/import_osm_pois.py` (Overpass), `python scripts/fetch_overture.py` (нужен `pyarrow`), затем `python scripts/build_places.py` (без сети). Скрипты и исходный код приложения публикуются под MIT, см. `LICENSE`.
 
-В `docs/` и `deliverables/` находятся сценарии проверки, ограничения, презентация и материалы демонстрации. Сценарии из задания хакатона (Mega Silk Way, тихое кафе с розеткой, с ребёнком, турист перед вылетом, ночная активность, пример у Экспо) и намерения запроса проверяются автоматически в `tests/scenarios.test.mjs` на полной базе мест: `npm test`.
+В `docs/` и `deliverables/` находятся концепция, этика, протокол сценариев, презентация и материалы демонстрации:
+
+- [docs/concept.md](docs/concept.md): идея, для кого, сценарии, RAG, бизнес-идея, ограничения, риски, план развития.
+- [docs/ethics.md](docs/ethics.md): приватность локации, недостоверная информация, безопасность, защита сервиса.
+- [docs/test-protocol.md](docs/test-protocol.md): 15 сценариев (6 из задания и 9 своих) с входом, ожидаемым ответом, фактическим ответом и Pass/Fail. Повторить: `node scripts/scenario-protocol.mjs`, на живом сайте `node scripts/scenario-protocol.mjs --live <адрес>`. PDF для сдачи: `python3 scripts/build_protocol_pdf.py`.
+
+Те же сценарии из задания хакатона (Mega Silk Way, тихое кафе с розеткой, с ребёнком, турист перед вылетом, ночная активность, пример у Экспо) и намерения запроса проверяются автоматически в `tests/scenarios.test.mjs` на полной базе мест: `npm test`.
