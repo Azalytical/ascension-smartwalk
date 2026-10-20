@@ -10,7 +10,8 @@
   ];
   const TIMES = [30, 45, 60, 90, 120];
   const CATEGORIES = { cafe: ['coffee', 'Кафе'], restaurant: ['food', 'Поесть'], park: ['park', 'Парк'], playground: ['family', 'Площадка'],
-    museum: ['museum', 'Музей'], attraction: ['landmark', 'Интересное'], mall: ['indoor', 'Под крышей'], culture: ['museum', 'Культура'] };
+    museum: ['museum', 'Музей'], attraction: ['landmark', 'Интересное'], mall: ['indoor', 'Под крышей'], culture: ['museum', 'Культура'],
+    family: ['family', 'Для семьи'] };
   // Same estimate as the server: straight line × 1.35 at 4.2 km/h, plus a 5-minute reserve.
   const METERS_PER_MINUTE = 4200 / 60 / 1.35;
   const RESERVE_MINUTES = 5;
