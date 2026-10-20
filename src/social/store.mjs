@@ -364,7 +364,8 @@ function inviteCode() { return randomString(8, CODE_ALPHABET); }
 
 const PUBLIC_OPS = {
   register({ input, meta, now, fresh }) {
-    this.limit(`register:${meta.client ?? 'anonymous'}`, 10, HOUR, now, 'С этого адреса уже создано много профилей. Попробуйте через час.');
+    // Generous per-address limit: a whole venue or campus often shares one public address.
+    this.limit(`register:${meta.client ?? 'anonymous'}`, 40, HOUR, now, 'С этого адреса уже создано много профилей. Попробуйте через час.');
     const name = text(input.name, { field: 'Имя', min: 1, max: 32 });
     const emoji = typeof input.emoji === 'string' && EMOJIS.includes(input.emoji) ? input.emoji : fail(400, 'INVALID_INPUT', 'Выберите значок из списка');
     const id = crypto.randomUUID();
@@ -395,7 +396,7 @@ const PUBLIC_OPS = {
   },
 
   claimDevice({ input, meta, now, fresh }) {
-    this.limit(`claim:${meta.client ?? 'anonymous'}`, 10, HOUR, now, 'Слишком много попыток ввода кода. Попробуйте через час.');
+    this.limit(`claim:${meta.client ?? 'anonymous'}`, 20, HOUR, now, 'Слишком много попыток ввода кода. Попробуйте через час.');
     const code = typeof input.code === 'string' ? input.code.replace(/\D/g, '') : '';
     const link = code.length === 6 ? this.db.get('SELECT * FROM link_codes WHERE code = ? AND expires_at > ?', code, now) : null;
     if (!link) fail(404, 'CODE_INVALID', 'Код не подошёл или устарел. Получите новый в профиле на телефоне.');
