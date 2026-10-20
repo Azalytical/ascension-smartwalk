@@ -196,3 +196,20 @@ test('Gemini writes «почему» and «что делать» per place; a te
     assert.ok(Array.isArray(sent.understood));
   } finally { globalThis.fetch = original; }
 });
+
+test('a failing Gemini hands over to OpenAI once when its key is set', async () => {
+  const original = globalThis.fetch;
+  const ok = { summary: 'Можно выбрать Парк: примерно 20 минут вместе с возвращением и запасом.', references: [poi.id], places: [] };
+  const env = { GEMINI_API_KEY: 'g', OPENAI_API_KEY: 'o', LOCAL_DEVELOPMENT: true, RETRY_DELAY_MS: 1 };
+  try {
+    const hosts = [];
+    globalThis.fetch = async (u) => {
+      const host = new URL(String(u)).host; hosts.push(host);
+      if (host.includes('googleapis')) return new Response('{}', { status: 503 });
+      return new Response(JSON.stringify({ output: [{ content: [{ type: 'output_text', text: JSON.stringify(ok) }] }] }), { headers: { 'Content-Type': 'application/json' } });
+    };
+    const data = await (await handleApi(request(valid), env, [poi])).json();
+    assert.equal(data.generation.mode, 'llm'); assert.equal(data.generation.provider, 'openai');
+    assert.deepEqual(hosts, ['generativelanguage.googleapis.com', 'generativelanguage.googleapis.com', 'generativelanguage.googleapis.com', 'api.openai.com']);
+  } finally { globalThis.fetch = original; }
+});

@@ -123,7 +123,14 @@ async function generate(result, query, env) {
   const understood = (result.understood || []).filter(item => item.key !== 'location').map(item => item.label);
   const input = JSON.stringify({ answerLanguage: answerLanguage(query), query: String(query || '').slice(0, 800), understood, alternatives: context });
   try {
-    const reply = await callWithRetry(provider, input, env);
+    let used = provider;
+    let reply = await callWithRetry(provider, input, env);
+    // A busy or failing Gemini hands over to OpenAI once when that key is set, so the answer still has a text.
+    if (reply.error && provider.name === 'gemini' && env.OPENAI_API_KEY) {
+      const backup = { name: 'openai', model: env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL };
+      const second = await callWithRetry(backup, input, env, 1);
+      if (!second.error) { reply = second; used = backup; }
+    }
     if (reply.error) return { ...fallback, reason: reply.error };
     const answer = JSON.parse(reply.text);
     const ids = new Set(context.map(p => p.id));
@@ -134,9 +141,9 @@ async function generate(result, query, env) {
     if (typeof answer.summary !== 'string' || answer.summary.length > 700 || !answer.summary.trim()
       || !Array.isArray(answer.references) || !answer.references.length || answer.references.some(id => !ids.has(id))) return { ...fallback, reason: 'validation' };
     if (UNSUPPORTED.test(answer.summary)) return { ...fallback, reason: 'unsupported_claim' };
-    return { mode: 'llm', provider: provider.name, model: provider.model, summary: answer.summary.trim(), references: answer.references,
+    return { mode: 'llm', provider: used.name, model: used.model, summary: answer.summary.trim(), references: answer.references,
       places: placeTexts(answer.places, context, query),
-      origin: 'generated', label: `Сгенерировано ${provider.name === 'gemini' ? 'Gemini' : 'OpenAI'} только по найденным местам` };
+      origin: 'generated', label: `Сгенерировано ${used.name === 'gemini' ? 'Gemini' : 'OpenAI'} только по найденным местам` };
   } catch { return { ...fallback, reason: 'provider_unavailable' }; }
 }
 
@@ -167,18 +174,18 @@ function placeTexts(places, context, query) {
 const RETRYABLE = /^provider_(429|500|502|503|504|unavailable)$/;
 const TOTAL_MS = 18000, ATTEMPT_MS = 8000, MAX_ATTEMPTS = 3;
 
-async function callWithRetry(provider, input, env) {
+async function callWithRetry(provider, input, env, maxAttempts = MAX_ATTEMPTS) {
   const call = provider.name === 'gemini' ? callGemini : callOpenAI;
   const deadline = Date.now() + TOTAL_MS;
   const pause = Number.isFinite(Number(env.RETRY_DELAY_MS)) ? Number(env.RETRY_DELAY_MS) : 600;
   let reply = { error: 'provider_unavailable' };
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), Math.min(ATTEMPT_MS, deadline - Date.now()));
     try { reply = await call(input, provider, env, controller.signal); }
     catch { reply = { error: 'provider_unavailable' }; }
     finally { clearTimeout(timer); }
-    if (!reply.error || !RETRYABLE.test(reply.error) || attempt === MAX_ATTEMPTS) break;
+    if (!reply.error || !RETRYABLE.test(reply.error) || attempt === maxAttempts) break;
     if (deadline - Date.now() < pause * attempt + 2000) break;
     await new Promise(resolve => setTimeout(resolve, pause * attempt));
   }
