@@ -18,4 +18,7 @@ deliverables/*-demo.mp4
 deliverables/*-submission.zip
 deliverables/evidence/
 __pycache__/
-__pycache__/
+public/vendor/
+public/data/
+public/js/lib/
+public/sw.js
