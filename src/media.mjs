@@ -34,14 +34,32 @@ export function nearbyCandidates(dataset, at, heading = null) {
   return found.sort((a, b) => a.distance - b.distance).slice(0, 12);
 }
 
+// Photo and speech answers are short JSON: Gemini 3's default thinking only slows them and eats the 512 output tokens.
+// The least thinking a model accepts is asked; a refusal naming thinking (HTTP 400) steps to the next level for this isolate.
+const THINKING_LEVELS = ['minimal', 'low', null];
+let thinkingIndex = 0;
+/** Forgets which thinking level the model accepted; for tests. */
+export function resetMediaState() { thinkingIndex = 0; }
+
 async function gemini(model, body, env, limitedJson, maximum, timeout = 15000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
+  // Speech synthesis (AUDIO) models do not think; only the JSON answers get a thinking level.
+  const thinks = body.generationConfig?.responseMimeType === 'application/json';
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-      method: 'POST', signal: controller.signal, headers: { 'x-goog-api-key': env.GEMINI_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (!response.ok) return { error: `provider_${response.status}` };
-    return { body: await limitedJson(response, maximum) };
+    for (;;) {
+      const level = thinks ? THINKING_LEVELS[thinkingIndex] : null;
+      const sent = level ? { ...body, generationConfig: { ...body.generationConfig, thinkingConfig: { thinkingLevel: level } } } : body;
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: 'POST', signal: controller.signal, headers: { 'x-goog-api-key': env.GEMINI_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(sent) });
+      if (response.ok) return { body: await limitedJson(response, maximum) };
+      if (response.status === 400 && level && thinkingIndex < THINKING_LEVELS.length - 1) {
+        let message = '';
+        try { message = String((await limitedJson(response, 16384))?.error?.message || ''); } catch { /* no details */ }
+        if (/think/i.test(message)) { thinkingIndex++; continue; }
+      }
+      return { error: `provider_${response.status}` };
+    }
   } catch { return { error: 'provider_unavailable' }; }
   finally { clearTimeout(timer); }
 }

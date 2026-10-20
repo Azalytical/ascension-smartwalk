@@ -6,7 +6,7 @@ import { handleSocial } from './social/routes.mjs';
 import { handleRatings, placeRatings } from './ratings-api.mjs';
 import { handleWatch, spokenAnswer, spokenLanguage, say } from './watch.mjs';
 import { handleMcp } from './mcp.mjs';
-import { farNote, runAgent } from './agent.mjs';
+import { farNote, runAgent, SPARE_AGENT_MODEL } from './agent.mjs';
 import { languageNote, languageProblem } from './language.mjs';
 import { EVENT_NOTE, EVENT_SOURCE, cityEventsFor, upcomingEvents } from './events.mjs';
 import { cityEventsState, PARSER_VERSION } from './events-live.mjs';
@@ -79,7 +79,25 @@ export function activeProvider(env = {}) {
   return null;
 }
 
+// Gemini 3 models think before answering unless told otherwise, and with default thinking the walk text took longer than
+// the whole time budget on the live site: two 8-second attempts, then the answer without the AI text. The least thinking
+// is enough here. A model that refuses a level (HTTP 400 naming thinking) is asked again at once with the next one, remembered
+// for this isolate; any other 400 is returned as it is, so a bad request never switches thinking back to the slow default.
+const THINKING_LEVELS = ['minimal', 'low', null];
+let thinkingIndex = 0;
+/** Forgets which thinking level the model accepted; for tests. */
+export function resetGenerationState() { thinkingIndex = 0; }
+
 async function callGemini(input, provider, env, signal) {
+  for (;;) {
+    const thinking = THINKING_LEVELS[thinkingIndex];
+    const reply = await postGemini(input, provider, env, signal, thinking);
+    if (!reply.thinkingRefused || thinkingIndex >= THINKING_LEVELS.length - 1) return reply;
+    thinkingIndex++;
+  }
+}
+
+async function postGemini(input, provider, env, signal, thinking) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(provider.model)}:generateContent`;
   const response = await fetch(url, {
     method: 'POST', signal,
@@ -89,6 +107,7 @@ async function callGemini(input, provider, env, signal) {
       contents: [{ role: 'user', parts: [{ text: input }] }],
       generationConfig: {
         temperature: 0.15, maxOutputTokens: 2048, responseMimeType: 'application/json',
+        ...(thinking ? { thinkingConfig: { thinkingLevel: thinking } } : {}),
         responseSchema: { type: 'OBJECT', properties: { summary: { type: 'STRING' }, references: { type: 'ARRAY', items: { type: 'STRING' } },
           places: { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: { type: 'STRING' }, why: { type: 'STRING' }, todo: { type: 'STRING' }, versus: { type: 'STRING' } },
             required: ['id', 'why', 'todo', 'versus'], propertyOrdering: ['id', 'why', 'todo', 'versus'] } } },
@@ -96,10 +115,20 @@ async function callGemini(input, provider, env, signal) {
       }
     })
   });
-  if (!response.ok) return { error: `provider_${response.status}` };
-  const body = await limitedJson(response);
+  const note = { status: response.status, thinking: thinking || 'off' };
+  if (!response.ok) {
+    let message = '';
+    if (response.status === 400 && thinking) { try { message = String((await limitedJson(response, 16384))?.error?.message || ''); } catch { /* no details */ } }
+    return { ...note, error: `provider_${response.status}`, ...(/think/i.test(message) ? { thinkingRefused: true } : {}) };
+  }
+  const body = await limitedJson(response, 262144);
+  const candidate = body.candidates?.[0];
+  const finishReason = typeof candidate?.finishReason === 'string' ? candidate.finishReason : null;
   // Thought parts, when a model returns them, are never shown or parsed.
-  return { text: (body.candidates?.[0]?.content?.parts || []).filter(p => !p.thought && typeof p.text === 'string').map(p => p.text).join('') };
+  const text = (candidate?.content?.parts || []).filter(p => !p.thought && typeof p.text === 'string').map(p => p.text).join('');
+  if (finishReason === 'MAX_TOKENS') return { ...note, finishReason, error: 'provider_truncated' };
+  if (!text.trim()) return { ...note, finishReason, error: 'provider_empty' };
+  return { ...note, finishReason, text };
 }
 
 async function callOpenAI(input, provider, env, signal) {
@@ -118,20 +147,28 @@ async function callOpenAI(input, provider, env, signal) {
       } } }
     })
   });
-  if (!response.ok) return { error: `provider_${response.status}` };
+  if (!response.ok) return { status: response.status, error: `provider_${response.status}` };
   const body = await limitedJson(response);
-  return { text: (body.output || []).flatMap(v => v.content || []).filter(v => v.type === 'output_text').map(v => v.text).join('') };
+  return { status: response.status, finishReason: typeof body.status === 'string' ? body.status : null,
+    text: (body.output || []).flatMap(v => v.content || []).filter(v => v.type === 'output_text').map(v => v.text).join('') };
 }
 
-// A rewrite for a slipped language is asked only while the answer is still quick.
-const LANGUAGE_RETRY_WITHIN_MS = 9000;
+// The walk text has one time budget: an answer with the AI text within it, or the answer from the place data at once.
+const GENERATION_MS = 9500, ATTEMPT_MS = 7000;
+// A rewrite, the spare model and the OpenAI hand-over are asked only while this much of the budget is left.
+const SECOND_CALL_MS = 3500;
 
 async function generate(result, query, env, preferred) {
   const startedAt = Date.now();
+  const deadline = startedAt + (Number(env.GENERATION_MS) || GENERATION_MS);
   const language = answerLanguage(query, preferred);
+  // What happened on the way to the model, safe to show: per attempt the provider, model, thinking level, time, HTTP status,
+  // finishReason and error type. Never the key, the prompt or the model's text.
+  const attempts = [];
+  const diagnose = value => ({ ...value, diagnostics: { totalMs: Date.now() - startedAt, budgetMs: deadline - startedAt, attempts } });
   const fallback = { mode: 'fallback', summary: safeSummary(result, query, preferred), references: [], origin: 'template', label: 'Текст без модели, по данным POI' };
   const provider = activeProvider(env);
-  if (!result.recommendations.length || !provider) return fallback;
+  if (!result.recommendations.length || !provider) return diagnose({ ...fallback, reason: provider ? 'no_places' : 'no_provider' });
   // Coordinates and visitor identity are deliberately excluded from model context.
   const context = result.recommendations.map(p => ({
     id: p.id, name: p.name, category: p.category, kind: typeof p.kind === 'string' ? p.kind : undefined,
@@ -142,7 +179,7 @@ async function generate(result, query, env, preferred) {
     hours: p.hoursCheck?.status === 'open' ? `по часам из источника открыто на время визита${p.hoursCheck.closesAt ? `, до ${p.hoursCheck.closesAt}` : ''}` : 'режим работы не подтверждён',
     wheelchair: p.wheelchair ?? undefined, activity: p.activities?.[0],
     pairing: p.pairing ? { name: p.pairing.name, distanceMeters: p.pairing.distanceMeters, extraMinutes: p.pairing.extraMinutes } : undefined,
-    why: p.why, warnings: p.warnings, confidence: p.confidence?.label, sourceUrl: p.sourceUrl,
+    why: p.why, warnings: p.warnings?.slice(0, 2), confidence: p.confidence?.label,
     notability: p.notability && p.notability.level !== 'low' ? p.notability.label : undefined
   }));
   // What the retrieval understood (child, night, group…) so the summary addresses it; no coordinates in these labels.
@@ -169,33 +206,46 @@ async function generate(result, query, env, preferred) {
   };
   const leak = answer => languageProblem(answer.summary, language, names) ? 'summary'
     : (Array.isArray(answer.places) ? answer.places : []).some(p => [p?.why, p?.todo, p?.versus].some(text => typeof text === 'string' && languageProblem(text, language, names))) ? 'places' : null;
+  const left = () => deadline - Date.now();
+  const parse = text => { try { return JSON.parse(text); } catch { return null; } };
   try {
     let used = provider;
-    let reply = await callWithRetry(provider, input, env);
-    // A busy or failing Gemini hands over to OpenAI once when that key is set, so the answer still has a text.
-    if (reply.error && provider.name === 'gemini' && env.OPENAI_API_KEY) {
+    let reply = await callWithRetry(provider, input, env, { deadline, log: attempts });
+    // Free-tier quotas are per model: out of quota, the spare model answers.
+    if (reply.error === 'provider_429' && provider.name === 'gemini' && left() >= SECOND_CALL_MS) {
+      const spare = { name: 'gemini', model: env.GEMINI_SPARE_MODEL || SPARE_AGENT_MODEL };
+      if (spare.model !== provider.model) {
+        const second = await callWithRetry(spare, input, env, { deadline, log: attempts, maxAttempts: 1 });
+        if (!second.error) { reply = second; used = spare; }
+      }
+    }
+    // A busy or failing Gemini hands over to OpenAI once when that key is set and time is left, so the answer still has a text.
+    if (reply.error && used.name === 'gemini' && env.OPENAI_API_KEY && left() >= SECOND_CALL_MS) {
       const backup = { name: 'openai', model: env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL };
-      const second = await callWithRetry(backup, input, env, 1);
+      const second = await callWithRetry(backup, input, env, { deadline, log: attempts, maxAttempts: 1 });
       if (!second.error) { reply = second; used = backup; }
     }
-    if (reply.error) return { ...fallback, reason: reply.error };
-    let answer = JSON.parse(reply.text);
+    if (reply.error) return diagnose({ ...fallback, reason: reply.error });
+    let answer = parse(reply.text);
+    if (!answer) return diagnose({ ...fallback, reason: 'invalid_json' });
     const reason = problem(answer);
-    if (reason) return { ...fallback, reason };
+    if (reason) return diagnose({ ...fallback, reason });
     // Russian slipping into a Kazakh or English answer gets one rewrite with the reason. A summary that slips again
     // means the template in the right language; a slipped «почему» leaves that card with its computed text.
     let slipped = leak(answer);
-    if (slipped && Date.now() - startedAt < LANGUAGE_RETRY_WITHIN_MS) {
-      const again = await callWithRetry(used, JSON.stringify({ ...payload, rejected: `Прошлый ответ отклонён проверкой: ${languageNote(language)}.` }), env, 1);
-      let second = null;
-      try { second = again.error ? null : JSON.parse(again.text); } catch { /* the first answer stays */ }
+    if (slipped && left() >= SECOND_CALL_MS) {
+      const again = await callWithRetry(used, JSON.stringify({ ...payload, rejected: `Прошлый ответ отклонён проверкой: ${languageNote(language)}.` }), env,
+        { deadline, log: attempts, maxAttempts: 1 });
+      const second = again.error ? null : parse(again.text);
       if (second && !problem(second)) { answer = second; slipped = leak(answer); }
     }
-    if (slipped === 'summary') return { ...fallback, reason: 'language' };
-    return { mode: 'llm', provider: used.name, model: used.model, summary: answer.summary.trim(), references: answer.references,
+    if (slipped === 'summary') return diagnose({ ...fallback, reason: 'language' });
+    return diagnose({ mode: 'llm', provider: used.name, model: used.model, summary: answer.summary.trim(), references: answer.references,
       places: placeTexts(answer.places, context, query, language, names),
-      origin: 'generated', label: `Сгенерировано ${used.name === 'gemini' ? 'Gemini' : 'OpenAI'} только по найденным местам` };
-  } catch { return { ...fallback, reason: 'provider_unavailable' }; }
+      origin: 'generated', label: `Сгенерировано ${used.name === 'gemini' ? 'Gemini' : 'OpenAI'} только по найденным местам` });
+  } catch (error) {
+    return diagnose({ ...fallback, reason: 'generation_error', error: String(error?.name || 'Error').slice(0, 40) });
+  }
 }
 
 /**
@@ -222,24 +272,37 @@ function placeTexts(places, context, query, language = answerLanguage(query), na
   return texts;
 }
 
-// Free-tier Gemini often answers 503 or stalls under load; a short retry usually succeeds.
+// Free-tier Gemini often answers 503 under load; a short retry usually succeeds. A call that ran out of time is not
+// asked again: waiting a second time is what made the live answer take 17 seconds.
 const RETRYABLE = /^provider_(429|500|502|503|504|unavailable)$/;
-const TOTAL_MS = 18000, ATTEMPT_MS = 8000, MAX_ATTEMPTS = 3;
+const ERROR_TYPES = { provider_timeout: 'timeout', provider_unavailable: 'network', provider_too_large: 'too_large', provider_truncated: 'max_tokens', provider_empty: 'empty' };
 
-async function callWithRetry(provider, input, env, maxAttempts = MAX_ATTEMPTS) {
+/** One safe line per attempt for generation.diagnostics. */
+function attemptNote(provider, reply, ms) {
+  return { provider: provider.name, model: provider.model, ...(reply.thinking ? { thinking: reply.thinking } : {}), ms,
+    status: Number.isFinite(reply.status) ? reply.status : null, finishReason: reply.finishReason ?? null,
+    error: reply.error ? ERROR_TYPES[reply.error] || (/^provider_\d+$/.test(reply.error) ? 'http' : 'other') : null };
+}
+
+async function callWithRetry(provider, input, env, { deadline = Date.now() + GENERATION_MS, maxAttempts = 2, log = [] } = {}) {
   const call = provider.name === 'gemini' ? callGemini : callOpenAI;
-  const deadline = Date.now() + TOTAL_MS;
   const pause = Number.isFinite(Number(env.RETRY_DELAY_MS)) ? Number(env.RETRY_DELAY_MS) : 600;
-  let reply = { error: 'provider_unavailable' };
+  const attemptMs = Number(env.ATTEMPT_MS) || ATTEMPT_MS;
+  let reply = { error: 'provider_timeout' };
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const left = deadline - Date.now();
+    if (left < 1500) break;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Math.min(ATTEMPT_MS, deadline - Date.now()));
+    const began = Date.now();
+    const timer = setTimeout(() => controller.abort(), Math.min(attemptMs, left));
     try { reply = await call(input, provider, env, controller.signal); }
-    catch { reply = { error: 'provider_unavailable' }; }
-    finally { clearTimeout(timer); }
+    catch (error) {
+      reply = { error: controller.signal.aborted ? 'provider_timeout' : error?.message === 'RESPONSE_TOO_LARGE' ? 'provider_too_large' : 'provider_unavailable' };
+    } finally { clearTimeout(timer); }
+    log.push(attemptNote(provider, reply, Date.now() - began));
     if (!reply.error || !RETRYABLE.test(reply.error) || attempt === maxAttempts) break;
-    if (deadline - Date.now() < pause * attempt + 2000) break;
-    await new Promise(resolve => setTimeout(resolve, pause * attempt));
+    if (deadline - Date.now() < pause + 4000) break;
+    await new Promise(resolve => setTimeout(resolve, pause));
   }
   return reply;
 }
@@ -540,10 +603,13 @@ export async function handleApi(request, env = {}, dataset = []) {
     if (!budget.allowed) return json({ error: 'Лимит запросов демо исчерпан. Попробуйте позднее.' }, 429, { 'Retry-After': '60' });
     // Words the dictionary did not understand get one Gemini embedding call (query text only). The dictionary answer
     // stands when the call fails, finds no clear meaning, or the meant category has nothing within the time.
+    let embeddings = null;
     if (budget.generationAllowed && meaningWanted(result)) {
-      const semantic = await semanticCategories(body.query, env);
+      embeddings = {};
+      const semantic = await semanticCategories(body.query, env, { report: embeddings });
       const meant = semantic?.categories.length ? recommend(pois, body, { weather: weatherNow, semantic, ratings }) : null;
       if (meant?.recommendations.length) result = meant;
+      Object.assign(embeddings, { categories: semantic?.categories ?? [], used: Boolean(meant?.recommendations.length) });
     }
     // Today's events from the city listing within walking reach, shown as their own block with the listing as source.
     const visitAt = body.visitDate && String(body.visitDate).includes('T') ? new Date(body.visitDate) : new Date();
@@ -551,9 +617,11 @@ export async function handleApi(request, env = {}, dataset = []) {
     result = { ...result, cityEvents: { label: 'Сегодня в городе', ...eventsOrigin(events),
       items: cityEventsFor(events.events, { lat: result.constraints.lat, lon: result.constraints.lon, minutes: result.constraints.minutes,
         maxWalkMinutes: result.constraints.maxWalkMinutes, withChild: result.constraints.withChild, now: visitAt }) } };
-    const generation = budget.generationAllowed
+    const generated = budget.generationAllowed
       ? await generate(result, body.query, env, body.lang)
       : { mode: 'fallback', summary: safeSummary(result, body.query, body.lang), references: [], reason: 'request_budget_unavailable' };
+    // The embedding call's own line sits with the model's, so one look at generation.diagnostics shows both.
+    const generation = embeddings ? { ...generated, diagnostics: { ...generated.diagnostics, embeddings } } : generated;
     // Model texts sit next to the computed ones, each labelled, so a card never presents generated text as data.
     // Google Maps, 2GIS and Google Calendar links are plain URLs, opened only when the visitor taps them.
     const label = generation.label;
