@@ -77,8 +77,14 @@ button, a, [role="button"], .chip, .seg { touch-action: manipulation; -webkit-us
 .field-input::placeholder { color: var(--ink-3); opacity: 1; }
 .field-input::-webkit-search-cancel-button { -webkit-appearance: none; }
 .search-field:focus-within { box-shadow: 0 0 0 2px var(--sky); background: var(--surface); }
-.search-field .mic { margin-right: 4px; background: transparent; color: var(--ink-2); }
-.mic.is-listening { background: var(--red-soft); color: var(--red); }
+.search-field .mic { margin-right: 6px; width: 42px; height: 42px; flex: none; border-radius: 50%; background: var(--gold); color: var(--on-gold); position: relative; }
+.mic.is-listening { background: var(--red); color: #fff; }
+.mic.is-listening::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--red); animation: mic-pulse 1.2s ease-out infinite; pointer-events: none; }
+.mic.is-thinking { background: var(--surface); color: var(--gold-ink); }
+.mic.is-thinking::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--gold); animation: spin .8s linear infinite; pointer-events: none; }
+@keyframes mic-pulse { from { transform: scale(.9); opacity: .9; } to { transform: scale(1.35); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .mic.is-listening::after, .mic.is-thinking::after { animation: none; } }
+.start-note { color: var(--ink-3); }
 .field { display: grid; gap: var(--s-2); margin-top: var(--s-3); }
 .field-label { font-size: var(--fs-13); color: var(--ink-3); font-weight: 500; }
 

@@ -39,7 +39,6 @@ export function placeView({ place, timing, start, serverHours, why, activities =
   if (WHEELCHAIR[place.wheelchair]) facts.push(row('accessible', t('place.wheelchair'), t(WHEELCHAIR[place.wheelchair])));
 
   const sourceName = place.source?.label || 'OpenStreetMap';
-  const confidence = CONFIDENCE[place.confidence?.level];
   const checks = [
     ['check', 'good', t('place.check.in', { source: sourceName })],
     ['check', 'good', t('place.check.coords')],
@@ -48,10 +47,9 @@ export function placeView({ place, timing, start, serverHours, why, activities =
     ['info', 'muted', t('place.check.live')],
   ];
   const snapshot = formatDate(place.retrievedAt);
-  const gemini = (key) => h('p', { class: 'origin is-ai' }, h('span', { class: 'ai-chip' }, icon('sparkle', 'icon-xs'), 'Gemini'), place.provenance?.[key]?.label || t('place.byGemini'));
-  const origin = (key) => place.provenance?.[key]?.label ? h('p', { class: 'origin' }, icon('info', 'icon-xs'), place.provenance[key].label) : null;
+  const gemini = () => h('p', { class: 'origin is-ai' }, h('span', { class: 'ai-chip' }, icon('sparkle', 'icon-xs'), 'Gemini'), t('place.aiShort'));
 
-  const routeLine = h('p', { class: 'fine', text: routeInfo ? t('place.route', { d: formatDistance(routeInfo.meters, lang()), n: Math.ceil(routeInfo.seconds / 60) }) : t('place.estimate') });
+  const routeLine = routeInfo ? h('p', { class: 'fine', text: t('place.route', { d: formatDistance(routeInfo.meters, lang()), n: Math.ceil(routeInfo.seconds / 60) }) }) : null;
   const friends = window.SeruenSocial?.planMeetup
     ? h('button', { class: 'btn btn-quiet btn-sm', type: 'button', onclick: () => window.SeruenSocial.planMeetup({ id: place.id, name: place.name, lat: place.lat, lon: place.lon, category: place.category }) }, icon('friends'), t('place.friends'))
     : null;
@@ -64,7 +62,7 @@ export function placeView({ place, timing, start, serverHours, why, activities =
       h('div', {}, h('h2', { id: 'place-title', class: 'title-2', text: place.name }),
         h('p', { class: 'meta' }, categoryName(place.category), timing.distanceMeters ? h('span', { class: 'meta-sep', 'aria-hidden': 'true' }) : null,
           timing.distanceMeters ? t('place.straight', { d: formatDistance(timing.distanceMeters, lang()) }) : null),
-        h('div', { class: 'place-badges' }, hoursChip(hours), confidence ? h('span', { class: `confidence confidence-${place.confidence.level}` }, icon(confidence.icon, 'icon-xs'), t(confidence.label)) : null))),
+        h('div', { class: 'place-badges' }, hoursChip(hours)))),
     h('section', { class: 'time-card' },
       timeRing({ there: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, reserve: timing.safetyReserveMinutes, size: 132, stroke: 13, label: `${total}`, sublabel: t('plan.min', { n: '' }).trim() }),
       h('div', { class: 'time-card-side' }, h('ul', { class: 'legend' }, legend), h('p', { class: 'return-by' }, icon('return'), t('place.returnNow', { time: returnBy(total) })))),
@@ -73,21 +71,22 @@ export function placeView({ place, timing, start, serverHours, why, activities =
     h('div', { class: 'place-actions' }, watchButton({ place, start, walk: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, minutes: timing.totalMinutes }), friends,
       safeUrl(place.links?.googleCalendar) ? h('a', { class: 'btn btn-quiet btn-sm', href: safeUrl(place.links.googleCalendar), target: '_blank', rel: 'noopener noreferrer' }, icon('calendar'), t('place.calendar')) : null),
     start ? navLinks(start, place, place.links) : null,
-    place.aiWhy ? section(t('place.why'), h('p', { class: 'prose', text: place.aiWhy }), gemini('aiWhy'), listenButton(() => [place.aiWhy, place.aiTodo].filter(Boolean).join(' ')))
-      : why ? section(t('place.why'), h('p', { class: 'prose', text: why }), origin('why')) : null,
-    place.aiTodo || steps.length ? section(t('place.plan'), place.aiTodo ? h('p', { class: 'prose', text: place.aiTodo }) : null, place.aiTodo ? gemini('aiTodo') : null,
-      steps.length ? h('ol', { class: 'plan-steps' }, steps.map((step) => h('li', { text: step }))) : null, steps.length ? origin('plan') : null) : null,
+    place.aiWhy ? section(t('place.why'), h('p', { class: 'prose', text: place.aiWhy }), gemini(), listenButton(() => [place.aiWhy, place.aiTodo].filter(Boolean).join(' ')))
+      : why ? section(t('place.why'), h('p', { class: 'prose', text: why })) : null,
+    place.aiTodo || steps.length ? section(t('place.plan'), place.aiTodo ? h('p', { class: 'prose', text: place.aiTodo }) : null, place.aiTodo ? gemini() : null,
+      !place.aiTodo && steps.length ? h('ol', { class: 'plan-steps' }, steps.map((step) => h('li', { text: step }))) : null) : null,
     pairing ? section(t('place.pairing'), h('div', { class: 'pairing' }, categoryArt(pairing.category, 32, 'art'),
       h('span', { class: 'row-text' }, h('strong', { text: pairing.name }), h('small', { text: t('place.pairingValue', { d: formatDistance(pairing.distanceMeters, lang()), n: pairing.extraMinutes }) })))) : null,
-    activities.length && !place.aiTodo ? section(t('place.todo'), h('ul', { class: 'bullets' }, activities.map((item) => h('li', { text: item }))), h('p', { class: 'origin is-idea' }, icon('sparkle', 'icon-xs'), t('place.idea'))) : null,
-    facts.length ? section(t('place.info'), h('dl', { class: 'facts' }, facts), origin('facts')) : null,
-    section(t('place.checks'), h('ul', { class: 'checks' }, checks.map(([name, tone, text]) => h('li', { class: `check-${tone}` }, icon(name), h('span', { text })))),
+    activities.length && !place.aiTodo && !steps.length ? section(t('place.todo'), h('ul', { class: 'bullets' }, activities.map((item) => h('li', { text: item })))) : null,
+    facts.length ? section(t('place.info'), h('dl', { class: 'facts' }, facts)) : null,
+    // Sources, what was and was not checked, and caveats: one closed line for whoever wants the details.
+    h('details', { class: 'disclosure' }, h('summary', {}, icon('info'), t('place.checks')),
+      h('ul', { class: 'checks' }, checks.map(([name, tone, text]) => h('li', { class: `check-${tone}` }, icon(name), h('span', { text })))),
+      warnings.length ? h('ul', { class: 'bullets fine' }, warnings.map((item) => h('li', { text: item }))) : null,
       h('p', { class: 'fine' }, externalLink(t('place.sourceOf', { source: sourceName }), place.sourceUrl), snapshot ? h('span', { text: ` ${t('place.snapshot', { date: snapshot })}` }) : null)),
-    warnings.length ? h('details', { class: 'disclosure' }, h('summary', {}, icon('warning'), t('place.warnings'), h('span', { class: 'count num', text: warnings.length })), h('ul', { class: 'bullets fine' }, warnings.map((item) => h('li', { text: item })))) : null,
   );
 }
 
-const CONFIDENCE = { high: { icon: 'check', label: 'conf.high' }, medium: { icon: 'info', label: 'conf.medium' }, low: { icon: 'warning', label: 'conf.low' } };
 const capitalize = (text) => String(text).charAt(0).toLocaleUpperCase() + String(text).slice(1);
 
 function row(iconName, label, value) {
