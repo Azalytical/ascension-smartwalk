@@ -4,7 +4,7 @@ Aidem отвечает на вопрос «куда сходить, если у 
 
 ```mermaid
 flowchart TB
-  subgraph collect["Сбор данных: скрипты, без ручной правки"]
+  subgraph collect["Сбор данных скриптами"]
     osm["OpenStreetMap<br/>через Overpass"] --> merge["build_places.py<br/>сведение дублей"]
     ovt["Overture Maps<br/>Meta, Microsoft, Foursquare"] --> merge
     merge --> db[("2058 мест<br/>с источником и лицензией")]
