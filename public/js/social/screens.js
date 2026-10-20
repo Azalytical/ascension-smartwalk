@@ -95,10 +95,10 @@ function routeLinks(target) {
 function downloadCalendar({ title, startsAt, endsAt, place, description = '' }) {
   const stamp = ts => new Date(ts).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const escape = value => String(value).replace(/[\\;,]/g, match => `\\${match}`).replace(/\n/g, '\\n');
-  const body = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Ulger//Astana//RU', 'BEGIN:VEVENT', `UID:${crypto.randomUUID()}@ulger`, `DTSTAMP:${stamp(Date.now())}`,
+  const body = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Aidem//Astana//RU', 'BEGIN:VEVENT', `UID:${crypto.randomUUID()}@aidem`, `DTSTAMP:${stamp(Date.now())}`,
     `DTSTART:${stamp(startsAt)}`, `DTEND:${stamp(endsAt ?? startsAt + 3600000)}`, `SUMMARY:${escape(title)}`, `LOCATION:${escape(place.name)}`, `GEO:${place.lat};${place.lon}`,
     `DESCRIPTION:${escape(description)}`, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
-  const link = h('a', { href: URL.createObjectURL(new Blob([body], { type: 'text/calendar' })), download: 'ulger.ics' });
+  const link = h('a', { href: URL.createObjectURL(new Blob([body], { type: 'text/calendar' })), download: 'aidem.ics' });
   document.body.append(link);
   link.click();
   setTimeout(() => { URL.revokeObjectURL(link.href); link.remove(); }, 1000);
@@ -384,7 +384,7 @@ export function mountSocial(root, ctx = {}) {
         qr.innerHTML = code.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
       }).catch(() => { qr.hidden = true; });
       const copy = async () => { try { await navigator.clipboard.writeText(link); toast('Ссылка скопирована', 'success'); } catch { prompt('Скопируйте ссылку', link); } };
-      const share = () => navigator.share({ title: 'Ulger', text: `${data().me.name} зовёт вас в друзья в Ulger: гулять по Астане вместе`, url: link }).catch(() => {});
+      const share = () => navigator.share({ title: 'Aidem', text: `${data().me.name} зовёт вас в друзья в Aidem: гулять по Астане вместе`, url: link }).catch(() => {});
       const own = h('input', { class: 'sx-input sx-code-input', maxlength: 8, placeholder: 'Код друга', autocapitalize: 'characters', 'aria-label': 'Код приглашения друга' });
       box.replaceChildren(
         h('h3', { class: 'sx-section-title' }, 'Пригласить друга'),
@@ -779,7 +779,7 @@ export function mountSocial(root, ctx = {}) {
         : ['friend_added', 'location_shared'].includes(item.type) ? { type: 'friend', id: item.entityId }
           : item.type === 'location_request' ? { type: 'share' } : null;
     const canAsk = 'Notification' in window && Notification.permission === 'default';
-    const ask = canAsk ? h('div', { class: 'sx-note' }, h('p', {}, 'Можно получать уведомления, пока вкладка Ulger открыта в фоне.'),
+    const ask = canAsk ? h('div', { class: 'sx-note' }, h('p', {}, 'Можно получать уведомления, пока вкладка Aidem открыта в фоне.'),
       button('Включить уведомления', async () => { await Notification.requestPermission().catch(() => {}); render(true); }, 'ghost')) : null;
     return h('div', { class: 'sx-stack' }, h('h3', { class: 'sx-section-title' }, 'Уведомления'), ask,
       list.length ? h('ul', { class: 'sx-list' }, list.map(item => h('li', {}, h('button', { type: 'button', class: `sx-row${item.read ? '' : ' is-unread'}`, onclick: () => { const next = target(item); if (next) open(next); } },
@@ -892,7 +892,7 @@ export function mountSocial(root, ctx = {}) {
     if (reason?.type === 'notifications') {
       for (const item of reason.items.slice(0, 2)) toast(item.text, 'info');
       if (document.visibilityState === 'hidden' && 'Notification' in window && Notification.permission === 'granted') {
-        for (const item of reason.items.slice(0, 2)) new Notification('Ulger', { body: item.text, icon: '/assets/brand/seruen/icon-192.png' });
+        for (const item of reason.items.slice(0, 2)) new Notification('Aidem', { body: item.text, icon: '/assets/brand/seruen/icon-192.png' });
       }
       return;
     }

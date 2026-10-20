@@ -54,7 +54,7 @@ function render() {
     h('details', { class: 'disclosure' }, h('summary', {}, icon('loop'), t('me.about')), h('div', { class: 'prose' }, ['about.p1', 'about.p2', 'about.p3'].map((key) => h('p', { text: t(key) })), h('p', { class: 'fine', text: t('about.credit') }))),
     h('details', { class: 'disclosure' }, h('summary', {}, icon('info'), t('me.privacy')), h('div', { class: 'prose' }, ['privacy.p1', 'privacy.p2', 'privacy.p3', 'privacy.p4'].map((key) => h('p', { text: t(key) })))),
     h('p', { class: 'fine data-line' }, icon('map'), t('me.data'), ': ', dataLine),
-    h('p', { class: 'fine center brand-foot' }, h('img', { src: '/assets/brand/seruen/mark.svg', alt: '', width: 20, height: 20 }), 'Ulger by Ascension')));
+    h('p', { class: 'fine center brand-foot' }, h('img', { src: '/assets/brand/seruen/mark.svg', alt: '', width: 20, height: 20 }), 'Aidem by Ascension')));
 }
 
 function openTabWithPlace(id) {

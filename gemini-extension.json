@@ -1,9 +1,9 @@
 {
-  "name": "ulger",
+  "name": "aidem",
   "version": "2.0.0",
-  "description": "Ulger: walks around Astana that fit your time. Plans, micro-routes, opening hours and weather for 2,000+ Astana places from OpenStreetMap and Overture Maps, as MCP tools.",
+  "description": "Aidem: walks around Astana that fit your time. Plans, micro-routes, opening hours and weather for 2,000+ Astana places from OpenStreetMap and Overture Maps, as MCP tools.",
   "mcpServers": {
-    "ulger": {
+    "aidem": {
       "httpUrl": "https://ascension-smartwalk.azamatbreach.workers.dev/mcp",
       "timeout": 20000
     }

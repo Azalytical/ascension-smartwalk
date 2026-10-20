@@ -362,7 +362,7 @@ function renderResults() {
   });
 
   clear(root, h('section', { class: 'view results-view', 'aria-labelledby': 'results-title' },
-    h('div', { class: 'view-bar' }, back, h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: 'Ulger', text: t('results.title', { min: request.minutes }), url: shareLink() }) }, icon('share'))),
+    h('div', { class: 'view-bar' }, back, h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: 'Aidem', text: t('results.title', { min: request.minutes }), url: shareLink() }) }, icon('share'))),
     h('h2', { id: 'results-title', class: 'title-1', text: t('results.title', { min: request.minutes }) }),
     h('p', { class: 'meta' }, icon('pin', 'icon-xs'), t('results.start', { name: startName() }), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }), t('plan.returnBy', { time: time(leave + request.minutes * 60000) })),
     tip,

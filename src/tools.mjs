@@ -1,4 +1,4 @@
-// One set of tools over the Ulger place base, shared by the MCP server (/mcp) and the Gemini agent (/api/agent).
+// One set of tools over the Aidem place base, shared by the MCP server (/mcp) and the Gemini agent (/api/agent).
 // Every tool is deterministic and read-only except get_weather, which asks Open-Meteo for the weather around a rounded point.
 import { recommend, preparedPlaces, haversineMeters, VISIT } from './retrieval.mjs';
 import { checkVisit } from './hours.mjs';
@@ -218,7 +218,7 @@ export const TOOLS = [
       return_to_start: { type: 'boolean', description: 'Нужно ли вернуться к точке старта. По умолчанию да.' }, visit_time },
     required: ['lat', 'lon'] }, run: planWalk },
   { name: 'search_places', title: 'Найти места',
-    description: 'Ищет места в базе Ulger (места Астаны из OpenStreetMap и Overture Maps) по названию или словам, категории и близости к точке. Возвращает координаты, расстояние, часы работы и статус по часам на сейчас.',
+    description: 'Ищет места в базе Aidem (места Астаны из OpenStreetMap и Overture Maps) по названию или словам, категории и близости к точке. Возвращает координаты, расстояние, часы работы и статус по часам на сейчас.',
     inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Название или слова: «Хан Шатыр», «кофе», «пицца».' },
       category: categoryField, lat, lon, limit: { type: 'number', description: 'Сколько мест вернуть, 1–10. По умолчанию 6.' } } }, run: searchPlaces },
   { name: 'place_details', title: 'Подробно о месте',
