@@ -1,0 +1,715 @@
+{
+ "source": {
+  "id": "sxodim",
+  "label": "sxodim.com",
+  "url": "https://sxodim.com/astana/afisha",
+  "collectedAt": "2026-10-20",
+  "note": "Название, дата, площадка, адрес и цена как в афише sxodim.com; координаты только у площадок, найденных в базе мест."
+ },
+ "events": [
+  {
+   "id": "sxodim:koncert-platina-v-astane",
+   "title": "Концерт Платина в Астане",
+   "category": "Концерты",
+   "dateText": "11 декабря в 20:00",
+   "when": {
+    "dates": [
+     "2026-12-11"
+    ],
+    "time": "20:00"
+   },
+   "venue": "Nova",
+   "address": "улица Достык, 3",
+   "price": "от 25 000 теңге",
+   "url": "https://sxodim.com/astana/event/koncert-platina-v-astane",
+   "lat": 51.1286406,
+   "lon": 71.4203796,
+   "placeId": "osm:way:230358847",
+   "placeName": "Көрме",
+   "located": "address"
+  },
+  {
+   "id": "sxodim:wow-quiz-ugaday-melodiyu-russkie-hity-i-ne-tolko",
+   "title": "Wow Quiz – Угадай мелодию: русские хиты и не только",
+   "category": "Игры (квизы, мафия и другое)",
+   "dateText": "20 октября в 20:00",
+   "when": {
+    "dates": [
+     "2026-10-20"
+    ],
+    "time": "20:00"
+   },
+   "venue": "Garage music bar",
+   "address": "ул. Кравцова, 6",
+   "price": "3000 теңге",
+   "url": "https://sxodim.com/astana/event/wow-quiz-ugaday-melodiyu-russkie-hity-i-ne-tolko",
+   "lat": 51.1578819,
+   "lon": 71.442862,
+   "placeId": "osm:node:1843876243",
+   "placeName": "Гараж",
+   "located": "address"
+  },
+  {
+   "id": "sxodim:kviz-pliz-novichki-804",
+   "title": "Квиз, плиз! (новички) #804",
+   "category": "Игры (квизы, мафия и другое)",
+   "dateText": "20 октября в 20:00",
+   "when": {
+    "dates": [
+     "2026-10-20"
+    ],
+    "time": "20:00"
+   },
+   "venue": "Harat’s Irish Pub EXPO",
+   "address": "пр. Мангилик Ел, 55 B2.4",
+   "price": "3500 тенге",
+   "url": "https://sxodim.com/astana/event/kviz-pliz-novichki-804",
+   "lat": 51.0884628,
+   "lon": 71.4154549,
+   "placeId": "overture:03710a5b-adef-4fe8-b0a0-24a7a96f8a4d",
+   "placeName": "Harat's Irish Pub Expo",
+   "located": "name"
+  },
+  {
+   "id": "sxodim:sbornyy-stendap-stand-up-bar-pozitiv-1",
+   "title": "Сборный стендап (Stand Up Bar «Pozitiv»)",
+   "category": "Мероприятия в стендап-баре Pozitiv",
+   "dateText": "10 октября - 24 октября",
+   "when": {
+    "from": "2026-10-10",
+    "to": "2026-10-24",
+    "time": null
+   },
+   "venue": "Бар «Pozitiv»",
+   "address": "ул. Габдуллина, 18",
+   "price": "от 3000 теңге",
+   "url": "https://sxodim.com/astana/event/sbornyy-stendap-stand-up-bar-pozitiv-1",
+   "lat": 51.1651726,
+   "lon": 71.4316521,
+   "placeId": "overture:26dac1f4-3261-4d4a-9a0f-91a977adb287",
+   "placeName": "Barrus",
+   "located": "address"
+  },
+  {
+   "id": "sxodim:improvizaciya-s-zalom-stand-up-bar-pozitiv",
+   "title": "Импровизация с залом (Stand Up Bar «Pozitiv»)",
+   "category": "Мероприятия в стендап-баре Pozitiv",
+   "dateText": "20 октября и 27 октября",
+   "when": {
+    "dates": [
+     "2026-10-20",
+     "2026-10-27"
+    ],
+    "time": null
+   },
+   "venue": "Бар Pozitiv",
+   "address": "ул. Габдуллина, 18",
+   "price": "3000 теңге",
+   "url": "https://sxodim.com/astana/event/improvizaciya-s-zalom-stand-up-bar-pozitiv",
+   "lat": 51.1651726,
+   "lon": 71.4316521,
+   "placeId": "overture:26dac1f4-3261-4d4a-9a0f-91a977adb287",
+   "placeName": "Barrus",
+   "located": "address"
+  },
+  {
+   "id": "sxodim:lekciya-i-master-klass-udivitelnyy-mir-mongol-zurag",
+   "title": "Лекция и мастер класс: удивительный мир Монгол зураг",
+   "category": "Выставки и ярмарки",
+   "dateText": "21 октября в 16:00",
+   "when": {
+    "dates": [
+     "2026-10-21"
+    ],
+    "time": "16:00"
+   },
+   "venue": "Галерея искусств «HAS SANAT»",
+   "address": "улица Динмухамеда Кунаева, 14-Д, ЖК «Нурсая-1»",
+   "price": "от 8000 теңге",
+   "url": "https://sxodim.com/astana/event/lekciya-i-master-klass-udivitelnyy-mir-mongol-zurag",
+   "lat": 51.1285934,
+   "lon": 71.4385147,
+   "placeId": "overture:233f9ff9-02f1-4fd2-9e02-b5dea3f7e9ce",
+   "placeName": "Has Sanat",
+   "located": "name"
+  },
+  {
+   "id": "sxodim:shou-knigery",
+   "title": "Шоу «Книгеры»",
+   "category": "Stand up",
+   "dateText": "21 октября в 19:00",
+   "when": {
+    "dates": [
+     "2026-10-21"
+    ],
+    "time": "19:00"
+   },
+   "venue": "Мята Lounge",
+   "address": "ул. Кабанбай батыра, 5 (здание Цирка)",
+   "price": "3000 тенге",
+   "url": "https://sxodim.com/astana/event/shou-knigery",
+   "lat": 51.1450693,
+   "lon": 71.4189112,
+   "placeId": "osm:node:5126825313",
+   "placeName": "Астаналық Цирк",
+   "located": "alias"
+  },
+  {
+   "id": "sxodim:kviz-pliz-syurpriz-9",
+   "title": "Квиз, плиз! (сюрприз) #9",
+   "category": "Игры (квизы, мафия и другое)",
+   "dateText": "21 октября в 20:00",
+   "when": {
+    "dates": [
+     "2026-10-21"
+    ],
+    "time": "20:00"
+   },
+   "venue": "Гриль-бар Draft",
+   "address": "ул. Жумабека Ташенова, 27",
+   "price": "3500 теңге",
+   "url": "https://sxodim.com/astana/event/kviz-pliz-syurpriz-9",
+   "lat": 51.1546529,
+   "lon": 71.4512694,
+   "placeId": "osm:node:4892345887",
+   "placeName": "Драфт",
+   "located": "address"
+  },
+  {
+   "id": "sxodim:wow-quiz-detektiv-kviz",
+   "title": "Wow Quiz – Детектив квиз",
+   "category": "Игры (квизы, мафия и другое)",
+   "dateText": "21 октября в 20:00",
+   "when": {
+    "dates": [
+     "2026-10-21"
+    ],
+    "time": "20:00"
+   },
+   "venue": "Garage music bar",
+   "address": "ул. Кравцова, 6",
+   "price": "3000 теңге",
+   "url": "https://sxodim.com/astana/event/wow-quiz-detektiv-kviz",
+   "lat": 51.1578819,
+   "lon": 71.442862,
+   "placeId": "osm:node:1843876243",
+   "placeName": "Гараж",
+   "located": "address"
+  },
+  {
+   "id": "sxodim:chernyy-stendap-stand-up-bar-pozitiv",
+   "title": "Проверочный стендап «Черно-белые шутки» (Stand Up Bar «Pozitiv»)",
+   "category": "Мероприятия в стендап-баре Pozitiv",
+   "dateText": "16 октября - 28 октября",
+   "when": {
+    "from": "2026-10-16",
+    "to": "2026-10-28",
+    "time": null
+   },
+   "venue": "Бар Pozitiv",
+   "address": "ул. Габдуллина, 18",
+   "price": "3000 теңге",
+   "url": "https://sxodim.com/astana/event/chernyy-stendap-stand-up-bar-pozitiv",
+   "lat": 51.1651726,
+   "lon": 71.4316521,
+   "placeId": "overture:26dac1f4-3261-4d4a-9a0f-91a977adb287",
+   "placeName": "Barrus",
+   "located": "address"
+  },
+  {
+   "id": "sxodim:razgovornoe-shou-chto-vas-besit-stand-up-bar-pozitiv-2",
+   "title": "Разговорное шоу «Что вас бесит» (Stand Up Bar «Pozitiv»)",
+   "category": "Мероприятия в стендап-баре Pozitiv",
+   "dateText": "21 октября и 28 октября",
+   "when": {
+    "dates": [
+     "2026-10-21",
+     "2026-10-28"
+    ],
+    "time": null
+   },
+   "venue": "Бар Pozitiv",
+   "address": "ул. Габдуллина, 18",
+   "price": "3000 теңге",
+   "url": "https://sxodim.com/astana/event/razgovornoe-shou-chto-vas-besit-stand-up-bar-pozitiv-2",
+   "lat": 51.1651726,
+   "lon": 71.4316521,
+   "placeId": "overture:26dac1f4-3261-4d4a-9a0f-91a977adb287",
+   "placeName": "Barrus",
+   "located": "address"
+  },
+  {
+   "id": "sxodim:vstrecha-s-kanatom-nurovym-upravlencheskie-resheniya-otkrytyy-razbor-biznes-keysov",
+   "title": "Встреча с Канатом Нуровым «Управленческие решения — открытый разбор бизнес-кейсов»",
+   "category": "Бизнес",
+   "dateText": "22 октября в 17:00",
+   "when": {
+    "dates": [
+     "2026-10-22"
+    ],
+    "time": "17:00"
+   },
+   "venue": "Abu Dhabi Plaza, Practic Office",
+   "address": "ул. Сыганак, 60/4, 26-й этаж",
+   "price": "9900 теңге",
+   "url": "https://sxodim.com/astana/event/vstrecha-s-kanatom-nurovym-upravlencheskie-resheniya-otkrytyy-razbor-biznes-keysov",
+   "lat": 51.1219718,
+   "lon": 71.4279322,
+   "placeId": "osm:way:762780007",
+   "placeName": "Abu Dhabi Plaza",
+   "located": "name"
+  },
+  {
+   "id": "sxodim:shou-doramy-istinnoe-obrazovanie",
+   "title": "Шоу «Дорамы» – «Истинное образование»",
+   "category": "Stand up",
+   "dateText": "22 октября в 19:00",
+   "when": {
+    "dates": [
+     "2026-10-22"
+    ],
+    "time": "19:00"
+   },
+   "venue": "Мята",
+   "address": "ул. Кабанбай батыра, 5 (здание Цирка)",
+   "price": "3000 тенге",
+   "url": "https://sxodim.com/astana/event/shou-doramy-istinnoe-obrazovanie",
+   "lat": 51.1450693,
+   "lon": 71.4189112,
+   "placeId": "osm:node:5126825313",
+   "placeName": "Астаналық Цирк",
+   "located": "alias"
+  },
+  {
+   "id": "sxodim:kinouzhin-s-filmom-unesennye-prizrakami-ot-vkuskino-v-astane",
+   "title": "Киноужин с фильмом «Унесенные призраками» от VkusKino в Астане",
+   "category": "Киноужины от VkusKino в Астане",
+   "dateText": "22 октября и 5 ноября",
+   "when": {
+    "dates": [
+     "2026-10-22",
+     "2026-11-05"
+    ],
+    "time": null
+   },
+   "venue": "Ресторан Korean home food by Ellina Tyan",
+   "address": "ул. Достык, 4",
+   "price": "от 25 500 тенге",
+   "url": "https://sxodim.com/astana/event/kinouzhin-s-filmom-unesennye-prizrakami-ot-vkuskino-v-astane",
+   "lat": 51.1289119,
+   "lon": 71.408326,
+   "placeId": "osm:node:13109131801",
+   "placeName": "Taiyo",
+   "located": "address"
+  },
+  {
+   "id": "sxodim:kviz-pliz-805",
+   "title": "Квиз, плиз! #805",
+   "category": "Игры (квизы, мафия и другое)",
+   "dateText": "22 октября в 20:00",
+   "when": {
+    "dates": [
+     "2026-10-22"
+    ],
+    "time": "20:00"
+   },
+   "venue": "Harat's Irish Pub EXPO",
+   "address": "Проспект Мангилик Ел, 55 B2.4",
+   "price": "3500 теңге",
+   "url": "https://sxodim.com/astana/event/kviz-pliz-805",
+   "lat": 51.0884628,
+   "lon": 71.4154549,
+   "placeId": "overture:03710a5b-adef-4fe8-b0a0-24a7a96f8a4d",
+   "placeName": "Harat's Irish Pub Expo",
+   "located": "name"
+  },
+  {
+   "id": "sxodim:troynoy-stand-up-stand-up-bar-pozitiv-1",
+   "title": "Тройной Stand Up (Stand Up Bar «Pozitiv»)",
+   "category": "Мероприятия в стендап-баре Pozitiv",
+   "dateText": "22 октября в 20:00",
+   "when": {
+    "dates": [
+     "2026-10-22"
+    ],
+    "time": "20:00"
+   },
+   "venue": "Бар Pozitiv",
+   "address": "ул. Габдуллина, 18",
+   "price": "4000 тенге",
+   "url": "https://sxodim.com/astana/event/troynoy-stand-up-stand-up-bar-pozitiv-1",
+   "lat": 51.1651726,
+   "lon": 71.4316521,
+   "placeId": "overture:26dac1f4-3261-4d4a-9a0f-91a977adb287",
+   "placeName": "Barrus",
+   "located": "address"
+  },
+  {
+   "id": "sxodim:stendap-otkrytyy-mikrofon-stand-up-bar-pozitiv-1",
+   "title": "Стендап «Открытый микрофон» (Stand Up Bar «Pozitiv»)",
+   "category": "Мероприятия в стендап-баре Pozitiv",
+   "dateText": "18 октября - 1 ноября",
+   "when": {
+    "from": "2026-10-18",
+    "to": "2026-11-01",
+    "time": null
+   },
+   "venue": "Бар Pozitiv",
+   "address": "ул. Габдуллина, 18",
+   "price": "2000 тенге",
+   "url": "https://sxodim.com/astana/event/stendap-otkrytyy-mikrofon-stand-up-bar-pozitiv-1",
+   "lat": 51.1651726,
+   "lon": 71.4316521,
+   "placeId": "overture:26dac1f4-3261-4d4a-9a0f-91a977adb287",
+   "placeName": "Barrus",
+   "located": "address"
+  },
+  {
+   "id": "sxodim:kviz-pliz-ugadyvaem-ispolniteley-90-00-1",
+   "title": "Квиз, плиз! (угадываем исполнителей) 90-00 #1",
+   "category": "Игры (квизы, мафия и другое)",
+   "dateText": "23 октября в 19:30",
+   "when": {
+    "dates": [
+     "2026-10-23"
+    ],
+    "time": "19:30"
+   },
+   "venue": "Гриль-бар Draft",
+   "address": "ул. Жумабека Ташенова, 27",
+   "price": "3500 теңге",
+   "url": "https://sxodim.com/astana/event/kviz-pliz-ugadyvaem-ispolniteley-90-00-1",
+   "lat": 51.1546529,
+   "lon": 71.4512694,
+   "placeId": "osm:node:4892345887",
+   "placeName": "Драфт",
+   "located": "address"
+  },
+  {
+   "id": "sxodim:kviz-pliz-novichki-804-1",
+   "title": "Квиз, плиз! (новички) #804",
+   "category": "Игры (квизы, мафия и другое)",
+   "dateText": "23 октября в 19:30",
+   "when": {
+    "dates": [
+     "2026-10-23"
+    ],
+    "time": "19:30"
+   },
+   "venue": "Harat's Irish Pub",
+   "address": "Желтоксан, 2т",
+   "price": "3500 теңге",
+   "url": "https://sxodim.com/astana/event/kviz-pliz-novichki-804-1",
+   "lat": 51.1626167,
+   "lon": 71.419529,
+   "placeId": "overture:27cbf60e-6385-4518-9dd8-dfbba8905ba4",
+   "placeName": "Harat's Irish Pub Grand Alatau",
+   "located": "alias"
+  },
+  {
+   "id": "sxodim:pozitiv-stendap-stand-up-bar-pozitiv",
+   "title": "Pozitiv стендап (Stand Up Bar «Pozitiv»)",
+   "category": "Мероприятия в стендап-баре Pozitiv",
+   "dateText": "23 октября и 27 октября",
+   "when": {
+    "dates": [
+     "2026-10-23",
+     "2026-10-27"
+    ],
+    "time": null
+   },
+   "venue": "Бар Pozitiv",
+   "address": "ул. Габдуллина, 18",
+   "price": "3000 тенге",
+   "url": "https://sxodim.com/astana/event/pozitiv-stendap-stand-up-bar-pozitiv",
+   "lat": 51.1651726,
+   "lon": 71.4316521,
+   "placeId": "overture:26dac1f4-3261-4d4a-9a0f-91a977adb287",
+   "placeName": "Barrus",
+   "located": "address"
+  },
+  {
+   "id": "sxodim:sbornyy-nochnoy-stendap-stand-up-bar-pozitiv",
+   "title": "Сборный ночной стендап (Stand Up Bar «Pozitiv»)",
+   "category": "Мероприятия в стендап-баре Pozitiv",
+   "dateText": "23 октября в 23:45",
+   "when": {
+    "dates": [
+     "2026-10-23"
+    ],
+    "time": "23:45"
+   },
+   "venue": "Бар Pozitiv",
+   "address": "ул. Габдуллина, 18",
+   "price": "3000 тенге",
+   "url": "https://sxodim.com/astana/event/sbornyy-nochnoy-stendap-stand-up-bar-pozitiv",
+   "lat": 51.1651726,
+   "lon": 71.4316521,
+   "placeId": "overture:26dac1f4-3261-4d4a-9a0f-91a977adb287",
+   "placeName": "Barrus",
+   "located": "address"
+  },
+  {
+   "id": "sxodim:yulduz-usmanovany-koncerti-astanada",
+   "title": "Юлдуз Усманованың концерті Астанада",
+   "category": "Концерты",
+   "dateText": "20 октября в 19:00",
+   "when": {
+    "dates": [
+     "2026-10-20"
+    ],
+    "time": "19:00"
+   },
+   "venue": "Е. Рахмадиев атындағы Мемлекеттік академиялық филармония",
+   "address": "Кенесары көшесі, 32",
+   "price": "7000 теңгеден бастап",
+   "url": "https://sxodim.com/astana/event/yulduz-usmanovany-koncerti-astanada",
+   "lat": 51.1636794,
+   "lon": 71.4223498,
+   "placeId": "osm:node:4916363251",
+   "placeName": "Е. Рахмадиев атындағы Мемлекеттік академиялық филармония",
+   "located": "alias"
+  },
+  {
+   "id": "sxodim:tribyut-koncert-gruppy-zveri-v-astane",
+   "title": "Трибьют Концерт группы «Звери» в Астане",
+   "category": "Концерты",
+   "dateText": "25 октября в 20:30",
+   "when": {
+    "dates": [
+     "2026-10-25"
+    ],
+    "time": "20:30"
+   },
+   "venue": "Harat's Grand Alatau",
+   "address": "ул. Желтоксан, 2Т",
+   "price": "от 8000 теңге",
+   "url": "https://sxodim.com/astana/event/tribyut-koncert-gruppy-zveri-v-astane",
+   "lat": 51.1626167,
+   "lon": 71.419529,
+   "placeId": "overture:27cbf60e-6385-4518-9dd8-dfbba8905ba4",
+   "placeName": "Harat's Irish Pub Grand Alatau",
+   "located": "alias"
+  },
+  {
+   "id": "sxodim:koncert-gruppy-cupsize-v-astane",
+   "title": "Концерт группы CUPSIZE в Астане",
+   "category": "Концерты",
+   "dateText": "30 октября в 20:00",
+   "when": {
+    "dates": [
+     "2026-10-30"
+    ],
+    "time": "20:00"
+   },
+   "venue": "Бар «Квадрат»",
+   "address": "ул. Желтоксан, 2т",
+   "price": null,
+   "url": "https://sxodim.com/astana/event/koncert-gruppy-cupsize-v-astane",
+   "lat": 51.1623207,
+   "lon": 71.4205834,
+   "placeId": "osm:node:5890174288",
+   "placeName": "Fuller's Pub",
+   "located": "address"
+  },
+  {
+   "id": "sxodim:koncert-tyndamusic-ludovico-einaudi-v-astane",
+   "title": "Концерт TyndaMusic – Ludovico Einaudi в Астане",
+   "category": "Концерты",
+   "dateText": "31 октября в 19:00",
+   "when": {
+    "dates": [
+     "2026-10-31"
+    ],
+    "time": "19:00"
+   },
+   "venue": "Государственная академическая филармония им. Е. Рахмадиева",
+   "address": "ул. Кенесары, 32",
+   "price": "от 7000 тенге",
+   "url": "https://sxodim.com/astana/event/koncert-tyndamusic-ludovico-einaudi-v-astane",
+   "lat": 51.1636794,
+   "lon": 71.4223498,
+   "placeId": "osm:node:4916363251",
+   "placeName": "Е. Рахмадиев атындағы Мемлекеттік академиялық филармония",
+   "located": "alias"
+  },
+  {
+   "id": "sxodim:thomas-anders-v-astane",
+   "title": "Thomas Anders в Астане",
+   "category": "Концерты",
+   "dateText": "31 октября в 20:00",
+   "when": {
+    "dates": [
+     "2026-10-31"
+    ],
+    "time": "20:00"
+   },
+   "venue": "ЦКЗ «QAZAQSTAN»",
+   "address": "пр-т. Мангилик Ел. 10/1",
+   "price": "от 15 000 тенге",
+   "url": "https://sxodim.com/astana/event/thomas-anders-v-astane",
+   "lat": 51.1236038,
+   "lon": 71.4415054,
+   "placeId": "overture:a4d7605b-b301-4a9c-baec-cc65c1b617ca",
+   "placeName": "Қазақстан ОКЗ / ЦКЗ Казахстан",
+   "located": "alias"
+  },
+  {
+   "id": "sxodim:koncert-tyndamusic-rock-concert-v-astane",
+   "title": "Концерт TyndaMusic – Rock Concert в Астане",
+   "category": "Концерты",
+   "dateText": "8 ноября в 18:30",
+   "when": {
+    "dates": [
+     "2026-11-08"
+    ],
+    "time": "18:30"
+   },
+   "venue": "Дворец молодежи Жастар",
+   "address": "пр. Республики, 34",
+   "price": "от 8000 теңге",
+   "url": "https://sxodim.com/astana/event/koncert-tyndamusic-rock-concert-v-astane",
+   "lat": 51.1703258,
+   "lon": 71.4269441,
+   "placeId": "osm:way:1428964223",
+   "placeName": "Жастар сарайы алаңы",
+   "located": "alias"
+  },
+  {
+   "id": "sxodim:tribyut-shou-gruppy-leningrad-v-ispolnenii-gruppy-chilli",
+   "title": "Трибьют-шоу группы «Ленинград» в исполнении группы CHILLI",
+   "category": "Концерты",
+   "dateText": "13 ноября в 23:00",
+   "when": {
+    "dates": [
+     "2026-11-13"
+    ],
+    "time": "23:00"
+   },
+   "venue": "Harat’s Grand Alatau",
+   "address": "ул. Желтоксан, 2Т",
+   "price": "от 5500 тенге",
+   "url": "https://sxodim.com/astana/event/tribyut-shou-gruppy-leningrad-v-ispolnenii-gruppy-chilli",
+   "lat": 51.1626167,
+   "lon": 71.419529,
+   "placeId": "overture:27cbf60e-6385-4518-9dd8-dfbba8905ba4",
+   "placeName": "Harat's Irish Pub Grand Alatau",
+   "located": "alias"
+  },
+  {
+   "id": "sxodim:koncert-tyndamusic-the-music-of-hans-zimmer-v-astane",
+   "title": "Концерт TyndaMusic – The music of Hans Zimmer в Астане",
+   "category": "Концерты",
+   "dateText": "15 ноября в 19:00",
+   "when": {
+    "dates": [
+     "2026-11-15"
+    ],
+    "time": "19:00"
+   },
+   "venue": "Казахконцерт им. Розы Баглановой",
+   "address": "пр. Мангилик Ел, 10/1",
+   "price": "от 9000 теңге",
+   "url": "https://sxodim.com/astana/event/koncert-tyndamusic-the-music-of-hans-zimmer-v-astane",
+   "lat": 51.1236038,
+   "lon": 71.4415054,
+   "placeId": "overture:a4d7605b-b301-4a9c-baec-cc65c1b617ca",
+   "placeName": "Қазақстан ОКЗ / ЦКЗ Казахстан",
+   "located": "same_address"
+  },
+  {
+   "id": "sxodim:gennadiy-hazanov-tvorcheskiy-vecher-v-astane",
+   "title": "Геннадий Хазанов: творческий вечер в Астане",
+   "category": "Концерты",
+   "dateText": "17 ноября в 19:00",
+   "when": {
+    "dates": [
+     "2026-11-17"
+    ],
+    "time": "19:00"
+   },
+   "venue": "Дворец Мира и Согласия",
+   "address": "пр. Тауелсиздик, 57",
+   "price": "от 10 000 теңге",
+   "url": "https://sxodim.com/astana/event/gennadiy-hazanov-tvorcheskiy-vecher-v-astane",
+   "lat": 51.1231232,
+   "lon": 71.463459,
+   "placeId": "osm:way:166197368",
+   "placeName": "Бейбітшілік және келісім сарайы",
+   "located": "alias"
+  },
+  {
+   "id": "sxodim:bolshoy-koncert-lindy-v-astane",
+   "title": "Большой концерт Линды в Астане",
+   "category": "Концерты",
+   "dateText": "30 ноября в 20:00",
+   "when": {
+    "dates": [
+     "2026-11-30"
+    ],
+    "time": "20:00"
+   },
+   "venue": "Жастар Сарайы",
+   "address": "пр. Республики, 34",
+   "price": "от 15 000 тенге",
+   "url": "https://sxodim.com/astana/event/bolshoy-koncert-lindy-v-astane",
+   "lat": 51.1703258,
+   "lon": 71.4269441,
+   "placeId": "osm:way:1428964223",
+   "placeName": "Жастар сарайы алаңы",
+   "located": "alias"
+  }
+ ],
+ "unlocated": [
+  {
+   "title": "Uly Dala Fest",
+   "venue": "Дворец единоборств имени Ж. Ушкемпирова",
+   "address": "пр. Кабанбай батыра, 43"
+  },
+  {
+   "title": "Expert talk «Cancel culture. Как культура отмены влияет на бизнес?»",
+   "venue": "Өnergy Creative Hub",
+   "address": "пр. Кабанбай батыра, 53, блок 32"
+  },
+  {
+   "title": "Киноужин с мультфильмом «Рататуй» от VkusKino в Астане",
+   "venue": "Ресторан Мята Green",
+   "address": "ул. Сыганак, 17г"
+  },
+  {
+   "title": "Мультимедийная выставка «Айвазовский. Ожившие полотна»",
+   "venue": "Мультимедийный музей Lumiere-Hall",
+   "address": "пр. Абая, 8"
+  },
+  {
+   "title": "Квартирник с хором в We Kitchen",
+   "venue": "We Kitchen",
+   "address": "ул. E669, 4, НП-9, ЖК Jetisu Lepsi 1"
+  },
+  {
+   "title": "Art Bäige: марафон творческих мастер-классов",
+   "venue": null,
+   "address": "Астана, ул. Касыма Аманжолова, 22А"
+  },
+  {
+   "title": "Пешая экскурсия «Об Астане: с интересом и любовью» по бульвару «Нуржол»",
+   "venue": null,
+   "address": "Место сбора: БЦ «Алтын Орда», пр. Мангилик Ел, 8/2"
+  },
+  {
+   "title": "Концерт Хиты на все времена в Астане",
+   "venue": "Конгресс-центр",
+   "address": "ул. Гейдара Алиева, 12"
+  },
+  {
+   "title": "Юбилейный концерт Дмитрия Маликова в Астане",
+   "venue": "Конгресс-центр",
+   "address": "ул. Гейдара Алиева, 12"
+  },
+  {
+   "title": "Сольный концерт IntroVert в Астане",
+   "venue": "The Bus Music Pub",
+   "address": "Коргалжынское шоссе, 3"
+  }
+ ]
+}

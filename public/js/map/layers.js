@@ -1,5 +1,5 @@
 // Walk-specific map layers: start point, reach ring, numbered result pins and route lines.
-import { h } from '../core/dom.js';
+import { h, icon, safeUrl } from '../core/dom.js';
 import { circlePolygon } from '../core/geo.js';
 import { walkingRoute } from '../core/api.js';
 import { setOverlay, removeOverlay, setData, marker, cssVar, fitPoints, getMap } from './map.js';
@@ -79,5 +79,16 @@ export function frame(start, places) {
   fitPoints([[start.lon, start.lat], ...places.map((place) => [place.lon, place.lat])], { maxZoom: 16.5 });
 }
 
-export function clearWalkLayers() { hidePins(); hideRoutes(); hideReach(); }
+// Today's city events near the start: small calendar pins that open the event page on sxodim.com.
+let eventPins = [];
+export function showEvents(events) {
+  hideEvents();
+  eventPins = events.filter((event) => Number.isFinite(event.lat) && Number.isFinite(event.lon) && safeUrl(event.url)).map((event) => {
+    const el = h('a', { class: 'event-pin', href: safeUrl(event.url), target: '_blank', rel: 'noopener noreferrer', title: `${event.title} · ${event.venue || ''}`, 'aria-label': event.title }, icon('calendar', 'icon-xs'));
+    return marker(el, [event.lon, event.lat]);
+  });
+}
+export function hideEvents() { eventPins.forEach((pin) => pin?.remove()); eventPins = []; }
+
+export function clearWalkLayers() { hidePins(); hideRoutes(); hideReach(); hideEvents(); }
 export const mapAvailable = () => Boolean(getMap());

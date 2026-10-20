@@ -1,6 +1,6 @@
 // The main tab: plan a walk, see the options, open a place, walk with the return countdown.
 import { registerTab } from '../shell.js';
-import { h, icon, clear, isDesktop } from '../core/dom.js';
+import { h, icon, clear, isDesktop, safeUrl } from '../core/dom.js';
 import { t, pick, plural, lang, time } from '../core/i18n.js';
 import * as store from '../core/store.js';
 import { PRESETS, inAstana, reachMeters, estimate } from '../core/geo.js';
@@ -503,6 +503,7 @@ function renderResults() {
     h('div', { class: 'result-list' }, rows),
     understoodRow(result.understood),
     routeCard(result.route),
+    eventsCard(result.cityEvents),
     notes.unchecked));
   drawResultsMap(recs);
   if (speakNext) {
@@ -564,6 +565,25 @@ function routeCard(route) {
 }
 const ensureAtLeastHalf = () => { if (getSnap() === 'full') setSnap('half'); };
 
+// «Сегодня в городе»: today's events from the sxodim.com listing within walking reach; each row opens the event page there.
+function eventsCard(events) {
+  const items = (events?.items || []).filter((event) => safeUrl(event.url)).slice(0, 3);
+  if (!items.length) return null;
+  return h('section', { class: 'route-card events-card', 'aria-labelledby': 'events-title' },
+    h('div', { class: 'route-head' }, h('span', { class: 'route-icon', 'aria-hidden': 'true' }, icon('calendar')),
+      h('div', {}, h('strong', { id: 'events-title', text: t('events.title') }), h('small', { text: t('events.note') }))),
+    h('ul', { class: 'event-list' }, items.map((event) => h('li', {},
+      h('a', { class: 'event-row', href: safeUrl(event.url), target: '_blank', rel: 'noopener noreferrer', 'aria-label': `${event.title}. ${t('events.open')}` },
+        h('span', { class: 'row-text' }, h('strong', { text: event.title }),
+          h('small', { text: [eventWhen(event), event.venue, t('explore.walk', { n: event.walkMinutes }), event.price].filter(Boolean).join(' · ') })),
+        icon('external', 'icon-xs'))))));
+}
+function eventWhen(event) {
+  if (event.when?.time) return t('events.at', { time: event.when.time });
+  if (event.when?.to) return t('events.until', { date: new Date(`${event.when.to}T12:00:00+05:00`).toLocaleDateString(lang() === 'kk' ? 'kk-KZ' : lang() === 'en' ? 'en-GB' : 'ru-RU', { day: 'numeric', month: 'long' }) });
+  return t('events.today');
+}
+
 // The Gemini tip, three lines at first so the places stay in view; the full text and the note open on tap.
 function aiCard(generation) {
   const note = h('p', { class: 'fine', text: t('results.aiNote'), hidden: true });
@@ -596,6 +616,7 @@ function drawResultsMap(recs) {
   layers.selectPin(selected);
   layers.frame(start, recs);
   recs.forEach((place, index) => layers.upgradeRoute(index, start, place));
+  layers.showEvents(result?.cityEvents?.items || []);
 }
 
 function renderEmpty(back) {
