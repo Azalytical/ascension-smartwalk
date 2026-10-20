@@ -1,8 +1,10 @@
-# SmartWalk · Успею вернуться
+# Seruen · Прогулка по Астане, ровно на ваше время
+
+Seruen (по-казахски «прогулка»). SmartWalk — рабочее имя до 20 октября, оно осталось в адресе сайта, в репозитории и в первом ролике.
 
 Команда **Ascension**, Build with AI Hackathon 2026, секция AI for Smart City.
 
-[Открыть работающее демо](https://ascension-smartwalk.azamatbreach.workers.dev) · [Видеообзор на YouTube](https://youtu.be/EKrwOn43a5w) · [Исходный код](https://github.com/Azalytical/ascension-smartwalk)
+[Открыть работающее демо](https://ascension-smartwalk.azamatbreach.workers.dev) · [Видеообзор на YouTube](https://youtu.be/6RCol9jsG4w) · [Исходный код](https://github.com/Azalytical/ascension-smartwalk)
 
 Городской RAG-помощник для прогулок по Астане. Пользователь выбирает точку старта, доступное время и предпочтения. Система извлекает подходящие POI из автоматически собранной базы (2255 мест из OpenStreetMap и Overture Maps), проверяет время и формирует короткое объяснение по найденным данным.
 
