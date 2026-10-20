@@ -125,7 +125,7 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
 .s-demo .ask{margin-top:34px;background:#fff;border:1.5px solid var(--line);border-radius:18px;padding:22px 28px;font-size:27px;line-height:1.4}
 .s-demo .ask small{display:block;font-size:20px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
 .s-demo ul{list-style:none;margin-top:30px}
-.s-demo li{font-size:26px;line-height:1.35;padding:13px 0;border-top:1.5px solid var(--line);display:flex;gap:18px}
+.s-demo li{font-size:26px;line-height:1.35;padding:22px 0;border-top:1.5px solid var(--line);display:flex;gap:18px}
 .s-demo li b{color:var(--teal);font-weight:700;min-width:44px}
 .s-demo .shot{width:1060px;height:597px;margin-top:150px}
 .s-demo .zoom{position:absolute;right:var(--pad);bottom:150px;display:flex;gap:18px}
@@ -180,6 +180,15 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
 .stop span{display:block;font-size:22px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-top:36px}
 .stop h3{font-size:46px;letter-spacing:-1.6px;font-weight:650;margin-top:12px;line-height:1.1}
 .stop p{font-size:27px;line-height:1.45;color:var(--muted);margin-top:18px}
+
+/* ============ SLIDE: GOOGLE-СТЕК ============ */
+.s-google h2{margin-top:26px;font-size:68px;letter-spacing:-2.5px;max-width:none;white-space:nowrap}
+.g-table{margin-top:36px}
+.g-row{display:grid;grid-template-columns:440px 1fr 260px;gap:40px;align-items:baseline;padding:22px 0;border-top:1.5px solid var(--line)}
+.g-row b{font-size:30px;font-weight:650;letter-spacing:-.6px}
+.g-row p{font-size:23px;line-height:1.35;color:var(--muted)}
+.g-row code{font:500 21px var(--font);color:var(--teal);text-align:right}
+.g-foot{margin-top:18px;font-size:22px;color:var(--muted)}
 
 /* ============ SLIDE: РИСКИ ============ */
 .s-risks h2{margin-top:36px;max-width:1500px}
@@ -322,14 +331,32 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
     <div class="step reveal d6"><span class="n">05 · ОТВЕТ</span><h3>Карточки</h3><p>Факты из данных отдельно от сгенерированного текста</p><div class="fig">1–3<small>места</small></div></div>
   </div>
   <div class="stack reveal d6">Стек: <span>Gemini API</span><span>OpenStreetMap</span><span>Cloudflare Workers</span><span>Overture Maps</span><span>Open-Meteo</span></div>
-  <aside class="notes">3:35–4:20. Высокоуровневая схема RAG из требований кейса. Если Gemini недоступен, поиск и расчёт продолжают работать, интерфейс честно пишет, что текст без генерации.</aside>
+  <aside class="notes">3:35–4:00. Высокоуровневая схема RAG из требований кейса. Если Gemini недоступен, поиск и расчёт продолжают работать, интерфейс честно пишет, что текст без генерации.</aside>
+</section>
+
+<!-- ======================= 7б. GOOGLE-СТЕК ======================= -->
+<section class="slide s-google" data-time="4:00">
+  <div class="crit"><span>Контекстуальность</span><span>Креативность и фишки</span></div>
+  <div class="kicker reveal d1">07 <b>/ Google-стек</b></div>
+  <h2 class="reveal d2">Gemini здесь не украшение, <em>а мозг прогулки</em>.</h2>
+  <div class="g-table">
+    <div class="g-row reveal d2"><b>Gemini · function calling</b><p>Сам решает, что проверить: погоду, места, часы, дорогу; шаги видны</p><code>/agent</code></div>
+    <div class="g-row reveal d2"><b>Gemini · объяснения</b><p>«Почему сюда» и «что делать» для каждого места, сервер сверяет факты</p><code>карточки</code></div>
+    <div class="g-row reveal d3"><b>Gemini · фото</b><p>«Что это за здание?»: фото → место из базы и факты с меткой «идея ИИ»</p><code>/agent, камера</code></div>
+    <div class="g-row reveal d3"><b>Gemini · голос</b><p>Ответ звучит голосом, в том числе по-казахски</p><code>«Озвучить»</code></div>
+    <div class="g-row reveal d4"><b>MCP + Gemini CLI</b><p>Наши инструменты для любого ИИ: gemini extensions install …</p><code>терминал</code></div>
+    <div class="g-row reveal d4"><b>Google ADK</b><p>Готовый агент на наших инструментах, готов к Agent Engine</p><code>integrations/adk</code></div>
+    <div class="g-row reveal d5"><b>Google Maps · Календарь</b><p>Маршрут пешком и прогулка в календаре в одно касание</p><code>у каждого места</code></div>
+  </div>
+  <p class="g-foot reveal d6">Бесплатный ключ AI Studio, без биллинга Google Cloud. Координаты человека в Gemini не уходят.</p>
+  <aside class="notes">4:00–4:30. «Без Gemini Seruen просто список мест. С Gemini он сам проверяет погоду, часы и дорогу и собирает прогулку ровно на ваше время, а наши инструменты может взять любой ИИ, от Gemini CLI до агентов на ADK.»</aside>
 </section>
 
 <!-- ======================= 8. ДОВЕРИЕ ======================= -->
-<section class="slide s-trust" data-time="4:20">
+<section class="slide s-trust" data-time="4:30">
   <div class="crit"><span>Этика и приватность</span></div>
   <div>
-    <div class="kicker reveal d1">07 <b>/ Чему можно верить</b></div>
+    <div class="kicker reveal d1">08 <b>/ Чему можно верить</b></div>
     <h2 class="reveal d2">Видно, откуда каждый факт.</h2>
     <div class="rules">
       <div class="rule reveal d3"><div class="ic">◎</div><div><h4>Точка старта не уходит в модель</h4><p>Gemini получает запрос и публичные места, без координат пользователя</p></div></div>
@@ -343,10 +370,10 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
 </section>
 
 <!-- ======================= 9. ПРОВЕРКИ И ОГРАНИЧЕНИЯ ======================= -->
-<section class="slide s-tests" data-time="5:00">
+<section class="slide s-tests" data-time="4:55">
   <div class="crit"><span>Завершённость</span><span>Этика и приватность</span></div>
   <div>
-    <div class="kicker reveal d1">08 <b>/ Проверки</b></div>
+    <div class="kicker reveal d1">09 <b>/ Проверки</b></div>
     <div class="score reveal d2">86<small>/86</small></div>
     <p class="cap reveal d3">автотестов проходят: поиск, часы и погода, друзья и встречи, часы на руке, приватность и лимиты</p>
     <div class="facts">
@@ -366,9 +393,9 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
 </section>
 
 <!-- ======================= 10. РИСКИ ======================= -->
-<section class="slide s-risks" data-time="5:25">
+<section class="slide s-risks" data-time="5:15">
   <div class="crit"><span>Этика и приватность</span><span>Завершённость</span></div>
-  <div class="kicker reveal d1">09 <b>/ Риски</b></div>
+  <div class="kicker reveal d1">10 <b>/ Риски</b></div>
   <h2 class="reveal d2">Что может пойти не так <em>и что мы делаем</em>.</h2>
   <div class="risk-list">
     <div class="risk reveal d3"><h4>Устаревшие часы и данные</h4><p>Метка источника и уверенность на карточке; нет данных, значит «неизвестно», а не «открыто»</p></div>
@@ -382,9 +409,9 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
 </section>
 
 <!-- ======================= 11. ПЛАН РАЗВИТИЯ ======================= -->
-<section class="slide s-next" data-time="5:45">
+<section class="slide s-next" data-time="5:35">
   <div class="crit"><span>Креативность и фишки</span><span>План развития</span></div>
-  <div class="kicker reveal d1">10 <b>/ Что дальше</b></div>
+  <div class="kicker reveal d1">11 <b>/ Что дальше</b></div>
   <h2 class="reveal d2">Из прогулки в инструмент <em>для города</em>.</h2>
   <div class="road">
     <div class="stop reveal d3"><div class="dot"></div><span>Сейчас</span><h3>Точнее время</h3><p>Пешеходные маршруты вместо оценки по прямой, больше проверенных полей о местах</p></div>
@@ -395,9 +422,9 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
 </section>
 
 <!-- ======================= 12. БИЗНЕС-МОДЕЛЬ ======================= -->
-<section class="slide s-biz" data-time="6:10">
+<section class="slide s-biz" data-time="5:55">
   <div class="crit"><span>Релевантность и полезность</span><span>План развития</span></div>
-  <div class="kicker reveal d1">11 <b>/ Бизнес-модель</b></div>
+  <div class="kicker reveal d1">12 <b>/ Бизнес-модель</b></div>
   <h2 class="reveal d2">Бесплатно для людей. <em>Платит тот, кому нужны данные и гости.</em></h2>
   <div class="biz">
     <div class="biz-card reveal d3"><span>Город</span><h3>НИЦ Smart City, акимат</h3><p>Обезличенная карта спроса: что ищут, где и когда не находят. Подписка на аналитику</p></div>
@@ -409,7 +436,7 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
 </section>
 
 <!-- ======================= 13. ФИНАЛ ======================= -->
-<section class="slide s-end dark" data-time="6:35">
+<section class="slide s-end dark" data-time="6:25">
   <div class="kicker reveal d1">Ascension · Build with AI 2026</div>
   <h1 class="reveal d2">Попробуйте <em>прямо сейчас.</em></h1>
   <div class="links">
