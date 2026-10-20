@@ -6,12 +6,13 @@ import { formatDistance } from '../core/geo.js';
 import { lang } from '../core/i18n.js';
 import * as store from '../core/store.js';
 import { timeRing } from './ring.js';
-import { categoryArt, categoryName, hoursStatus, hoursChip, navLinks, share, returnBy, backButton, watchButton, listenButton } from './common.js';
+import { categoryArt, categoryName, hoursStatus, hoursChip, navLinks, share, backTime, confidenceChip, backButton, watchButton, listenButton } from './common.js';
 import { toast } from './toast.js';
 
 const WHEELCHAIR = { yes: 'place.wheelchair.yes', limited: 'place.wheelchair.limited', no: 'place.wheelchair.no' };
 
-export function placeView({ place, timing, start, serverHours, why, activities = [], warnings = [], onBack, backLabel, onStart, routeInfo, shareUrl, voice = null }) {
+export function placeView({ place, timing, start, serverHours, why, activities = [], warnings = [], onBack, backLabel, onStart, routeInfo, shareUrl, voice = null, backAt = null }) {
+  const back = backAt || backTime(timing);
   const hours = hoursStatus(place, timing.walkMinutes, timing.visitMinutes, serverHours);
   const saved = store.isSaved(place.id);
   const saveButton = h('button', { class: `icon-btn${saved ? ' is-on' : ''}`, type: 'button', 'aria-pressed': String(saved), 'aria-label': t(saved ? 'place.saved' : 'place.save') }, icon(saved ? 'heart-fill' : 'heart'));
@@ -23,7 +24,7 @@ export function placeView({ place, timing, start, serverHours, why, activities =
     saveButton.replaceChildren(icon(now ? 'heart-fill' : 'heart'));
     toast(t(now ? 'toast.saved' : 'toast.unsaved'), { iconName: now ? 'heart-fill' : 'heart' });
   });
-  const shareButton = h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: place.name, text: `${place.name}: ${t('place.returnNow', { time: returnBy(timing.totalMinutes) })}`, url: shareUrl }) }, icon('share'));
+  const shareButton = h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: place.name, text: `${place.name}: ${t('place.returnNow', { time: back })}`, url: shareUrl }) }, icon('share'));
 
   const total = Math.ceil(timing.totalMinutes);
   const legend = [['there', 'place.there', timing.walkMinutes], ['visit', 'place.visit', timing.visitMinutes], ['back', 'place.back', timing.returnMinutes], ['reserve', 'place.reserve', timing.safetyReserveMinutes]]
@@ -62,10 +63,10 @@ export function placeView({ place, timing, start, serverHours, why, activities =
       h('div', {}, h('h2', { id: 'place-title', class: 'title-2', text: place.name }),
         h('p', { class: 'meta' }, categoryName(place.category), timing.distanceMeters ? h('span', { class: 'meta-sep', 'aria-hidden': 'true' }) : null,
           timing.distanceMeters ? t('place.straight', { d: formatDistance(timing.distanceMeters, lang()) }) : null),
-        h('div', { class: 'place-badges' }, hoursChip(hours)))),
+        h('div', { class: 'place-badges' }, hoursChip(hours), confidenceChip(place.confidence)))),
     h('section', { class: 'time-card' },
       timeRing({ there: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, reserve: timing.safetyReserveMinutes, size: 132, stroke: 13, label: `${total}`, sublabel: t('plan.min', { n: '' }).trim() }),
-      h('div', { class: 'time-card-side' }, h('ul', { class: 'legend' }, legend), h('p', { class: 'return-by' }, icon('return'), t('place.returnNow', { time: returnBy(total) })))),
+      h('div', { class: 'time-card-side' }, h('ul', { class: 'legend' }, legend), h('p', { class: 'return-by' }, icon('return'), t('place.returnNow', { time: back })))),
     routeLine,
     h('button', { class: 'btn btn-gold btn-xl', type: 'button', onclick: onStart }, icon('play'), t('place.start')),
     h('div', { class: 'place-actions' }, watchButton({ place, start, walk: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, minutes: timing.totalMinutes }), friends,

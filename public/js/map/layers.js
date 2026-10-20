@@ -8,9 +8,12 @@ let startMarker = null;
 let pins = [];
 const empty = { type: 'FeatureCollection', features: [] };
 
-export function showStart(start, label) {
+export function showStart(start, label, { tag = false } = {}) {
   startMarker?.remove();
-  const el = h('div', { class: 'start-pin', title: label, 'aria-hidden': 'true' }, h('span'));
+  // A GPS start is the person: the blue dot (with «Вы здесь» on the plan map, where no pins cover it); any other start is the gold pin.
+  const el = start.kind === 'gps'
+    ? h('div', { class: 'here-pin', title: label, 'aria-hidden': 'true' }, h('span', { class: 'user-dot' }, h('span')), tag ? h('span', { class: 'here-label', text: label }) : null)
+    : h('div', { class: 'start-pin', title: label, 'aria-hidden': 'true' }, h('span'));
   startMarker = marker(el, [start.lon, start.lat]);
 }
 export function hideStart() { startMarker?.remove(); startMarker = null; }
