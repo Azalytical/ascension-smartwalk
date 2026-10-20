@@ -96,7 +96,7 @@ def footer(canvas, doc):
     canvas.line(43, 40, A4[0] - 43, 40)
     canvas.setFont('Body', 7.8)
     canvas.setFillColor(MUTED)
-    canvas.drawString(43, 27, 'Aidem (SmartWalk) by Ascension · Build with AI Hackathon 2026 · НИЦ Smart City')
+    canvas.drawString(43, 27, 'Aidem by Ascension · Build with AI Hackathon 2026 · НИЦ Smart City')
     canvas.drawRightString(A4[0] - 43, 27, str(doc.page))
     canvas.restoreState()
 
@@ -106,10 +106,10 @@ def main():
     concept = (ROOT / 'docs' / 'concept.md').read_text(encoding='utf-8')
     ethics = (ROOT / 'docs' / 'ethics.md').read_text(encoding='utf-8')
     story = [Paragraph('ASCENSION · SMART CITY · BUILD WITH AI 2026', TAG),
-             Paragraph('Aidem (SmartWalk): тестовые сценарии, ограничения и этика', H1),
+             Paragraph('Aidem (ранее SmartWalk): тестовые сценарии, ограничения и этика', H1),
              Paragraph('Документ сдачи по задаче НИЦ Smart City: набор тестовых сценариев с входными данными, ожидаемым типом ответа и '
-                       'фактическим результатом прогона, затем ограничения, риски и заметки об этике и приватности. Aidem («Айдём»): «айда» + «идём», приглашение пройтись. '
-                       'SmartWalk — рабочее имя до 20 октября, оно осталось в адресе сайта, в репозитории и в первом ролике.', BODY),
+                       'фактическим результатом прогона, затем ограничения, риски и заметки об этике и приватности. Aidem (ранее SmartWalk): '
+                       'прежнее имя осталось в адресе сайта, в репозитории и в первом ролике.', BODY),
              Spacer(1, 4)]
     render(protocol, story, skip_title=True)
     story.append(PageBreak())
@@ -120,7 +120,7 @@ def main():
     render(ethics, story)
     OUT.parent.mkdir(exist_ok=True)
     document = SimpleDocTemplate(str(OUT), pagesize=A4, leftMargin=43, rightMargin=43, topMargin=43, bottomMargin=56,
-                                 title='Aidem (SmartWalk): тестовые сценарии, ограничения и этика', author='Ascension')
+                                 title='Aidem (ранее SmartWalk): тестовые сценарии, ограничения и этика', author='Ascension')
     document.build(story, onFirstPage=footer, onLaterPages=footer)
     print(OUT.relative_to(ROOT), OUT.stat().st_size, 'bytes')
 

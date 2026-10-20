@@ -1,4 +1,4 @@
-/* Ulger for watches. Sizes use --k, one percent of the watch screen width, set by watch.js. Colors follow the Ulger dark theme. */
+/* Aidem for watches. Sizes use --k, one percent of the watch screen width, set by watch.js. Colors follow the Aidem dark theme. */
 :root{--bg:#0A0F15;--surface:#121922;--surface-2:#1B2531;--ink:#F2F4F7;--ink-on-gold:#0E1621;--muted:#97A3B3;--gold:#FFC21A;--sky:#4AA8FF;--green:#3CCB7F;--amber:#FFB020;--red:#FF5A5F;--k:1vmin;--h:100vh;--ease-out:cubic-bezier(.2,.8,.3,1);--font:Onest,-apple-system,"SF Pro Text",system-ui,"Google Sans",Roboto,"Segoe UI",Arial,sans-serif}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
