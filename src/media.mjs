@@ -4,6 +4,7 @@ import { mapLinks } from './links.mjs';
 
 export const DEFAULT_VISION_MODEL = 'gemini-3.5-flash-lite';
 export const DEFAULT_TTS_MODEL = 'gemini-3.8-flash-lite-tts';
+const TTS_FALLBACKS = ['gemini-3.8-flash-tts', 'gemini-3.1-flash-tts-preview'];
 const BOUNDS = { minLat: 51, maxLat: 51.35, minLon: 71.25, maxLon: 71.65 };
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
 const SIDES = ['впереди', 'впереди справа', 'справа', 'сзади справа', 'сзади', 'сзади слева', 'слева', 'впереди слева'];
@@ -99,15 +100,20 @@ export async function speak(input, { env, limitedJson }) {
   const text = typeof input?.text === 'string' ? input.text.replace(/\s+/g, ' ').trim() : '';
   if (!text || text.length > 400) throw new MediaError('Текст для озвучки: от 1 до 400 символов.');
   if (!env.GEMINI_API_KEY) throw new MediaError('Озвучка Gemini на этом сервере выключена.', 503);
-  const model = env.GEMINI_TTS_MODEL || DEFAULT_TTS_MODEL;
-  const key = `${model}:${text}`;
+  const key = text;
   if (voices.has(key)) return { ...voices.get(key), cached: true };
-  const reply = await gemini(model, {
-    contents: [{ role: 'user', parts: [{ text }] }],
-    generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: env.GEMINI_TTS_VOICE || 'Kore' } } } }
-  }, env, limitedJson, 3 * 1024 * 1024, 20000);
-  if (reply.error) throw new MediaError('Озвучка сейчас недоступна, попробуйте ещё раз.', 502);
-  const audio = (reply.body.candidates?.[0]?.content?.parts || []).find(part => part.inlineData?.data)?.inlineData;
+  // Free-tier quotas are per model, so a refused or unknown model hands over to the next one; a timeout does not.
+  const models = [...new Set([env.GEMINI_TTS_MODEL || DEFAULT_TTS_MODEL, ...TTS_FALLBACKS])];
+  let audio = null, model = null;
+  for (const candidate of models) {
+    const reply = await gemini(candidate, {
+      contents: [{ role: 'user', parts: [{ text }] }],
+      generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: env.GEMINI_TTS_VOICE || 'Kore' } } } }
+    }, env, limitedJson, 3 * 1024 * 1024, 20000);
+    audio = reply.body ? (reply.body.candidates?.[0]?.content?.parts || []).find(part => part.inlineData?.data)?.inlineData : null;
+    if (audio) { model = candidate; break; }
+    if (reply.error && !/^provider_(400|403|404|429)$/.test(reply.error)) break;
+  }
   if (!audio) throw new MediaError('Озвучка сейчас недоступна, попробуйте ещё раз.', 502);
   const rate = Number(/rate=(\d+)/.exec(audio.mimeType || '')?.[1]) || 24000;
   const value = { mimeType: audio.mimeType || 'audio/L16;rate=24000', sampleRate: rate, channels: 1, data: audio.data, model, provider: 'gemini' };
