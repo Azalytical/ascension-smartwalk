@@ -11,7 +11,7 @@ https://ascension-smartwalk.azamatbreach.workers.dev
 Видео (3:41):
 файл в репозитории: deliverables/video/aidem-final.mp4
 https://github.com/Azalytical/ascension-smartwalk/blob/main/deliverables/video/aidem-final.mp4
-YouTube (доступ по ссылке): ссылка появится здесь, как только ролик загрузится
+YouTube (доступ по ссылке): https://youtu.be/7eWd4-gZa_I
 
 Репозиторий:
 https://github.com/Azalytical/ascension-smartwalk

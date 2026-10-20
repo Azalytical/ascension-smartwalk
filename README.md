@@ -6,7 +6,7 @@
   <a href="https://ascension-smartwalk.azamatbreach.workers.dev"><img alt="Открыть Aidem" src="https://img.shields.io/badge/%D0%9E%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8C-Aidem-F5B700?style=for-the-badge&labelColor=0E1621&logo=googlechrome&logoColor=white"></a>
   <a href="https://ascension-smartwalk.azamatbreach.workers.dev/watch"><img alt="Часы" src="https://img.shields.io/badge/%D0%A7%D0%B0%D1%81%D1%8B-%2Fwatch-4AA8FF?style=for-the-badge&labelColor=0E1621&logo=apple&logoColor=white"></a>
   <a href="https://ascension-smartwalk.azamatbreach.workers.dev/agent"><img alt="Агент Gemini" src="https://img.shields.io/badge/%D0%90%D0%B3%D0%B5%D0%BD%D1%82-Gemini-8E75FF?style=for-the-badge&labelColor=0E1621&logo=googlegemini&logoColor=white"></a>
-  <a href="#видео"><img alt="Видео на YouTube" src="https://img.shields.io/badge/%D0%92%D0%B8%D0%B4%D0%B5%D0%BE-YouTube-FF0000?style=for-the-badge&labelColor=0E1621&logo=youtube&logoColor=white"></a>
+  <a href="https://youtu.be/7eWd4-gZa_I"><img alt="Видео на YouTube" src="https://img.shields.io/badge/%D0%92%D0%B8%D0%B4%D0%B5%D0%BE-YouTube-FF0000?style=for-the-badge&labelColor=0E1621&logo=youtube&logoColor=white"></a>
   <a href="deliverables/ascension-smartwalk-presentation.pdf"><img alt="Презентация PDF" src="https://img.shields.io/badge/%D0%9F%D1%80%D0%B5%D0%B7%D0%B5%D0%BD%D1%82%D0%B0%D1%86%D0%B8%D1%8F-PDF-2EA44F?style=for-the-badge&labelColor=0E1621&logo=adobeacrobatreader&logoColor=white"></a>
   <a href="deliverables/ascension-smartwalk-tests-and-limitations.pdf"><img alt="Сценарии 15 из 15" src="https://img.shields.io/badge/%D0%A1%D1%86%D0%B5%D0%BD%D0%B0%D1%80%D0%B8%D0%B8-15%2F15_Pass-2EA44F?style=for-the-badge&labelColor=0E1621"></a>
 </p>
@@ -20,7 +20,7 @@
 | | Что | Ссылка |
 |---|---|---|
 | 🌐 | Работающее демо, телефон или компьютер | [ascension-smartwalk.azamatbreach.workers.dev](https://ascension-smartwalk.azamatbreach.workers.dev) |
-| 🎬 | Видео, 3:41 | [скачать MP4](deliverables/video/aidem-final.mp4) · [YouTube](#видео) |
+| 🎬 | Видео, 3:41 | [смотреть на YouTube](https://youtu.be/7eWd4-gZa_I) · [скачать MP4](deliverables/video/aidem-final.mp4) |
 | 📊 | Презентация, 14 слайдов на 6 минут | [PDF](deliverables/ascension-smartwalk-presentation.pdf) · [живая версия с анимацией](deliverables/deck/) |
 | 🧪 | Тестовые сценарии и ограничения | [PDF](deliverables/ascension-smartwalk-tests-and-limitations.pdf) · [протокол 15 сценариев](docs/test-protocol.md) |
 | 💡 | Концепция, аудитория, бизнес-идея, риски, план | [docs/concept.md](docs/concept.md) |
@@ -114,7 +114,7 @@ flowchart LR
 | Что просили | Где это у нас |
 |---|---|
 | Концепция: идея, аудитория, сценарии | [docs/concept.md](docs/concept.md) и первые слайды презентации |
-| Демо на нескольких сценариях | [живой сайт](https://ascension-smartwalk.azamatbreach.workers.dev), часы, агент; [видео](#видео) |
+| Демо на нескольких сценариях | [живой сайт](https://ascension-smartwalk.azamatbreach.workers.dev), часы, агент; [видео на YouTube](https://youtu.be/7eWd4-gZa_I) |
 | Описание RAG-подхода | [docs/how-it-works.md](docs/how-it-works.md) |
 | Тестовые сценарии: вход и ожидаемый ответ | [PDF](deliverables/ascension-smartwalk-tests-and-limitations.pdf), [протокол](docs/test-protocol.md): 6 из задания и 9 своих, 15 из 15 Pass |
 | Презентация на 5–7 минут: бизнес, ограничения, риски, план | [PDF](deliverables/ascension-smartwalk-presentation.pdf), [docs/concept.md](docs/concept.md) |
@@ -146,7 +146,7 @@ npm run build && npx wrangler deploy     # ключ один раз: npx wrangle
 <!-- VIDEO-LINK: заменить строку ниже ссылкой YouTube, когда ролик загружен -->
 Ролик на 3:41: сайт, телефон и часы в работе, озвучивает команда.
 
-**[Скачать видео (MP4, 85 МБ)](deliverables/video/aidem-final.mp4)** · ссылка на YouTube появится здесь, как только ролик загрузится.
+**[▶ Смотреть на YouTube](https://youtu.be/7eWd4-gZa_I)** · [скачать видео (MP4, 85 МБ)](deliverables/video/aidem-final.mp4)
 <!-- /VIDEO-LINK -->
 
 ## Что в репозитории
