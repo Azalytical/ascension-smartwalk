@@ -85,7 +85,7 @@
 
   function show(name) {
     for (const view of document.querySelectorAll('.view')) view.hidden = view.id !== `view-${name}`;
-    $('screen').classList.toggle('scroll-snap', name === 'results');
+    $('screen').classList.toggle('scroll-snap', name === 'results' || name === 'meet');
     $('screen').scrollTop = 0;
     window.scrollTo(0, 0);
   }
@@ -94,6 +94,7 @@
     $('time-value').textContent = state.minutes;
     $('start-value').textContent = STARTS[state.startIndex].label;
     $('clock').textContent = time(Date.now());
+    refreshMeetCount();
   }
 
   function inAstana(point) {
@@ -211,7 +212,8 @@
     }
   }
 
-  function showError(message) {
+  function showError(message, retry = () => (state.mood ? findPlaces(state.mood) : show('home'))) {
+    state.retry = retry;
     $('error-text').textContent = message;
     show('error');
   }
@@ -259,12 +261,10 @@
     return circle;
   }
 
-  function setupRing(walk) {
-    const there = walk.place.walkMinutes, back = walk.place.returnMinutes;
-    const stay = Math.max(1, state.plan.minutes - there - back - RESERVE_MINUTES);
-    walk.ringMinutes = there + stay + back + RESERVE_MINUTES;
+  function setupRing(walk, parts) {
+    walk.ringMinutes = parts.reduce((sum, [, minutes]) => sum + minutes, 0);
     let start = 0;
-    walk.segments = [['there', there], ['stay', stay], ['back', back], ['reserve', RESERVE_MINUTES]].map(([kind, minutes]) => {
+    walk.segments = parts.map(([kind, minutes]) => {
       const segment = { kind, start, length: minutes / walk.ringMinutes * 100 };
       start += segment.length;
       return segment;
@@ -285,19 +285,28 @@
     $('ring-dot').setAttribute('cy', (50 - 46 * Math.cos(angle)).toFixed(2));
   }
 
-  function startWalk(place) {
-    const start = state.plan.start;
+  function newWalk(fields) {
     const now = Date.now();
+    return { phase: 'to', demo: state.demo, t0: now, simNow: now, lastReal: performance.now(), realStart: performance.now(),
+      pos: { lat: fields.start.lat, lon: fields.start.lon }, accuracy: null, alerted: false, arrivedAt: null, ...fields };
+  }
+
+  function startWalk(place) {
+    const walk = newWalk({ kind: 'place', place, start: state.plan.start });
+    walk.deadline = walk.t0 + state.plan.minutes * 60000;
+    const there = place.walkMinutes, back = place.returnMinutes;
+    const stay = Math.max(1, state.plan.minutes - there - back - RESERVE_MINUTES);
+    beginWalk(walk, [['there', there], ['stay', stay], ['back', back], ['reserve', RESERVE_MINUTES]]);
+    if (window.SeruenRemind?.supported()) remindOnWrist(walk);
+  }
+
+  function beginWalk(walk, parts) {
     state.heading = null;
-    state.walk = {
-      place, start, phase: 'to', demo: state.demo, t0: now, simNow: now, lastReal: performance.now(), realStart: performance.now(),
-      deadline: now + state.plan.minutes * 60000, pos: { lat: start.lat, lon: start.lon }, accuracy: null, alerted: false, arrivedAt: null
-    };
-    setupRing(state.walk);
-    setNote(state.demo ? 'ДЕМО ×30' : '');
-    if (window.SeruenRemind?.supported()) remindOnWrist(state.walk);
+    state.walk = walk;
+    setupRing(walk, parts);
+    setNote(walk.demo ? 'ДЕМО ×30' : '');
     $('view-go').classList.remove('late', 'over', 'stay', 'alert');
-    if (!state.demo) {
+    if (!walk.demo) {
       listenCompass();
       if (navigator.geolocation) {
         state.watchId = navigator.geolocation.watchPosition((position) => {
@@ -311,7 +320,7 @@
     show('go');
     buzz(40);
     tick();
-    state.timer = setInterval(tick, state.demo ? 200 : 1000);
+    state.timer = setInterval(tick, walk.demo ? 200 : 1000);
   }
 
   function setNote(text) {
@@ -351,6 +360,8 @@
   function stopWalk() {
     cancelReminders(state.walk);
     clearInterval(state.timer);
+    clearInterval(state.poll);
+    state.poll = null;
     if (state.watchId !== undefined && state.watchId !== null) navigator.geolocation?.clearWatch(state.watchId);
     state.watchId = null;
     window.removeEventListener('deviceorientationabsolute', onOrientation);
@@ -410,6 +421,8 @@
     const late = Math.round((clock() - walk.deadline) / 60000);
     $('done-title').textContent = late > 0 ? 'Почти вовремя' : 'Вы вернулись';
     $('done-text').textContent = late > 0 ? `${spent} мин, на ${late} мин позже плана.` : `${spent} мин из ${state.plan.minutes}. Вовремя.`;
+    $('done-home').textContent = 'Ещё прогулка';
+    state.doneTo = 'home';
     buzz([70, 70, 70]);
     state.walk = null;
     show('done');
@@ -418,6 +431,7 @@
   function tick() {
     const walk = state.walk;
     if (!walk) return;
+    if (walk.kind !== 'place') { tickTarget(walk); return; }
     const target = walk.phase === 'back' ? walk.start : walk.place;
     if (walk.demo) simulate(walk, target);
     const now = clock();
@@ -439,13 +453,7 @@
     view.classList.toggle('over', now > walk.deadline);
     view.classList.toggle('late', now <= walk.deadline && (walk.phase === 'back' ? now + walkMinutes * 60000 > walk.deadline : now >= leaveBy - 3 * 60000));
 
-    const heading = state.heading;
-    let rotation = heading === null ? toTarget : toTarget - heading;
-    // Turn the shortest way instead of spinning through 360°.
-    rotation = state.rotation + ((((rotation - state.rotation) % 360) + 540) % 360 - 180);
-    state.rotation = rotation;
-    $('arrow').style.transform = `rotate(${rotation}deg)`;
-    $('north').style.transform = `translateY(-50%) rotate(${heading === null ? 0 : -heading}deg)`;
+    pointArrow(toTarget);
     if (walk.demo) $('demo-badge').textContent = `ДЕМО ×${walk.phase === 'stay' ? 120 : 30}`;
 
     $('go-name').textContent = walk.phase === 'back' ? walk.start.name : walk.place.name;
@@ -463,13 +471,351 @@
     $('go-next').textContent = { to: 'Я на месте', stay: 'Обратно', back: 'Я вернулся' }[walk.phase];
   }
 
+  function pointArrow(toTarget) {
+    const heading = state.heading;
+    let rotation = heading === null ? toTarget : toTarget - heading;
+    // Turn the shortest way instead of spinning through 360°.
+    rotation = state.rotation + ((((rotation - state.rotation) % 360) + 540) % 360 - 180);
+    state.rotation = rotation;
+    $('arrow').style.transform = `rotate(${rotation}deg)`;
+    $('north').style.transform = `translateY(-50%) rotate(${heading === null ? 0 : -heading}deg)`;
+  }
+
   function next() {
     const walk = state.walk;
     if (!walk) return;
+    if (walk.kind !== 'place') { arriveAtTarget(); return; }
     if (walk.phase === 'to') setPhase('stay');
     else if (walk.phase === 'stay') setPhase('back');
     else { finish(); return; }
     tick();
+  }
+
+  // Meetups and friends come from the Seruen account on the phone. The watch is linked once with a 6-digit code
+  // (phone: Профиль → Связать часы) and then keeps its own token.
+  const SOCIAL_KEY = 'seruen-watch-social';
+  const MEMBER_STATUS = { arrived: 'на месте', on_way: 'в пути', going: 'придёт', maybe: 'может быть', invited: 'приглашён', declined: 'не придёт' };
+
+  function socialToken() {
+    try { return localStorage.getItem(SOCIAL_KEY) || state.socialToken; } catch { return state.socialToken; }
+  }
+
+  function rememberToken(token) {
+    state.socialToken = token;
+    try { if (token) localStorage.setItem(SOCIAL_KEY, token); else localStorage.removeItem(SOCIAL_KEY); } catch { /* private mode */ }
+    if (!token) { state.social = null; state.socialAt = 0; }
+  }
+
+  async function social(op, body) {
+    const token = socialToken();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(`/api/social/${op}`, body === undefined ? { headers, signal: controller.signal }
+        : { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal });
+      let data = {};
+      try { data = await response.json(); } catch { /* not JSON */ }
+      if (response.status === 401 && token) rememberToken(null);
+      if (!response.ok) throw Object.assign(new Error(typeof data.error === 'string' ? data.error : 'Не получилось. Попробуйте ещё раз.'), { status: response.status });
+      return data;
+    } catch (error) {
+      if (error.name === 'AbortError') throw new Error('Сеть отвечает слишком долго. Попробуйте ещё раз.');
+      if (error instanceof TypeError) throw new Error('Нет связи с Seruen. Проверьте интернет на часах или телефоне.');
+      throw error;
+    } finally { clearTimeout(timer); }
+  }
+
+  function upcomingMeetups() {
+    const now = Date.now();
+    return (state.social?.meetups || []).filter((meetup) => meetup.status !== 'cancelled' && meetup.myStatus !== 'declined' && meetup.startsAt > now - 2 * 3600000);
+  }
+
+  async function loadSocial() {
+    state.social = await social('state');
+    state.me = state.social.me;
+    state.socialAt = Date.now();
+    return state.social;
+  }
+
+  async function refreshMeetCount() {
+    if (socialToken() && Date.now() - (state.socialAt || 0) > 60000) {
+      state.socialAt = Date.now();
+      try { await loadSocial(); } catch { /* the chip still opens the list */ }
+    }
+    const count = socialToken() ? upcomingMeetups().length : 0;
+    $('meet-count').textContent = String(count);
+    $('meet-count').hidden = !count;
+  }
+
+  function showLink(message) {
+    $('link-text').textContent = message || 'На телефоне: Seruen → Профиль → Связать часы';
+    $('link-text').classList.toggle('error', Boolean(message));
+    show('link');
+  }
+
+  function showPad() {
+    state.code = '';
+    renderCode();
+    show('pair');
+  }
+
+  function renderCode() {
+    [...$('pair-code').children].forEach((slot, index) => {
+      slot.textContent = state.code[index] || '';
+      slot.classList.toggle('filled', index < state.code.length);
+    });
+    $('pair-code').setAttribute('aria-label', `Код с телефона: ${state.code.length} из 6 цифр`);
+  }
+
+  function press(key) {
+    if (state.claiming) return;
+    if (key === 'back') { showLink(); return; }
+    if (key === 'del') state.code = state.code.slice(0, -1);
+    else if (/^\d$/.test(key) && state.code.length < 6) state.code += key;
+    renderCode();
+    buzz(8);
+    if (state.code.length === 6) claim();
+  }
+
+  async function claim() {
+    state.claiming = true;
+    $('pair-code').classList.add('busy');
+    try {
+      const data = await social('claimDevice', { code: state.code });
+      rememberToken(data.token);
+      state.me = data.me;
+      buzz([60, 60, 60]);
+      openMeet();
+    } catch (error) {
+      buzz(250);
+      showLink(error.message);
+    } finally {
+      state.claiming = false;
+      $('pair-code').classList.remove('busy');
+    }
+  }
+
+  async function openMeet() {
+    if (!socialToken()) { showLink(); return; }
+    show('loading');
+    $('loading-text').textContent = 'Загружаем встречи…';
+    try {
+      [, state.meetStart] = await Promise.all([loadSocial(), resolveStart()]);
+      renderMeet();
+      show('meet');
+    } catch (error) {
+      if (error.status === 401) showLink('Часы отвязаны. Получите новый код на телефоне.');
+      else showError(error.message, openMeet);
+    }
+  }
+
+  function button(className, text, onClick) {
+    const node = element('button', className, text);
+    node.type = 'button';
+    node.addEventListener('click', onClick);
+    return node;
+  }
+
+  function day(ms) {
+    const date = new Date(ms);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (date.toDateString() === new Date().toDateString()) return 'Сегодня';
+    if (date.toDateString() === tomorrow.toDateString()) return 'Завтра';
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '');
+  }
+
+  function peopleSummary(members) {
+    const others = members.filter((member) => member.id !== state.me?.id);
+    const arrived = others.filter((member) => member.status === 'arrived').length;
+    const onWay = others.filter((member) => member.status === 'on_way').length;
+    return [arrived && `${arrived} на месте`, onWay && `${onWay} в пути`].filter(Boolean).join(' · ');
+  }
+
+  function renderMeet() {
+    const list = $('meetups');
+    list.replaceChildren();
+    const start = state.meetStart;
+    const meetups = upcomingMeetups().slice(0, 5);
+    meetups.forEach((meetup) => list.append(meetupCard(meetup, start)));
+    const located = (state.social.friends || []).filter((friend) => Number.isFinite(friend.location?.lat) && Number.isFinite(friend.location?.lon))
+      .map((friend) => ({ friend, meters: haversine(start, friend.location) })).sort((a, b) => a.meters - b.meters).slice(0, 4);
+    if (located.length) list.append(friendsCard(located));
+    if (!meetups.length && !located.length) {
+      const card = element('article', 'card');
+      card.append(element('p', 'card-top', state.me ? `${state.me.emoji} ${state.me.name}` : 'Seruen'), element('p', 'card-name', 'Пока нет встреч'),
+        element('p', 'card-hours', 'Позовите друзей на встречу в Seruen на телефоне, и она появится здесь.'));
+      list.append(card);
+    }
+    if (start.note) list.firstChild.append(element('p', 'card-hours', start.note));
+    refreshMeetCount();
+  }
+
+  function meetupCard(meetup, start) {
+    const now = Date.now();
+    const meters = haversine(start, meetup.place);
+    const walkMinutes = Math.max(1, Math.ceil(meters / METERS_PER_MINUTE));
+    const leaveAt = meetup.startsAt - walkMinutes * 60000;
+    const card = element('article', 'card meet-card');
+    card.setAttribute('aria-label', `Встреча ${meetup.title}, ${day(meetup.startsAt).toLowerCase()} в ${time(meetup.startsAt)}`);
+    const top = element('p', 'card-top', `${meetup.changed ? 'Изменена' : day(meetup.startsAt)} · ${time(meetup.startsAt)}`);
+    const people = element('p', 'people');
+    const members = meetup.members.filter((member) => member.status !== 'declined');
+    for (const member of members.slice(0, 5)) {
+      const chip = element('span', `person is-${member.status}`, member.emoji);
+      chip.title = `${member.name}: ${MEMBER_STATUS[member.status] || member.status}`;
+      people.append(chip);
+    }
+    if (members.length > 5) people.append(element('span', 'person more', `+${members.length - 5}`));
+    const summary = peopleSummary(meetup.members);
+    if (summary) people.append(element('span', 'people-note', summary));
+    // The hero is when to leave; the walk itself goes into the place line.
+    const timing = element('p', 'card-walk meet-when');
+    const caption = element('span');
+    const [first, second, at] = now < leaveAt ? ['выйти', 'до', leaveAt] : now < meetup.startsAt ? ['пора', 'выходить', null] : ['началась', 'в', meetup.startsAt];
+    caption.append(first, document.createElement('br'), second);
+    timing.append(caption);
+    if (at) timing.append(element('b', '', time(at)));
+    else timing.classList.add('now');
+    const where = element('p', 'card-hours card-place');
+    where.append(element('span', 'place-name', meetup.place.name), element('span', '', ` · ${walkMinutes} мин`));
+    card.append(top, element('p', 'card-name', meetup.title), where, people, timing);
+    if (meetup.myStatus === 'arrived') { card.append(element('p', 'card-here', 'Вы на месте')); return card; }
+    card.append(button('action', 'Идём', () => startTargetWalk('meet', meetup)));
+    if (!['going', 'on_way'].includes(meetup.myStatus)) {
+      const answer = button('action ghost', 'Приду', () => promise(meetup, answer, leaveAt, walkMinutes));
+      card.append(answer);
+    }
+    return card;
+  }
+
+  function friendsCard(located) {
+    const card = element('article', 'card friends-card');
+    card.append(element('p', 'card-top', 'Друзья рядом'));
+    for (const { friend, meters } of located) {
+      const row = button('friend', undefined, () => startTargetWalk('friend', friend));
+      row.setAttribute('aria-label', `Идти к ${friend.name}, ${distanceText(meters)}`);
+      row.append(element('span', 'person', friend.emoji), element('span', 'friend-name', friend.name), element('span', 'friend-far', distanceText(meters)));
+      card.append(row);
+    }
+    card.append(element('p', 'card-hours', 'Нажмите, чтобы пойти к другу'));
+    return card;
+  }
+
+  function rsvp(id, status) {
+    return social('rsvpMeetup', { id, status }).catch(() => null);
+  }
+
+  // "I'll come": answers the invite and, if the meetup is soon enough, reminds on the wrist 5 minutes before it is time to leave.
+  async function promise(meetup, answer, leaveAt, walkMinutes) {
+    answer.disabled = true;
+    const remindAt = leaveAt - 5 * 60000;
+    if (window.SeruenRemind?.supported() && remindAt > Date.now() + 60000 && remindAt < Date.now() + 6 * 3600000) {
+      // Started inside the tap, so the browser may show its permission prompt.
+      window.SeruenRemind.schedule([{ at: remindAt, tag: 'seruen-meet', title: `Через 5 минут выходить: ${meetup.title}`.slice(0, 80),
+        body: `${meetup.place.name} в ${time(meetup.startsAt)}, идти ${walkMinutes} мин.`.slice(0, 240) }]);
+    }
+    if (await rsvp(meetup.id, 'going')) {
+      answer.textContent = '✓ Вы придёте';
+      buzz(40);
+    } else {
+      answer.disabled = false;
+      answer.textContent = 'Приду · ещё раз';
+    }
+  }
+
+  // Walking to a meetup or a friend. The ring is the time until the meetup starts; the target follows updates every 15 s.
+  function startTargetWalk(kind, item) {
+    const start = state.meetStart;
+    const target = kind === 'meet' ? { name: item.place.name, lat: item.place.lat, lon: item.place.lon }
+      : { name: `${item.emoji} ${item.name}`, lat: item.location.lat, lon: item.location.lon };
+    const walk = newWalk({ kind, id: item.id, place: target, start, title: item.title, startsAt: kind === 'meet' ? item.startsAt : null,
+      members: item.members || [], seen: item.location?.updatedAt, approximate: item.location?.mode === 'approximate', lost: false });
+    const there = Math.max(1, Math.ceil(haversine(start, target) / METERS_PER_MINUTE));
+    const wait = walk.startsAt ? Math.round((walk.startsAt - walk.t0) / 60000) - there : 0;
+    beginWalk(walk, wait >= 1 ? [['there', there], ['stay', wait]] : [['there', there]]);
+    if (kind === 'meet' && !walk.demo) rsvp(item.id, 'on_way');
+    if (!walk.demo) setNote(targetNote(walk));
+    state.poll = setInterval(() => refreshTarget(walk), 15000);
+  }
+
+  function targetNote(walk) {
+    return walk.kind === 'meet' ? peopleSummary(walk.members) : '';
+  }
+
+  async function refreshTarget(walk) {
+    let data;
+    try { data = await loadSocial(); } catch { return; }
+    if (state.walk !== walk) return;
+    if (walk.kind === 'meet') {
+      const meetup = data.meetups.find((item) => item.id === walk.id);
+      if (!meetup || meetup.status === 'cancelled') {
+        stopWalk();
+        state.walk = null;
+        buzz([250, 100, 250]);
+        showError(`Встречу «${walk.title}» отменили.`, openMeet);
+        return;
+      }
+      Object.assign(walk.place, { name: meetup.place.name, lat: meetup.place.lat, lon: meetup.place.lon });
+      walk.members = meetup.members;
+      walk.startsAt = meetup.startsAt;
+    } else {
+      const location = data.friends.find((friend) => friend.id === walk.id)?.location;
+      walk.lost = !(Number.isFinite(location?.lat) && Number.isFinite(location?.lon));
+      if (!walk.lost) {
+        Object.assign(walk.place, { lat: location.lat, lon: location.lon });
+        walk.seen = location.updatedAt;
+        walk.approximate = location.mode === 'approximate';
+      }
+    }
+    if (!walk.demo) setNote(targetNote(walk));
+  }
+
+  function tickTarget(walk) {
+    if (walk.demo) simulate(walk, walk.place);
+    const now = clock();
+    const distance = haversine(walk.pos, walk.place);
+    const arrivalRadius = walk.demo ? 12 : Math.max(walk.approximate ? 150 : 25, Math.min(walk.accuracy || 25, 60));
+    if (distance <= arrivalRadius) { arriveAtTarget(); return; }
+    const minutes = Math.ceil(distance / METERS_PER_MINUTE);
+    const view = $('view-go');
+    updateRing(walk, Math.min(1, Math.max(0, (now - walk.t0) / (walk.ringMinutes * 60000))));
+    view.classList.toggle('over', Boolean(walk.startsAt) && now > walk.startsAt);
+    view.classList.toggle('late', Boolean(walk.startsAt) && now <= walk.startsAt && now + minutes * 60000 > walk.startsAt);
+    pointArrow(bearing(walk.pos, walk.place));
+    $('go-phase').textContent = `${walk.kind === 'meet' ? 'К встрече' : 'К другу'} · ${distanceText(distance)}`;
+    $('go-name').textContent = walk.place.name;
+    $('go-minutes').textContent = String(minutes);
+    $('go-unit').textContent = 'мин';
+    if (walk.kind === 'meet') {
+      const late = Math.ceil((now + minutes * 60000 - walk.startsAt) / 60000);
+      if (now > walk.startsAt) $('go-back').replaceChildren('началась в ', element('b', '', time(walk.startsAt)));
+      else if (late > 0) $('go-back').replaceChildren('опоздание ~', element('b', '', `${late} мин`));
+      else $('go-back').replaceChildren('начало в ', element('b', '', time(walk.startsAt)));
+    } else if (walk.lost) $('go-back').replaceChildren('друг скрыл место');
+    else $('go-back').replaceChildren(walk.approximate ? 'примерно · ' : 'место от ', element('b', '', time(walk.seen)));
+    $('go-next').textContent = 'Я на месте';
+  }
+
+  function arriveAtTarget() {
+    const walk = state.walk;
+    const now = clock();
+    stopWalk();
+    state.walk = null;
+    if (walk.kind === 'meet') {
+      if (!walk.demo) rsvp(walk.id, 'arrived');
+      const early = Math.round((walk.startsAt - now) / 60000);
+      $('done-title').textContent = 'На месте';
+      $('done-text').textContent = `${early > 0 ? `За ${early} мин до начала.` : early < 0 ? `Опоздание ${-early} мин.` : 'Ровно к началу.'}${walk.demo ? '' : ' Друзья это видят.'}`;
+    } else {
+      $('done-title').textContent = 'Вы рядом';
+      $('done-text').textContent = `${walk.place.name} где-то здесь.`;
+    }
+    $('done-home').textContent = 'К встречам';
+    state.doneTo = 'meet';
+    buzz([70, 70, 70]);
+    show('done');
   }
 
   // Phone hand-off: /watch#to=51.1,71.4&name=…&cat=cafe&from=51.12,71.43&fromName=…&min=45&walk=4&visit=20&back=4
@@ -507,9 +853,33 @@
     $('ask-gemini').addEventListener('click', askGemini);
     $('back-home').addEventListener('click', () => { history.replaceState(null, '', location.pathname + location.search); renderHome(); show('home'); });
     $('go-next').addEventListener('click', next);
-    $('go-stop').addEventListener('click', () => { stopWalk(); state.walk = null; show('results'); });
-    $('done-home').addEventListener('click', () => { renderHome(); show('home'); });
-    $('error-retry').addEventListener('click', () => state.mood ? findPlaces(state.mood) : show('home'));
+    $('go-stop').addEventListener('click', () => {
+      const walk = state.walk;
+      stopWalk();
+      state.walk = null;
+      if (walk?.kind === 'place') { show('results'); return; }
+      if (walk?.kind === 'meet' && !walk.demo) rsvp(walk.id, 'going');
+      openMeet();
+    });
+    $('done-home').addEventListener('click', () => { if (state.doneTo === 'meet') openMeet(); else { renderHome(); show('home'); } });
+    $('error-retry').addEventListener('click', () => state.retry());
+    $('meet-chip').addEventListener('click', openMeet);
+    $('link-enter').addEventListener('click', showPad);
+    $('link-home').addEventListener('click', () => { renderHome(); show('home'); });
+    document.querySelectorAll('[data-key]').forEach((key) => key.addEventListener('click', () => press(key.dataset.key)));
+    document.addEventListener('keydown', (event) => {
+      if ($('view-pair').hidden || event.metaKey || event.ctrlKey || event.altKey) return;
+      const key = /^\d$/.test(event.key) ? event.key : { Backspace: 'del', Escape: 'back' }[event.key];
+      if (key) { event.preventDefault(); press(key); }
+    });
+    $('meet-refresh').addEventListener('click', openMeet);
+    $('meet-home').addEventListener('click', () => { renderHome(); show('home'); });
+    $('meet-unlink').addEventListener('click', () => {
+      social('logout', {}).catch(() => {});
+      rememberToken(null);
+      renderHome();
+      show('home');
+    });
     $('error-home').addEventListener('click', () => { renderHome(); show('home'); });
     document.querySelectorAll('[data-shape]').forEach((button) => button.addEventListener('click', () => { state.shape = button.dataset.shape; save(); applyShape(); }));
     $('demo-toggle').addEventListener('change', (event) => { state.demo = event.target.checked; });

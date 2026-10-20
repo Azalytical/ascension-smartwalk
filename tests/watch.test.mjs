@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { handleApi } from '../src/api.mjs';
 import { plural, spokenPlan } from '../src/watch.mjs';
 
@@ -52,4 +53,15 @@ test('nothing in reach is said honestly', () => {
 test('Russian plurals', () => {
   assert.deepEqual([1, 2, 5, 11, 21, 24, 112].map(n => plural(n, 'минуту', 'минуты', 'минут')),
     ['минуту', 'минуты', 'минут', 'минут', 'минуту', 'минуты', 'минут']);
+});
+
+test('every element the watch script looks up exists on the page', () => {
+  const html = readFileSync(new URL('../public/watch.html', import.meta.url), 'utf8');
+  const script = readFileSync(new URL('../public/watch.js', import.meta.url), 'utf8');
+  const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
+  const used = new Set([...script.matchAll(/\$\('([^']+)'\)/g)].map(match => match[1]));
+  assert.ok(used.size > 40);
+  assert.deepEqual([...used].filter(id => !ids.has(id)), []);
+  // The pairing keypad: ten digits, erase and back.
+  assert.equal([...html.matchAll(/data-key="([^"]+)"/g)].map(match => match[1]).sort().join(','), '0,1,2,3,4,5,6,7,8,9,back,del');
 });
