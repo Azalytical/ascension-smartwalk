@@ -1,5 +1,6 @@
 import { recommend } from './retrieval.mjs';
 import { handleTelegram } from './telegram.mjs';
+import { handleSocial } from './social/routes.mjs';
 
 const HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
@@ -189,7 +190,7 @@ export async function handleApi(request, env = {}, dataset = []) {
     if (request.method !== 'GET') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'GET' });
     return json({ poiCount: pois.length, updatedAt: dataset.retrievedAt || pois[0]?.retrievedAt || null,
       generationAvailable: Boolean(activeProvider(env)), generationProvider: activeProvider(env)?.name ?? null,
-      source: 'OpenStreetMap', version: '1.1.0' });
+      source: 'OpenStreetMap', version: '1.1.0', social: Boolean(env.SOCIAL || env.SOCIAL_LOCAL) });
   }
   if (url.pathname === '/telegram/webhook') {
     if (request.method !== 'POST') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'POST' });
@@ -199,6 +200,7 @@ export async function handleApi(request, env = {}, dataset = []) {
         : { mode: 'fallback', summary: safeSummary(result), references: [], reason: 'request_budget_unavailable' };
     });
   }
+  if (url.pathname.startsWith('/api/social/')) return handleSocial(request, env, dataset);
   if (url.pathname !== '/api/recommend') return null;
   if (request.method !== 'POST') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'POST' });
   const origin = request.headers.get('Origin');

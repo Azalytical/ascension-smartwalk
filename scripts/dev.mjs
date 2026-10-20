@@ -2,13 +2,16 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
 import { handleApi } from '../src/api.mjs';
+import { localSocialHub } from '../src/social/local.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 // SMARTWALK_PRODUCTION=1 (set in the Dockerfile for Cloud Run) listens on all interfaces and enforces the request budget.
 const production = process.env.SMARTWALK_PRODUCTION === '1';
 const env = { GEMINI_API_KEY: process.env.GEMINI_API_KEY, GEMINI_MODEL: process.env.GEMINI_MODEL,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY, OPENAI_MODEL: process.env.OPENAI_MODEL,
-  ...(production ? { MEMORY_BUDGET: true } : { LOCAL_DEVELOPMENT: true }) };
+  ...(production ? { MEMORY_BUDGET: true } : { LOCAL_DEVELOPMENT: true }),
+  // Friends and meetups: SQLite file in SOCIAL_DB (or in memory), the same store the Durable Object uses.
+  SOCIAL_LOCAL: localSocialHub(process.env.SOCIAL_DB || ':memory:') };
 const port = Number(process.env.PORT || 8789);
 const host = process.env.HOST || '127.0.0.1';
 const dataset = JSON.parse(await readFile(resolve(root, 'data/pois.json'), 'utf8'));

@@ -32,6 +32,7 @@ assets['/'] = assets['/index.html'];
 const data = JSON.parse(await readFile(resolve(root, 'data/pois.json'), 'utf8'));
 const code = `import {handleApi} from './src/api.mjs';
 import {prepareDataset} from './src/retrieval.mjs';
+export {SocialHub} from './src/social/hub.mjs';
 const assets=${JSON.stringify(assets)};
 const data=${JSON.stringify(data)};
 prepareDataset(data);
