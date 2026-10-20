@@ -558,7 +558,7 @@ function renderResults() {
     notes.notices,
     h('div', { class: 'result-list' }, rows),
     surprise ? h('button', { class: 'btn btn-quiet surprise-btn', type: 'button', onclick: () => submit({ surprise: true }) }, icon('sparkle'), t('surprise.again')) : null,
-    understoodRow(result.understood),
+    understoodRow(surpriseMode ? ownHidden(result.understood) : result.understood),
     routeCard(result.route),
     eventsCard(result.cityEvents),
     notes.unchecked));
@@ -601,6 +601,13 @@ function notesView(recs, { skip = null } = {}) {
     unchecked: folded.length ? h('details', { class: 'disclosure unchecked' }, h('summary', {}, icon('info'), t('results.unchecked'), h('span', { class: 'count num', text: folded.length })),
       h('ul', { class: 'bullets fine' }, folded.map((text) => h('li', { text })))) : null,
   };
+}
+
+// A surprise request also excludes the surprises already shown, so the server's «вы скрыли» count includes them:
+// in that mode the line counts only the person's own list.
+function ownHidden(items) {
+  const n = store.hiddenIds().length;
+  return (items || []).map((item) => (item.key !== 'hidden' ? item : n ? { ...item, label: t('understood.hidden', { n, what: plural(n, 'understood.hiddenForms') }) } : null)).filter(Boolean);
 }
 
 // «Мы учли»: what the server understood from the request (time, categories, child, night, weather, hours).
