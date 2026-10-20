@@ -25,7 +25,7 @@ createServer(async (req, res) => {
   try {
     const chunks = []; let count = 0;
     // Photos for /api/vision are the only large bodies.
-    const limit = req.url.startsWith('/api/vision') ? 1500000 : req.url.startsWith('/mcp') ? 65536 : 8192;
+    const limit = req.url.startsWith('/api/vision') || req.url.startsWith('/api/listen') ? 1500000 : req.url.startsWith('/mcp') ? 65536 : 8192;
     for await (const chunk of req) { count += chunk.length; if (count > limit) { res.writeHead(413); res.end(); return; } chunks.push(chunk); }
     // Behind Cloud Run the public origin comes from Host and X-Forwarded-Proto; the API compares it with Origin.
     const proto = production && req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';

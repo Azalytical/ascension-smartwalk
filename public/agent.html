@@ -9,7 +9,7 @@
   <title>Aidem · ИИ-агент</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230E1621'/%3E%3Cpath d='M37.6 16.7A16 16 0 1 0 48 30' fill='none' stroke='%23F5B700' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='43.5' cy='20.5' r='3.6' fill='%234AA8FF'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="/agent.css">
-  <script src="/agent.js" defer></script>
+  <script type="module" src="/agent.js"></script>
 </head>
 <body>
   <header class="top">
@@ -24,6 +24,16 @@
     </section>
 
     <form class="ask" id="ask" autocomplete="off">
+      <div class="voice" id="voice">
+        <button type="button" class="mic" id="mic" aria-label="Говорить с Gemini" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+        </button>
+        <div class="voice-text">
+          <b id="voiceState">Нажмите и говорите</b>
+          <span id="voiceHint">Gemini ответит голосом, потом можно спросить ещё, не касаясь экрана. Русский, қазақша, English.</span>
+        </div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="handsfree" checked> <span>После ответа слушать продолжение</span></label>
       <label class="sr" for="query">Что хотите</label>
       <textarea id="query" name="query" rows="2" maxlength="500" required placeholder="Например: час свободен, хочу кофе и немного пройтись"></textarea>
       <div class="examples" id="examples" aria-label="Примеры запросов">
@@ -65,6 +75,7 @@
           <span class="who" id="who">Gemini</span>
           <button class="btn btn-ghost btn-small" id="speak" type="button">Озвучить</button>
         </div>
+        <p class="you" id="you"></p>
         <p class="summary" id="summary"></p>
         <div id="route"></div>
         <ul class="places" id="places"></ul>

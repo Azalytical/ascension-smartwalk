@@ -1,4 +1,8 @@
 // Aidem agent page: asks /api/agent, then replays the agent's steps and shows the answer with map and calendar links.
+// Voice uses the app's engine: tap once, speak, hear the answer, then ask a follow-up without touching the screen.
+import { converse, understand } from '/js/core/voice.js';
+import { speakText, stopSpeaking } from '/js/core/media.js';
+
 const $ = id => document.getElementById(id);
 const state = { lat: 51.1283, lon: 71.4304, minutes: 60 };
 const CATEGORY = { park: 'парк', cafe: 'кафе', museum: 'музей', playground: 'детская площадка', attraction: 'достопримечательность',
@@ -104,10 +108,8 @@ function routeNode(route) {
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 let lastSummary = '';
 
-$('ask').addEventListener('submit', async event => {
-  event.preventDefault();
-  const query = $('query').value.trim();
-  if (!query) return;
+/** Runs the agent for one question and renders its steps and answer. Returns the response, or null on failure. */
+async function ask(query, extra = {}) {
   const go = $('go');
   go.disabled = true; go.textContent = 'Gemini думает…';
   $('result').hidden = false; $('answer').hidden = true;
@@ -117,62 +119,92 @@ $('ask').addEventListener('submit', async event => {
   $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
   try {
     const response = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, lat: state.lat, lon: state.lon, minutes: state.minutes, withChild: $('child').checked }) });
+      body: JSON.stringify({ query, lat: state.lat, lon: state.lon, minutes: state.minutes, withChild: $('child').checked, ...extra }) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Не получилось');
     steps.replaceChildren();
-    for (const step of data.steps) { steps.append(stepNode(step, step.tool === 'give_answer')); await wait(380); }
+    for (const step of data.steps) { steps.append(stepNode(step, step.tool === 'give_answer')); await wait(extra.lang ? 200 : 380); }
     $('who').textContent = data.mode === 'agent'
       ? `Gemini · ${data.model} · ${data.modelCalls} обращ. к модели, ${data.toolCalls} инструм.`
       : 'Подбор по данным без ИИ: Gemini сейчас недоступен';
     lastSummary = data.summary;
+    $('you').textContent = extra.lang ? `Вы сказали: «${query}»` : '';
     $('summary').textContent = data.summary;
     $('route').replaceChildren(...(data.route ? [routeNode(data.route)] : []));
     $('places').replaceChildren(...data.places.map(placeNode));
     $('privacy').textContent = data.privacy;
     $('answer').hidden = false;
+    return data;
   } catch (error) {
     steps.replaceChildren(el('li', { class: 'error', text: error.message || 'Не получилось. Попробуйте ещё раз.' }));
+    return null;
   } finally {
     go.disabled = false; go.textContent = 'Спросить Gemini';
   }
-});
-
-// The audio context is created inside the tap: iOS keeps a context made after an await silent.
-async function playPcm(context, base64, sampleRate) {
-  const bytes = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
-  // A WAV answer starts with a RIFF header; the samples after it are the same 16-bit PCM.
-  const offset = bytes.length > 44 && String.fromCharCode(...bytes.subarray(0, 4)) === 'RIFF' ? 44 : 0;
-  const samples = new Int16Array(bytes.buffer, offset, Math.floor((bytes.length - offset) / 2));
-  const buffer = context.createBuffer(1, samples.length, sampleRate || 24000);
-  const channel = buffer.getChannelData(0);
-  for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768;
-  const source = context.createBufferSource();
-  source.buffer = buffer; source.connect(context.destination);
-  await context.resume?.();
-  source.start();
-  return new Promise(resolve => { source.onended = resolve; });
 }
 
-const KAZAKH = /[әғқңөұүһі]/i;
+$('ask').addEventListener('submit', event => {
+  event.preventDefault();
+  const query = $('query').value.trim();
+  if (query) ask(query);
+});
+
 $('speak').addEventListener('click', async () => {
   if (!lastSummary) return;
   const button = $('speak');
-  button.disabled = true; button.textContent = 'Готовим голос…';
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  const context = AudioContext ? new AudioContext() : null;
-  try {
-    if (!context) throw new Error('no audio');
-    const response = await fetch('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: lastSummary.slice(0, 400) }) });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-    button.textContent = 'Говорит Gemini…';
-    await playPcm(context, data.data, data.sampleRate);
-  } catch {
-    // The browser voice is the fallback; it may lack Kazakh.
-    if ('speechSynthesis' in window) speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(lastSummary), { lang: KAZAKH.test(lastSummary) ? 'kk-KZ' : /[а-яё]/i.test(lastSummary) ? 'ru-RU' : 'en-US' }));
-  } finally { context?.close?.().catch(() => {}); button.disabled = false; button.textContent = 'Озвучить'; }
+  button.disabled = true; button.textContent = 'Говорит Gemini…';
+  try { await speakText(lastSummary); } finally { button.disabled = false; button.textContent = 'Озвучить'; }
 });
+
+// ---------- hands-free voice ----------
+const VOICE = {
+  idle: ['Нажмите и говорите', 'Gemini ответит голосом, потом можно спросить ещё, не касаясь экрана. Русский, қазақша, English.'],
+  listening: ['Слушаю…', 'Скажите, сколько у вас времени и чего хочется. Пауза — конец фразы.'],
+  followUp: ['Слушаю продолжение…', 'Например: «а поближе?», «а с кофе?» Или молчите, и разговор закончится.'],
+  thinking: ['Gemini думает…', 'Распознаю фразу и проверяю погоду, места и часы работы.'],
+  speaking: ['Gemini отвечает', 'Нажмите на кнопку, чтобы остановить.'],
+  failed: ['Не получилось', 'Нет доступа к микрофону или речь не распознана. Разрешите микрофон или напишите словами.'],
+};
+let conversation = null;
+let turns = 0;
+let previous = null;
+
+function showVoice(stateName) {
+  const key = stateName === 'listening' && turns > 0 ? 'followUp' : stateName;
+  const [title, hint] = VOICE[key] || VOICE.idle;
+  $('voiceState').textContent = title;
+  $('voiceHint').textContent = hint;
+  $('mic').dataset.state = stateName;
+  $('mic').setAttribute('aria-pressed', String(stateName !== 'idle' && stateName !== 'failed'));
+  $('mic').setAttribute('aria-label', stateName === 'idle' || stateName === 'failed' ? 'Говорить с Gemini' : 'Остановить разговор');
+}
+
+$('mic').addEventListener('click', () => {
+  if (conversation) { conversation.stop(); return; }
+  turns = 0; previous = null;
+  conversation = converse({
+    onState: showVoice,
+    onText: text => { $('query').value = text; },
+    again: () => $('handsfree').checked,
+    onPhrase: async (text, lang) => {
+      const { minutes } = understand(text);
+      if (minutes) {
+        state.minutes = minutes;
+        const chip = $('minutes').querySelector(`[data-min="${minutes}"]`);
+        for (const other of $('minutes').querySelectorAll('.chip')) other.setAttribute('aria-pressed', String(other === chip));
+      }
+      $('query').value = text;
+      const data = await ask(text, { lang, ...(previous ? { previous } : {}) });
+      if (!data) return '';
+      previous = { query: text.slice(0, 300), summary: data.summary.slice(0, 500) };
+      turns++;
+      return data.summary;
+    },
+  });
+  conversation.done.catch(() => showVoice('failed')).finally(() => { conversation = null; if ($('mic').dataset.state !== 'failed') showVoice('idle'); });
+});
+
+addEventListener('pagehide', () => { conversation?.stop(); stopSpeaking(); });
 
 async function shrink(file) {
   const bitmap = await createImageBitmap(file);
