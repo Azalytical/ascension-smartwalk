@@ -11,7 +11,6 @@
   "full_decode": "passed",
   "recording_type": "Narrated video review of genuine browser screenshots; not continuous screencast",
   "application_context": {
-    "public_site": "https://ascension-smartwalk-astana.azamatbreach.chatgpt.site",
     "capture_date": "2026-10-19",
     "poi_count": 930,
     "cloud_llm_cases_reported_confirmed": [
@@ -20,7 +19,8 @@
       "unknown"
     ],
     "application_tests_reported_passed": 23,
-    "scope": "Application checks were confirmed by the project operator before final media rendering. Media QA independently checks the encoded video and the exact captured screenshots."
+    "scope": "Application checks were confirmed by the project operator before final media rendering. Media QA independently checks the encoded video and the exact captured screenshots.",
+    "note": "QA of the first 19 October screen review. The final Aidem video replaces it; the live site is https://ascension-smartwalk.azamatbreach.workers.dev"
   },
   "listening_review": "Not performed: the tool environment explicitly does not support audio input. Non-silent speech, duration, waveform peaks and full MP4 decoding were checked.",
   "source_manifest_version": 2,
