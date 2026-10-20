@@ -666,13 +666,12 @@
 
   function startWalk(place) {
     stopVoice();
-    // A place found by name may need more time than the chip says.
-    state.plan.minutes = Math.max(state.plan.minutes, place.totalMinutes);
-    const walk = newWalk({ kind: 'place', place, start: state.plan.start });
-    walk.deadline = walk.t0 + state.plan.minutes * 60000;
-    const there = place.walkMinutes, back = place.returnMinutes;
-    const stay = Math.max(1, state.plan.minutes - there - back - RESERVE_MINUTES);
-    beginWalk(walk, [['there', there], ['stay', stay], ['back', back], ['reserve', RESERVE_MINUTES]]);
+    // The walk keeps the card's plan, so «обратно к» on the wrist is the time the card showed.
+    const there = place.walkMinutes, stay = Math.max(1, place.visitMinutes), back = place.returnMinutes;
+    const reserve = Math.max(0, place.totalMinutes - there - stay - back);
+    const walk = newWalk({ kind: 'place', place, start: state.plan.start, minutes: there + stay + back + reserve, reserve });
+    walk.deadline = walk.t0 + walk.minutes * 60000;
+    beginWalk(walk, [['there', there], ['stay', stay], ['back', back], ['reserve', reserve]]);
     if (window.SeruenRemind?.supported()) remindOnWrist(walk);
   }
 
@@ -733,7 +732,7 @@
 
   // Reminders through the phone's notifications reach any paired watch or band, even with this page closed.
   function remindOnWrist(walk) {
-    walk.leaveAt = walk.t0 + (state.plan.minutes - walk.place.returnMinutes - RESERVE_MINUTES) * 60000;
+    walk.leaveAt = walk.t0 + (walk.minutes - walk.place.returnMinutes - walk.reserve) * 60000;
     if (walk.demo) {
       // Demo time is accelerated, so only ask for permission now; the notification goes out when the demo says "time to go back".
       window.SeruenRemind.permission().catch(() => {});
@@ -800,7 +799,7 @@
     walk.realStart = performance.now();
     // Leaving early: the scheduled "time to go back" is no longer needed.
     if (phase === 'back' && !walk.alerted) cancelReminders(walk);
-    if (phase === 'stay') { walk.arrivedAt = clock(); buzz([70, 70, 70]); }
+    if (phase === 'stay') { walk.arrivedAt = clock(); walk.stayAt = { ...walk.pos }; buzz([70, 70, 70]); }
   }
 
   function timeToReturn() {
@@ -825,7 +824,7 @@
     const spent = Math.max(1, Math.round((clock() - walk.t0) / 60000));
     const late = Math.round((clock() - walk.deadline) / 60000);
     $('done-title').textContent = late > 0 ? 'Почти вовремя' : 'Вы вернулись';
-    $('done-text').textContent = late > 0 ? `${spent} мин, на ${late} мин позже плана.` : `${spent} мин из ${state.plan.minutes}. Вовремя.`;
+    $('done-text').textContent = late > 0 ? `${spent} мин, на ${late} мин позже плана.` : `${spent} мин из ${walk.minutes}. Вовремя.`;
     $('done-home').textContent = 'Ещё прогулка';
     state.doneTo = 'home';
     buzz([70, 70, 70]);
@@ -844,13 +843,16 @@
     const distance = haversine(walk.pos, target);
     const toTarget = bearing(walk.pos, target);
     const backMinutes = Math.ceil(haversine(walk.pos, walk.start) / METERS_PER_MINUTE);
-    const leaveBy = walk.deadline - (backMinutes + RESERVE_MINUTES) * 60000;
+    const leaveBy = walk.deadline - (backMinutes + walk.reserve) * 60000;
     const arrivalRadius = walk.demo ? 12 : Math.max(25, Math.min(walk.accuracy || 25, 60));
 
+    const away = Math.max(90, arrivalRadius * 2);
+    // The walk ends itself only after the walker has really left the start, so trying it at a desk does not finish it.
+    if (haversine(walk.pos, walk.start) > away) walk.leftStart = true;
     if (walk.phase === 'to' && distance <= arrivalRadius) setPhase('stay');
-    // Walking away from the place means the visit is over.
-    else if (walk.phase === 'stay' && !walk.demo && haversine(walk.pos, walk.place) > Math.max(90, arrivalRadius * 2)) setPhase('back');
-    else if (walk.phase === 'back' && distance <= arrivalRadius) { finish(); return; }
+    // Walking away from where the visit began means it is over.
+    else if (walk.phase === 'stay' && !walk.demo && haversine(walk.pos, walk.stayAt || walk.place) > away) setPhase('back');
+    else if (walk.phase === 'back' && distance <= arrivalRadius && (walk.demo || walk.leftStart)) { finish(); return; }
     if (walk.phase !== 'back' && now >= leaveBy) { timeToReturn(); return tick(); }
 
     const view = $('view-go');
