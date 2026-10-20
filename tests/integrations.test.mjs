@@ -305,3 +305,28 @@ test('weather: one Open-Meteo 503 is retried', async () => {
   assert.equal(calls, 2);
   assert.equal(value.available, true);
 });
+
+test('listen: Gemini writes down a spoken request, OpenAI is the fallback', withFetch(async (url, init) => {
+  if (String(url).includes('generativelanguage')) {
+    const body = JSON.parse(init.body);
+    assert.equal(body.contents[0].parts[0].inlineData.mimeType, 'audio/wav');
+    if (globalThis.__geminiDown) return new Response('{}', { status: 503 });
+    return jsonResponse({ candidates: [{ content: { parts: [{ text: JSON.stringify({ text: '  час, кофе   и парк ' }) }] } }] });
+  }
+  assert.match(String(url), /api\.openai\.com\/v1\/audio\/transcriptions/);
+  assert.ok(init.body instanceof FormData);
+  return jsonResponse({ text: 'кофе у воды' });
+}, async () => {
+  const audio = 'UklGR'.padEnd(400, 'A');
+  const ask = (extra) => handleApi(new Request('https://demo.example/api/listen', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ audio, mimeType: 'audio/wav;codecs=1', lang: 'ru' }) }), { ...env, ...extra }, pois);
+  globalThis.__geminiDown = false;
+  assert.deepEqual(await (await ask({ GEMINI_API_KEY: 'test' })).json(), { text: 'час, кофе и парк', provider: 'gemini' });
+  globalThis.__geminiDown = true;
+  assert.deepEqual(await (await ask({ GEMINI_API_KEY: 'test', OPENAI_API_KEY: 'test' })).json(), { text: 'кофе у воды', provider: 'openai' });
+  assert.equal((await ask({ GEMINI_API_KEY: 'test' })).status, 502);
+  assert.equal((await ask({})).status, 503);
+  const video = await handleApi(new Request('https://demo.example/api/listen', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ audio, mimeType: 'video/mp4' }) }), { ...env, GEMINI_API_KEY: 'test' }, pois);
+  assert.equal(video.status, 400);
+}));

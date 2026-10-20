@@ -5,7 +5,7 @@ import { handleSocial } from './social/routes.mjs';
 import { handleWatch } from './watch.mjs';
 import { handleMcp } from './mcp.mjs';
 import { runAgent } from './agent.mjs';
-import { identifyPlace, speak, MediaError } from './media.mjs';
+import { identifyPlace, speak, listen, MediaError } from './media.mjs';
 import { placeLinks } from './links.mjs';
 import { astanaWeather } from './weather.mjs';
 
@@ -329,7 +329,7 @@ async function weather(request, url, env) {
 }
 
 // Gemini features beyond the walk summary. Each request counts once against the same demo budget as /api/recommend.
-const BODY_LIMITS = { '/api/agent': 4096, '/api/vision': 1500000, '/api/speak': 4096 };
+const BODY_LIMITS = { '/api/agent': 4096, '/api/vision': 1500000, '/api/speak': 4096, '/api/listen': 1100000 };
 const agentDays = new Map();
 async function gemini(request, url, env, dataset) {
   if (request.method !== 'POST') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'POST' });
@@ -360,6 +360,7 @@ async function gemini(request, url, env, dataset) {
         { env: agentEnv, dataset, limitedJson, answerLanguage, unsupported: UNSUPPORTED }));
     }
     if (url.pathname === '/api/vision') return json(await identifyPlace(body, { env: model, dataset, limitedJson }));
+    if (url.pathname === '/api/listen') return json(await listen(body, { env: model, limitedJson }));
     return json(await speak(body, { env: model, limitedJson }));
   } catch (error) {
     if (error instanceof MediaError) return json({ error: error.message }, error.status);
@@ -378,7 +379,7 @@ export async function handleApi(request, env = {}, dataset = []) {
       generationAvailable: Boolean(activeProvider(env)), generationProvider: activeProvider(env)?.name ?? null,
       source: summary.source, bySource: summary.bySource, licenses: summary.licenses, attribution: summary.attribution, version: '1.2.0',
       social: Boolean(env.SOCIAL || env.SOCIAL_LOCAL),
-      integrations: { mcp: '/mcp', agent: '/api/agent', vision: '/api/vision', speak: '/api/speak', weather: '/api/weather' } });
+      integrations: { mcp: '/mcp', agent: '/api/agent', vision: '/api/vision', speak: '/api/speak', listen: '/api/listen', weather: '/api/weather' } });
   }
   if (url.pathname === '/api/places' || url.pathname.startsWith('/api/places/')) {
     if (request.method !== 'GET') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'GET' });
@@ -401,7 +402,7 @@ export async function handleApi(request, env = {}, dataset = []) {
   if (url.pathname.startsWith('/api/social/')) return handleSocial(request, env, dataset);
   if (url.pathname === '/mcp') return handleMcp(request, env, dataset);
   if (url.pathname === '/api/weather') return weather(request, url, env);
-  if (['/api/agent', '/api/vision', '/api/speak'].includes(url.pathname)) return gemini(request, url, env, dataset);
+  if (['/api/agent', '/api/vision', '/api/speak', '/api/listen'].includes(url.pathname)) return gemini(request, url, env, dataset);
   if (url.pathname !== '/api/recommend') return null;
   if (request.method !== 'POST') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'POST' });
   const origin = request.headers.get('Origin');

@@ -154,8 +154,7 @@ function renderVision() {
         h('div', {}, h('h3', { class: 'title-2', text: found.name }),
           h('p', { class: 'meta' }, categoryName(found.category), found.distanceMeters ? h('span', { class: 'meta-sep', 'aria-hidden': 'true' }) : null,
             found.distanceMeters ? t('vision.away', { d: formatDistance(found.distanceMeters, lang()) }) : null),
-          h('div', { class: 'place-badges' }, CONF[data.confidence] ? h('span', { class: `confidence confidence-${data.confidence}` }, t(CONF[data.confidence])) : null,
-            h('span', { class: 'fine', text: t('vision.name', { source: data.nameSource || 'OpenStreetMap' }) })))));
+          h('div', { class: 'place-badges' }, CONF[data.confidence] ? h('span', { class: `confidence confidence-${data.confidence}` }, t(CONF[data.confidence])) : null))));
       if (facts.length) body.push(h('ul', { class: 'vision-facts' }, facts.map((fact) => h('li', {}, h('span', { class: 'ai-chip' }, icon('sparkle', 'icon-xs'), t('vision.idea')), h('span', { text: fact })))));
       body.push(h('div', { class: 'place-actions' },
         h('button', { class: 'btn btn-gold', type: 'button', onclick: () => { vision = null; openPlace(place); } }, icon('walk'), t('vision.open')),
@@ -170,7 +169,7 @@ function renderVision() {
       categoryArt(item.category, 32, 'art'), h('span', { class: 'row-text' }, h('strong', { text: item.name }), h('small', { text: formatDistance(item.distanceMeters, lang()) })), icon('chevron', 'row-chevron')))));
     }
     body.push(again);
-    if (data.privacy) body.push(h('p', { class: 'fine', text: data.privacy }));
+    body.push(h('p', { class: 'fine', text: t('vision.private') }));
   }
   clear(root, h('section', { class: 'view vision-view', 'aria-labelledby': 'vision-title', 'aria-busy': String(status === 'loading') },
     h('div', { class: 'view-bar' }, back),
