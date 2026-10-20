@@ -1,6 +1,10 @@
 *
 !package.json
+!package-lock.json
 !src/
 !public/
 !scripts/dev.mjs
-!data/pois.json
+!scripts/prepare-public.mjs
+!scripts/demo-answers.mjs
+!data/places.json
+!data/events.json

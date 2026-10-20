@@ -4,7 +4,7 @@
 // Writes docs/test-protocol.json and docs/test-protocol.md.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-import { recommend } from '../src/retrieval.mjs';
+import { recommend, preparedPlaces } from '../src/retrieval.mjs';
 
 const root = new URL('..', import.meta.url);
 const live = process.argv.includes('--live') ? process.argv[process.argv.indexOf('--live') + 1] : null;
@@ -158,7 +158,7 @@ writeFileSync(new URL('docs/test-protocol.json', root), JSON.stringify(protocol,
 
 const md = [`# Протокол тестовых сценариев Aidem (ранее SmartWalk)`, '',
   `Команда Ascension, Build with AI Hackathon 2026, задача НИЦ Smart City «ИИ-помощник по прогулкам в городе Астана».`, '',
-  `Прогон: ${protocol.mode}, коммит \`${commit}\`, база ${places.length} мест, день визита ${DAY} (Астана, UTC+5), ${protocol.date.slice(0, 16).replace('T', ' ')} UTC. Итог: **${passed} из ${results.length} сценариев Pass.**`, '',
+  `Прогон: ${protocol.mode}, коммит \`${commit}\`, база ${preparedPlaces(places).length} мест (${places.length} записей до сведения дублей), день визита ${DAY} (Астана, UTC+5), ${protocol.date.slice(0, 16).replace('T', ' ')} UTC. Итог: **${passed} из ${results.length} сценариев Pass.**`, '',
   'Pass ставится, только если выполнены все проверки сценария и общие проверки формата ответа из задания: не больше трёх мест, время в бюджете, «почему», «чем отличается», время и план у каждого места, источник и уровень уверенности, идея помечена как идея, нет «открыто сейчас», показано, что учтено. Повторить: `node scripts/scenario-protocol.mjs` (движок) или `node scripts/scenario-protocol.mjs --live <адрес сайта>`.', '',
   ...(live ? [] : ['Сценарий M1 (смысловой поиск на эмбеддингах Gemini) идёт только на живом сайте: движку без сети модель недоступна.', '']),
   '| Сценарий | Откуда | Итог |', '|---|---|---|',
