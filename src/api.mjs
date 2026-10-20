@@ -1,4 +1,5 @@
-import { recommend, placeCategory } from './retrieval.mjs';
+import { recommend, placeCategory, meaningWanted } from './retrieval.mjs';
+import { semanticCategories } from './semantic.mjs';
 import { currentWeather } from './weather.mjs';
 import { handleTelegram } from './telegram.mjs';
 import { handleSocial } from './social/routes.mjs';
@@ -417,9 +418,17 @@ export async function handleApi(request, env = {}, dataset = []) {
     const body = await limitedJson(request, 8192);
     if (typeof body.query !== 'undefined' && (typeof body.query !== 'string' || body.query.length > 800)) return json({ error: 'Запрос должен быть текстом до 800 символов' }, 400);
     // Weather comes from the server's own lookup; a weather field in the request body is never read.
-    const result = recommend(pois, body, { weather: body.visitDate ? null : await currentWeather(env) });
+    const weatherNow = body.visitDate ? null : await currentWeather(env);
+    let result = recommend(pois, body, { weather: weatherNow });
     const budget = await rateLimit(request, env);
     if (!budget.allowed) return json({ error: 'Лимит запросов демо исчерпан. Попробуйте позднее.' }, 429, { 'Retry-After': '60' });
+    // Words the dictionary did not understand get one Gemini embedding call (query text only). The dictionary answer
+    // stands when the call fails, finds no clear meaning, or the meant category has nothing within the time.
+    if (budget.generationAllowed && meaningWanted(result)) {
+      const semantic = await semanticCategories(body.query, env);
+      const meant = semantic?.categories.length ? recommend(pois, body, { weather: weatherNow, semantic }) : null;
+      if (meant?.recommendations.length) result = meant;
+    }
     const generation = budget.generationAllowed
       ? await generate(result, body.query, env)
       : { mode: 'fallback', summary: safeSummary(result), references: [], reason: 'request_budget_unavailable' };
