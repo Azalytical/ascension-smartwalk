@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#F4F3EF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0A0F15" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="Агент Aidem на Gemini: сам проверяет погоду, места, часы работы и маршрут и показывает каждый шаг.">
+  <title>Aidem · ИИ-агент</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230E1621'/%3E%3Cpath d='M37.6 16.7A16 16 0 1 0 48 30' fill='none' stroke='%23F5B700' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='43.5' cy='20.5' r='3.6' fill='%234AA8FF'/%3E%3C/svg%3E" type="image/svg+xml">
+  <link rel="stylesheet" href="/agent.css">
+  <script type="module" src="/agent.js"></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/" aria-label="Aidem, на главную" data-i18n-label="brand"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><path d="M37.6 16.7A16 16 0 1 0 48 30"/><circle cx="43.5" cy="20.5" r="3.6"/></svg><span><span class="wm-ai">ai</span>dem</span></a>
+    <div class="langs" id="langs" role="group" aria-label="Язык" data-i18n-label="langs">
+      <button type="button" data-lang="ru" aria-pressed="true" lang="ru">RU</button>
+      <button type="button" data-lang="kk" aria-pressed="false" lang="kk">ҚАЗ</button>
+      <button type="button" data-lang="en" aria-pressed="false" lang="en">EN</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="intro">
+      <span class="badge" data-i18n="badge">ИИ-агент · Gemini</span>
+      <h1 data-i18n="h1">Спросите своими словами</h1>
+      <p data-i18n="intro">Gemini сам решает, что проверить: погоду, места рядом, часы работы, мини-маршрут. Каждый его шаг виден ниже, а факты о местах берутся только из базы мест (OpenStreetMap и Overture Maps).</p>
+    </section>
+
+    <form class="ask" id="ask" autocomplete="off">
+      <div class="voice" id="voice">
+        <button type="button" class="mic" id="mic" aria-label="Говорить с Gemini" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+        </button>
+        <div class="voice-text">
+          <b id="voiceState">Нажмите и говорите</b>
+          <span id="voiceHint">Gemini ответит голосом, потом можно спросить ещё, не касаясь экрана. Русский, қазақша, English.</span>
+        </div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="handsfree" checked> <span data-i18n="handsfree">После ответа слушать продолжение</span></label>
+      <label class="sr" for="query" data-i18n="query.label">Что хотите</label>
+      <textarea id="query" name="query" rows="2" maxlength="500" required placeholder="Например: час свободен, хочу кофе и немного пройтись" data-i18n-placeholder="query.placeholder"></textarea>
+      <div class="examples" id="examples" aria-label="Примеры запросов" data-i18n-label="examples">
+        <button type="button" class="chip" data-q="Час свободен, хочу кофе и немного пройтись" data-i18n="ex.coffee" data-i18n-q="ex.coffee.q">Кофе и прогулка</button>
+        <button type="button" class="chip" data-q="Мы с ребёнком на 2 часа, на улице ветрено" data-min="120" data-child="1" data-i18n="ex.child" data-i18n-q="ex.child.q">С ребёнком</button>
+        <button type="button" class="chip" data-q="Я турист, 2 часа до вылета, что посмотреть поблизости?" data-min="120" data-i18n="ex.tourist" data-i18n-q="ex.tourist.q">Турист, 2 часа</button>
+        <button type="button" class="chip" data-q="Собери маршрут из трёх мест на вечер: музей, прогулка и где поесть" data-min="180" data-i18n="ex.route" data-i18n-q="ex.route.q">Маршрут из 3 мест</button>
+        <button type="button" class="chip" data-q="Тихое место с кофе и Wi-Fi недалеко" data-min="60" data-i18n="ex.wifi" data-i18n-q="ex.wifi.q">Кофе и Wi-Fi</button>
+      </div>
+
+      <fieldset class="row">
+        <legend data-i18n="from">Откуда</legend>
+        <div class="chips" id="starts">
+          <button type="button" class="chip" data-start="me" aria-pressed="false" data-i18n="start.me">Моё место</button>
+          <button type="button" class="chip" data-start="51.1283,71.4304" aria-pressed="true" data-i18n="start.baiterek">Байтерек</button>
+          <button type="button" class="chip" data-start="51.1325,71.4039" aria-pressed="false" data-i18n="start.khan">Хан Шатыр</button>
+          <button type="button" class="chip" data-start="51.0928,71.4215" aria-pressed="false">EXPO</button>
+          <button type="button" class="chip" data-start="51.0891,71.4073" aria-pressed="false">Mega Silk Way</button>
+        </div>
+      </fieldset>
+      <fieldset class="row">
+        <legend data-i18n="time">Сколько времени</legend>
+        <div class="chips" id="minutes">
+          <button type="button" class="chip" data-min="30" aria-pressed="false" data-i18n="time.30">30 мин</button>
+          <button type="button" class="chip" data-min="60" aria-pressed="true" data-i18n="time.60">1 час</button>
+          <button type="button" class="chip" data-min="120" aria-pressed="false" data-i18n="time.120">2 часа</button>
+          <button type="button" class="chip" data-min="180" aria-pressed="false" data-i18n="time.180">3 часа</button>
+        </div>
+      </fieldset>
+      <label class="toggle"><input type="checkbox" id="child"> <span data-i18n="child">С ребёнком</span></label>
+      <button class="btn btn-primary" id="go" type="submit" data-i18n="go">Спросить Gemini</button>
+    </form>
+
+    <section class="result" id="result" hidden aria-live="polite">
+      <h2 data-i18n="result">Как думал агент</h2>
+      <ol class="steps" id="steps"></ol>
+      <div class="answer" id="answer" hidden>
+        <div class="answer-head">
+          <span class="who" id="who">Gemini</span>
+          <button class="btn btn-ghost btn-small" id="speak" type="button" data-i18n="speak">Озвучить</button>
+        </div>
+        <p class="you" id="you"></p>
+        <p class="summary" id="summary"></p>
+        <div id="route"></div>
+        <ul class="places" id="places"></ul>
+        <p class="privacy" id="privacy"></p>
+      </div>
+    </section>
+
+    <section class="vision">
+      <h2 data-i18n="v.title">Что это за здание?</h2>
+      <p data-i18n="v.text">Наведите камеру на здание: Gemini сравнит фото с местами рядом из нашей базы. Название берётся из нашей базы мест, факты помечены «идея ИИ».</p>
+      <label class="btn btn-gold" for="photo" data-i18n="v.button">Сфотографировать</label>
+      <input class="sr" id="photo" type="file" accept="image/*" capture="environment">
+      <div class="vision-out" id="vision" aria-live="polite"></div>
+    </section>
+
+    <section class="connect">
+      <h2 data-i18n="c.title">Aidem в вашем ИИ</h2>
+      <p data-i18n="c.text">Те же инструменты открыты как MCP-сервер: Gemini CLI, агенты на Google ADK, Claude и другие ИИ-клиенты могут планировать прогулки по Астане.</p>
+      <div class="code"><code id="mcp-url"></code><button class="btn btn-ghost btn-small" type="button" data-copy="mcp-url" data-i18n="c.copy">Копировать</button></div>
+      <p class="label" data-i18n="c.cli">Gemini CLI, одной командой:</p>
+      <div class="code"><code id="gemini-cmd">gemini extensions install https://github.com/Azalytical/ascension-smartwalk</code><button class="btn btn-ghost btn-small" type="button" data-copy="gemini-cmd" data-i18n="c.copy">Копировать</button></div>
+      <p class="hint" data-i18n="c.hint">Инструменты: plan_walk, search_places, place_details, build_route, get_weather. Пример для Google ADK лежит в репозитории: integrations/adk.</p>
+    </section>
+  </main>
+
+  <footer class="foot" data-i18n="foot">Места: © участники OpenStreetMap (ODbL), Overture Maps Foundation (CDLA-Permissive-2.0). Погода: Open-Meteo.com (CC BY 4.0). ИИ: Gemini API. Время пешком — оценка, не обещание.</footer>
+</body>
+</html>

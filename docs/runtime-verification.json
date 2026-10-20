@@ -1,65 +1,56 @@
 {
-  "checkedAt": "2026-10-19T11:53:09.467038+00:00",
-  "site": "https://ascension-smartwalk-astana.azamatbreach.chatgpt.site",
+  "checkedAt": "2026-10-20T11:22:00+00:00",
+  "site": "https://ascension-smartwalk.azamatbreach.workers.dev",
+  "host": "Cloudflare Workers",
   "repository": "https://github.com/Azalytical/ascension-smartwalk",
-  "automatedTests": {
-    "passed": 23,
-    "failed": 0,
-    "command": "npm test"
+  "method": "HTTP GET of the public pages and /api/status from outside the team network",
+  "status": {
+    "endpoint": "/api/status",
+    "poiCount": 2255,
+    "snapshotUpdatedAt": "2026-10-20T09:54:00+00:00",
+    "sources": {
+      "OpenStreetMap": 1454,
+      "Overture Maps · Meta": 757,
+      "Overture Maps · Foursquare": 22,
+      "Overture Maps · Microsoft": 16,
+      "Overture Maps · AllThePlaces": 6
+    },
+    "licenses": [
+      "ODbL-1.0",
+      "CDLA-Permissive-2.0",
+      "Apache-2.0",
+      "CC0-1.0"
+    ],
+    "version": "1.2.0",
+    "generationAvailable": true,
+    "generationProvider": "gemini",
+    "socialEnabled": true,
+    "endpoints": [
+      "/mcp",
+      "/agent",
+      "/api/vision",
+      "/api/speak",
+      "/api/listen",
+      "/api/weather"
+    ]
   },
-  "browserChecks": [
+  "pages": [
     {
-      "scenario": "coffee45",
-      "observed": "Gasteria31;Starbucks31;Лепим и варим33;each includes return and5minute reserve",
-      "generation": "llm",
-      "evidence": "deliverables/screenshots/coffee-results.png"
+      "path": "/",
+      "title": "Aidem: прогулка по Астане ровно на ваше время"
     },
     {
-      "scenario": "child60_maxWalk10",
-      "observed": "Сквер,10+15+10+5=40minutes;unsupported safety/accessibility not asserted",
-      "generation": "llm",
-      "evidence": "deliverables/screenshots/child.png"
-    },
-    {
-      "scenario": "lateCoffeeSockets",
-      "observed": "Degirmen,CrepeCafe,Drinkit;socket/noise/open-now not confirmed",
-      "generation": "llm",
-      "evidence": "deliverables/screenshots/unknown.png"
+      "path": "/watch",
+      "title": "Aidem · часы",
+      "observed": "«Куда?», 🎤, категории, «Есть 45 мин», «От моего места», «Встречи»"
     }
   ],
-  "scope": "Three scenarios observed on deployed UI; the additional scenarios document is a test plan, not a claim all scenarios were executed.",
-  "geminiDeploy": {
-    "checkedAt": "2026-10-19T12:45:00+00:00",
-    "site": "https://ascension-smartwalk.azamatbreach.workers.dev",
-    "host": "Cloudflare Workers",
-    "status": {
-      "poiCount": 930,
-      "generationAvailable": true,
-      "generationProvider": "gemini",
-      "version": "1.1.0"
-    },
-    "recommendRequest": {
-      "lat": 51.1283,
-      "lon": 71.4304,
-      "minutes": 90,
-      "query": "идёт дождь, хочу поесть"
-    },
-    "recommendResponse": {
-      "http": 200,
-      "mode": "llm",
-      "provider": "gemini",
-      "model": "gemini-3.8-flash",
-      "references": [
-        "osm:node:10598438988",
-        "osm:node:12909752901",
-        "osm:node:7670738828"
-      ]
-    },
-    "automatedTests": {
-      "passed": 35,
-      "failed": 0,
-      "command": "npm test"
-    },
-    "note": "The browserChecks above were made on the earlier chatgpt.site deployment with OpenAI."
-  }
+  "automatedTests": {
+    "passed": 117,
+    "failed": 0,
+    "command": "npm test",
+    "commit": "88c51de"
+  },
+  "scenarioProtocol": "docs/test-protocol.md: 15 of 15 Pass on the engine without Gemini. A live run with Gemini (node scripts/scenario-protocol.mjs --live <site>) is done from the team PC and is recorded separately.",
+  "scope": "This file records only what was observed on the live site at checkedAt. It does not claim that Gemini text quality, opening hours or place attributes were verified."
 }

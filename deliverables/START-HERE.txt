@@ -1,27 +1,30 @@
-ASCENSION · SMARTWALK · BUILD WITH AI 2026
+ASCENSION · AIDEM · BUILD WITH AI 2026
 
-Проект: «Успею вернуться», секция AI for Smart City.
+Проект: Aidem. Прогулка по Астане, ровно на ваше время. Секция AI for Smart City.
+Aidem (ранее SmartWalk). Название от «айда» и «идём»: оно звучит как приглашение, и в нём есть AI. Прежнее имя осталось в адресе сайта и репозитория.
 
 Работающий прототип:
 https://ascension-smartwalk.azamatbreach.workers.dev
+Часы: https://ascension-smartwalk.azamatbreach.workers.dev/watch
+Агент Gemini с шагами: https://ascension-smartwalk.azamatbreach.workers.dev/agent
 
-Видеообзор на YouTube (доступ по ссылке):
-https://youtu.be/EKrwOn43a5w
+Видео (3:41):
+файл в репозитории: deliverables/video/aidem-final.mp4
+https://github.com/Azalytical/ascension-smartwalk/blob/main/deliverables/video/aidem-final.mp4
+YouTube (доступ по ссылке): https://youtu.be/7eWd4-gZa_I
 
 Репозиторий:
 https://github.com/Azalytical/ascension-smartwalk
 
-Презентация (11 слайдов): ascension-smartwalk-presentation.pdf, исходник в deck/index.html (открыть в браузере).
-Прежняя редактируемая версия: ascension-smartwalk-presentation.pptx
-Сценарии и ограничения: ascension-smartwalk-tests-and-limitations.pdf
-Речь и демонстрация: ascension-smartwalk-defense-and-screencast.pdf
-Локальное видео: ascension-smartwalk-demo.mp4
+Презентация (14 слайдов, 6 минут): ascension-smartwalk-presentation.pdf, живая версия с анимацией в deck/index.html (открыть в Chrome или Edge).
+Сценарии, ограничения и этика: ascension-smartwalk-tests-and-limitations.pdf (протокол 15 сценариев с Pass/Fail)
+Концепция и бизнес-идея: docs/concept.md, как работает RAG: docs/how-it-works.md, этика: docs/ethics.md,
+интеграции с Google: docs/integrations.md, запуск и деплой: docs/deploy.md (всё в репозитории)
 
-930 канонических POI из 933 исходных записей OpenStreetMap.
-35 автоматизированных тестов пройдены. Генерация: Gemini (gemini-3.5-flash-lite на демо), запасной ответ без модели.
-Три сценария ранее проверены в опубликованном интерфейсе.
-Каждая карточка — отдельная альтернатива, а не часть общего маршрута.
+2058 мест Астаны из OpenStreetMap и Overture Maps (2255 записей до сведения дублей), собраны скриптами.
+197 автоматических тестов пройдены, 15 из 15 тестовых сценариев Pass. Генерация: Gemini (gemini-3.5-flash-lite на демо), запасной ответ без модели.
+Карточки — 1–3 альтернативы; при запасе от 45 минут дополнительно предлагается мини-маршрут из трёх мест.
 Пешее время является оценкой по расстоянию. Открытие и условия посещения не гарантируются.
 
-Данные © OpenStreetMap contributors, ODbL 1.0.
+Данные © OpenStreetMap contributors, ODbL 1.0, и Overture Maps Foundation.
 https://www.openstreetmap.org/copyright

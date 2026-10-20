@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- Apple Watch renders pages at a shrunk desktop width unless the page opts out of the adaptation. -->
+  <meta name="disabled-adaptations" content="watch">
+  <meta name="theme-color" content="#0A0F15">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Aidem на часах: куда пойти, сколько идти и когда пора обратно." data-t-content="page.description">
+  <title data-t="page.title">Aidem · часы</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230E1621'/%3E%3Cpath d='M37.6 16.7A16 16 0 1 0 48 30' fill='none' stroke='%23F5B700' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='43.5' cy='20.5' r='3.6' fill='%234AA8FF'/%3E%3C/svg%3E" type="image/svg+xml">
+  <link rel="stylesheet" href="/watch.css">
+  <script src="/watch-text.js" defer></script>
+  <script src="/watch-remind.js" defer></script>
+  <script src="/watch.js" defer></script>
+</head>
+<body>
+  <div class="stage">
+    <div class="device" id="device">
+      <div class="crown" aria-hidden="true"></div>
+      <main class="screen" id="screen">
+        <section class="view view-home" id="view-home" aria-labelledby="home-title">
+          <p class="clock" aria-hidden="true"><svg class="mark" viewBox="0 0 64 64"><path d="M37.6 16.7A16 16 0 1 0 48 30"/><circle cx="43.5" cy="20.5" r="3.6"/></svg><span id="clock">--:--</span></p>
+          <h1 class="title" id="home-title" data-t="home.title">Куда?</h1>
+          <!-- The mic is a label for the field: on Apple Watch a tap opens watchOS dictation; where the browser can listen, watch.js records instead. -->
+          <form class="search" id="search-form" role="search" action="#">
+            <input class="search-input" id="search-input" type="search" name="q" placeholder="Найти место" data-t-placeholder="search.placeholder" enterkeyhint="search" autocomplete="off" aria-label="Найти место по названию или задать вопрос" data-t-aria="search.aria" maxlength="120">
+            <label class="voice" id="voice" for="search-input" role="button" tabindex="0" aria-label="Сказать голосом, куда идти" data-t-aria="search.voice">🎤</label>
+          </form>
+          <button class="chip chip-ai" id="ai-chip" type="button"><span class="spark" aria-hidden="true">✦</span> <b data-t="ai.chip">Спросить ИИ</b></button>
+          <div class="moods">
+            <button class="mood" type="button" data-mood="coffee"><img src="/assets/icons/categories/coffee-64.webp" alt="" width="32" height="32"><span data-t="mood.coffee">Кофе</span></button>
+            <button class="mood" type="button" data-mood="park"><img src="/assets/icons/categories/park-64.webp" alt="" width="32" height="32"><span data-t="mood.park">Парк</span></button>
+            <button class="mood" type="button" data-mood="child"><img src="/assets/icons/categories/family-64.webp" alt="" width="32" height="32"><span data-t="mood.child">С детьми</span></button>
+            <button class="mood" type="button" data-mood="indoor"><img src="/assets/icons/categories/indoor-64.webp" alt="" width="32" height="32"><span data-t="mood.indoor">Под крышей</span></button>
+            <button class="mood" type="button" data-mood="food"><img src="/assets/icons/categories/food-64.webp" alt="" width="32" height="32"><span data-t="mood.food">Поесть</span></button>
+            <button class="mood" type="button" data-mood="sights"><img src="/assets/icons/categories/landmark-64.webp" alt="" width="32" height="32"><span data-t="mood.sights">Интересное</span></button>
+          </div>
+          <button class="chip" id="time-chip" type="button" aria-label="Время на прогулку, нажмите, чтобы изменить" data-t-aria="time.aria"><span class="chip-label" data-t="time.label">Есть</span> <b id="time-value">45</b> <span data-t="min">мин</span></button>
+          <button class="chip chip-start" id="start-chip" type="button" aria-label="Откуда идём, нажмите, чтобы изменить" data-t-aria="start.aria"><span class="chip-label" data-t="start.label">От</span> <b id="start-value">моего места</b></button>
+          <button class="chip chip-meet" id="meet-chip" type="button"><span aria-hidden="true">👥</span> <b data-t="meet.chip">Встречи</b><span class="count" id="meet-count" hidden></span></button>
+          <p class="footnote">© OpenStreetMap contributors, Overture Maps Foundation</p>
+        </section>
+
+        <!-- The assistant: the same Gemini agent as /agent on the phone. Apple Watch answers through its own dictation in the field. -->
+        <section class="view view-ask" id="view-ask" aria-labelledby="ask-title" hidden>
+          <h2 class="ask-title" id="ask-title"><span class="spark" aria-hidden="true">✦</span> <span data-t="ask.title">Спросите Aidem</span></h2>
+          <p class="ask-context" id="ask-context" hidden></p>
+          <form class="search" id="ask-form" action="#">
+            <input class="search-input" id="ask-input" type="text" name="q" placeholder="Ваш вопрос" data-t-placeholder="ask.placeholder" enterkeyhint="send" autocomplete="off" aria-label="Вопрос помощнику Aidem" data-t-aria="ask.aria" maxlength="300">
+            <label class="voice" id="ask-voice" for="ask-input" role="button" tabindex="0" aria-label="Спросить голосом" data-t-aria="ask.voice">🎤</label>
+          </form>
+          <div class="examples" id="ask-examples"></div>
+          <button class="action ghost" id="ask-home" type="button" data-t="back">Назад</button>
+          <button class="text-button" id="ask-reset" type="button" hidden data-t="ask.reset">Новый разговор</button>
+        </section>
+
+        <section class="view view-loading" id="view-loading" hidden>
+          <div class="spinner" aria-hidden="true"></div>
+          <p class="loading-text" id="loading-text" role="status" data-t="loading.near">Ищем рядом…</p>
+        </section>
+
+        <section class="view view-results" id="view-results" aria-label="Варианты прогулки" data-t-aria="results.aria" hidden>
+          <div class="results" id="results"></div>
+          <div class="results-end">
+            <button class="action" id="ask-more" type="button" hidden><span class="spark" aria-hidden="true">✦</span>&nbsp;<span data-t="ask.more">Спросить ещё</span></button>
+            <button class="action ghost" id="ask-gemini" type="button" data-t="gemini.ask">Почему эти? · Gemini</button>
+            <p class="tip" id="gemini-tip" role="status" hidden></p>
+            <button class="action ghost" id="back-home" type="button" data-t="back">Назад</button>
+          </div>
+        </section>
+
+        <section class="view view-go" id="view-go" aria-label="Прогулка" data-t-aria="go.aria" hidden>
+          <!-- The brand ring as a clock: planned there / stay / back / reserve, a blue dot for now. -->
+          <svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
+            <g id="ring-plan" class="ring-plan" transform="rotate(-90 50 50)"></g>
+            <g id="ring-done" class="ring-done" transform="rotate(-90 50 50)"></g>
+            <circle id="ring-dot" class="ring-dot" cx="50" cy="3.5" r="3.4"></circle>
+          </svg>
+          <div class="north" id="north" aria-hidden="true"><span data-t="go.north">С</span></div>
+          <p class="go-phase" id="go-phase" data-t="go.there">Туда</p>
+          <p class="go-name" id="go-name"></p>
+          <div class="go-main">
+            <div class="arrow-wrap" aria-hidden="true">
+              <svg class="arrow" id="arrow" viewBox="0 0 64 64"><path d="M32 4 54 56 32 45 10 56Z"/></svg>
+            </div>
+            <p class="go-big" aria-live="polite"><b id="go-minutes">–</b><span id="go-unit" data-t="min">мин</span></p>
+          </div>
+          <p class="go-back" id="go-back"></p>
+          <div class="go-actions">
+            <button class="action" id="go-next" type="button" data-t="go.here">Я на месте</button>
+            <button class="icon-button" id="go-stop" type="button" aria-label="Закончить прогулку" data-t-aria="go.stop">✕</button>
+          </div>
+          <p class="demo-badge" id="demo-badge" hidden>ДЕМО ×30</p>
+        </section>
+
+        <section class="view view-link" id="view-link" aria-labelledby="link-title" hidden>
+          <p class="link-mark" aria-hidden="true">👥</p>
+          <h2 class="link-title" id="link-title" data-t="link.title">Встречи и друзья</h2>
+          <p class="link-text" id="link-text" data-t="link.text">На телефоне: Aidem → Профиль → ⌚ Связать часы</p>
+          <button class="action" id="link-enter" type="button" data-t="link.enter">Ввести код</button>
+          <button class="action ghost" id="link-home" type="button" data-t="back">Назад</button>
+        </section>
+
+        <section class="view view-pair" id="view-pair" aria-label="Код с телефона" data-t-aria="pair.aria" hidden>
+          <p class="pair-code" id="pair-code" role="status" aria-label="Код с телефона" data-t-aria="pair.aria"><span></span><span></span><span></span><span></span><span></span><span></span></p>
+          <div class="keypad" id="keypad">
+            <button type="button" data-key="1">1</button><button type="button" data-key="2">2</button><button type="button" data-key="3">3</button>
+            <button type="button" data-key="4">4</button><button type="button" data-key="5">5</button><button type="button" data-key="6">6</button>
+            <button type="button" data-key="7">7</button><button type="button" data-key="8">8</button><button type="button" data-key="9">9</button>
+            <button type="button" data-key="back" class="key-soft" aria-label="Назад" data-t-aria="back">✕</button><button type="button" data-key="0">0</button><button type="button" data-key="del" class="key-soft" aria-label="Стереть цифру" data-t-aria="pair.delete">⌫</button>
+          </div>
+        </section>
+
+        <section class="view view-meet" id="view-meet" aria-label="Встречи и друзья" data-t-aria="meet.aria" hidden>
+          <div class="results" id="meetups"></div>
+          <div class="results-end">
+            <button class="action ghost" id="meet-refresh" type="button" data-t="meet.refresh">Обновить</button>
+            <button class="action ghost" id="meet-home" type="button" data-t="back">Назад</button>
+            <button class="text-button" id="meet-unlink" type="button" data-t="meet.unlink">Отвязать часы</button>
+          </div>
+        </section>
+
+        <section class="view view-done" id="view-done" hidden>
+          <p class="done-mark" aria-hidden="true">✓</p>
+          <h2 class="title" id="done-title" data-t="done.back">Вы вернулись</h2>
+          <p class="done-text" id="done-text"></p>
+          <button class="action" id="done-home" type="button" data-t="done.more">Ещё прогулка</button>
+        </section>
+
+        <section class="view view-error" id="view-error" hidden>
+          <p class="error-text" id="error-text" role="alert"></p>
+          <button class="action" id="error-retry" type="button" data-t="error.retry">Ещё раз</button>
+          <button class="action ghost" id="error-home" type="button" data-t="back">Назад</button>
+        </section>
+      </main>
+    </div>
+
+    <aside class="caption" aria-label="О версии для часов" data-t-aria="caption.aria">
+      <p class="kicker"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><path d="M37.6 16.7A16 16 0 1 0 48 30"/><circle cx="43.5" cy="20.5" r="3.6"/></svg><span data-t="caption.kicker">aidem · часы</span></p>
+      <h2 data-t="caption.title">Взгляните на запястье: куда идти, сколько и когда обратно.</h2>
+      <p data-t="caption.walk">Выберите настроение, и часы покажут стрелку к месту, минуты пешком и кольцо времени: туда, на месте, обратно. Синяя точка идёт по кольцу. Когда пора возвращаться, приходит уведомление «Пора обратно», и его повторяют любые часы или браслет, подключённые к телефону.</p>
+      <p data-t="caption.meet">«Встречи»: привяжите часы кодом с телефона, и они покажут ваши встречи, кто уже в пути и стрелку к месту встречи или к другу.</p>
+      <div class="segmented" role="group" aria-label="Форма часов" data-t-aria="caption.shape">
+        <button type="button" data-shape="round" aria-pressed="true" data-t="caption.round">Круглые</button>
+        <button type="button" data-shape="square" aria-pressed="false">Apple Watch</button>
+      </div>
+      <label class="demo-toggle"><input type="checkbox" id="demo-toggle"> <span data-t="caption.demo">Демо-прогулка: время ×30</span></label>
+      <p class="open-on-watch"><span data-t="caption.open">На часах откройте </span><b id="watch-url">/watch</b></p>
+      <a class="caption-link" href="/" data-t="caption.full">← Полная версия Aidem</a>
+    </aside>
+  </div>
+</body>
+</html>

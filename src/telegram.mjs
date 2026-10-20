@@ -4,6 +4,7 @@
  * secret token header, 30-minute in-memory session) come from the Ascension HackAlem bot.
  */
 import { recommend } from './retrieval.mjs';
+import { coarse } from './privacy.mjs';
 
 const SESSION_TTL_MS = 30 * 60 * 1000;
 const MAX_SESSIONS = 2000;
@@ -57,12 +58,15 @@ function formatResult(result, generation) {
   result.recommendations.forEach((place, index) => {
     lines.push(`<b>${index + 1}. ${escape(place.name)}</b>`,
       `~${place.walkMinutes} мин туда · ~${place.totalMinutes} мин всего с возвращением`,
-      escape(place.why),
+      ...(generation?.places?.[place.id] ? [`✨ ${escape(generation.places[place.id].why)}`, `🧭 ${escape(generation.places[place.id].todo)}`]
+        : [escape(place.why), ...(place.plan?.text ? [`🧭 ${escape(place.plan.text)}`] : [])]),
+      ...(place.confidence ? [`${{ high: '🟢', medium: '🟡', low: '🟠' }[place.confidence.level] ?? '•'} ${escape(place.confidence.label)}: ${escape(place.confidence.reasons.join('; ') || 'по данным источника')}`] : []),
       `⚠️ ${escape(place.warnings[0])}`,
-      `<a href="${escape(place.sourceUrl)}">Источник: OpenStreetMap</a>`, '');
+      `<a href="${escape(place.sourceUrl)}">Источник: ${escape(place.source?.label ?? 'OpenStreetMap')}</a>`, '');
   });
+  if (result.route) lines.push(`<b>🗺 ${escape(result.route.label)}</b>`, escape(result.route.summary), '');
   lines.push(generation?.mode === 'llm'
-    ? 'Первую строку написал Gemini только по данным этих карточек. Время, расстояние и часы считает сервер.'
+    ? 'Строки курсивом и со ✨ написал Gemini только по данным этих карточек. Время, расстояние и часы считает сервер.'
     : 'Подбор составлен по данным мест без языковой модели.');
   return lines.join('\n');
 }
@@ -85,7 +89,8 @@ export async function handleTelegram(request, env, pois, generate, now = Date.no
     const { latitude: lat, longitude: lon } = message.location;
     try { recommend([], { lat, lon }); }
     catch { return reply(chatId, 'Эта точка вне Астаны. Сейчас я работаю только по Астане.'); }
-    remember(chatId, lat, lon, now);
+    // Telegram hands over the exact point; only the rounded cell is kept for the 30 minutes.
+    remember(chatId, coarse(lat), coarse(lon), now);
     return reply(chatId, 'Точка получена. Что хотите и сколько у вас времени? Например: «кофе, есть час» или «с ребёнком на 2 часа».');
   }
   const text = typeof message.text === 'string' ? message.text.trim().slice(0, 500) : '';

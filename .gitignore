@@ -10,15 +10,16 @@ tmp/
 src/assets.generated.mjs
 .openai/.local/
 docs/.build/
-video/build/
-video/tools/
+archive/first-submission/video/build/
+archive/first-submission/video/tools/
 deliverables/slide-previews/
 deliverables/*-r*.pptx
 deliverables/*-demo.mp4
 deliverables/*-submission.zip
 deliverables/evidence/
-
-# Local browser evidence
-.playwright-cli/
-output/
-.impeccable/review/
+__pycache__/
+public/vendor/
+public/data/
+public/js/lib/
+public/sw.js
+deliverables/submission-package-manifest.json

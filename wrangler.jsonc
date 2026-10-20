@@ -6,8 +6,21 @@
   "compatibility_date": "2026-10-01",
   "workers_dev": true,
   // Without D1 or a rate limiter binding, the in-isolate budget (8/min per address, 500/day) gates generation.
-  // Free tier: gemini-3.8-flash allows 20 requests a day, gemini-3.5-flash-lite 500 a day and 15 a minute.
-  "vars": { "MEMORY_BUDGET": "1", "GEMINI_MODEL": "gemini-3.5-flash-lite" },
+  // Free tier: gemini-3.8-flash allows 20 requests a day. The walk text, photo and voice start on gemini-3.1-flash-lite and
+  // hand over to gemini-3.5-flash-lite when it is busy (3.5 answered 503 under load on 20 Oct).
+  "vars": { "MEMORY_BUDGET": "1", "GEMINI_MODEL": "gemini-3.1-flash-lite", "WEATHER": "1" },
   // Run next to Google: from Cloudflare's Astana location the Gemini API is unreachable and every answer falls back.
-  "placement": { "region": "gcp:europe-west1" }
+  "placement": { "region": "gcp:europe-west1" },
+  // Workers Logs keep only what the code writes (errors, without coordinates). Invocation logs are off: they would store
+  // each request URL, and Siri's /api/watch/ask carries the phone's point in its query string.
+  "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": false } },
+  // Friends, location sharing, meetups and events: one SQLite-backed Durable Object per city (available on the Workers Free plan).
+  // Watch reminders ("time to head back" via Web Push): VAPID keys and pending reminders, woken by an alarm.
+  // City events: the sxodim.com listing the Worker collects itself, kept with the state of the last collection.
+  "durable_objects": { "bindings": [{ "name": "SOCIAL", "class_name": "SocialHub" }, { "name": "WATCH_PUSH", "class_name": "WatchPush" },
+    { "name": "CITY_EVENTS_STORE", "class_name": "CityEventsStore" }] },
+  "migrations": [{ "tag": "social-v1", "new_sqlite_classes": ["SocialHub"] }, { "tag": "watch-v1", "new_sqlite_classes": ["WatchPush"] },
+    { "tag": "events-v1", "new_sqlite_classes": ["CityEventsStore"] }],
+  // 00:50 UTC is 05:50 in Astana: the listing is collected before the morning walks.
+  "triggers": { "crons": ["50 0 * * *"] }
 }
