@@ -18,19 +18,25 @@ const MONTHS = { января: 1, февраля: 2, марта: 3, апреля
 export const EVENT_SOURCE = { id: 'sxodim', label: 'sxodim.com', url: 'https://sxodim.com/astana/afisha' };
 export const EVENT_NOTE = 'Из афиши sxodim.com: время и билеты уточняйте на странице события.';
 
+const DAY_LIST = new RegExp(`(?<![\\d:])(\\d{1,2})((?:\\s*(?:[-–—]|,|и)\\s*\\d{1,2})+)\\s+(${Object.keys(MONTHS).join('|')})`, 'giu');
 const pad = number => String(number).padStart(2, '0');
 const isoDay = (year, month, day) => `${year}-${pad(month)}-${pad(day)}`;
 
 /**
  * When an event runs, from the date text of the listing: «31 октября в 17:00», «18 октября - 28 ноября»,
- * «20 октября и 27 октября». The listing gives no year: dates are taken in the collection year, and a range that ends
+ * «18 - 20 октября», «20 октября и 27 октября». The listing gives no year: dates are taken in the collection year, and a range that ends
  * before it starts ends the next year. Null when the listing gives no date.
  */
-export function parseWhen(text, year) {
-  const dates = [...String(text || '').matchAll(/(\d{1,2})\s+([а-я]+)/giu)]
+export function parseWhen(source, year) {
+  // «18 - 20 октября» and «20, 21 и 22 октября»: every day gets its month first.
+  const text = String(source || '').replace(DAY_LIST, (whole, first, rest, month) => {
+    const days = [first, ...rest.match(/\d{1,2}/g)];
+    return /^\s*[-–—]/.test(rest) && days.length === 2 ? `${first} ${month} - ${days[1]} ${month}` : days.map(day => `${day} ${month}`).join(' и ');
+  });
+  const dates = [...text.matchAll(/(\d{1,2})\s+([а-я]+)/giu)]
     .map(([, day, month]) => ({ day: Number(day), month: MONTHS[month.toLowerCase()] })).filter(date => date.month && date.day >= 1 && date.day <= 31);
   if (!dates.length) return null;
-  const time = String(text).match(/(?:^|\s)в\s+(\d{1,2}):(\d{2})/u);
+  const time = text.match(/(?:^|\s)в\s+(\d{1,2}):(\d{2})/u);
   const at = time ? `${pad(time[1])}:${time[2]}` : null;
   if (/\d\s+[а-я]+\s*[-–—]\s*\d/iu.test(text) && dates.length === 2) {
     const [from, to] = dates;

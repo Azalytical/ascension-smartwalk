@@ -15,6 +15,11 @@
   "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": false } },
   // Friends, location sharing, meetups and events: one SQLite-backed Durable Object per city (available on the Workers Free plan).
   // Watch reminders ("time to head back" via Web Push): VAPID keys and pending reminders, woken by an alarm.
-  "durable_objects": { "bindings": [{ "name": "SOCIAL", "class_name": "SocialHub" }, { "name": "WATCH_PUSH", "class_name": "WatchPush" }] },
-  "migrations": [{ "tag": "social-v1", "new_sqlite_classes": ["SocialHub"] }, { "tag": "watch-v1", "new_sqlite_classes": ["WatchPush"] }]
+  // City events: the sxodim.com listing the Worker collects itself, kept with the state of the last collection.
+  "durable_objects": { "bindings": [{ "name": "SOCIAL", "class_name": "SocialHub" }, { "name": "WATCH_PUSH", "class_name": "WatchPush" },
+    { "name": "CITY_EVENTS_STORE", "class_name": "CityEventsStore" }] },
+  "migrations": [{ "tag": "social-v1", "new_sqlite_classes": ["SocialHub"] }, { "tag": "watch-v1", "new_sqlite_classes": ["WatchPush"] },
+    { "tag": "events-v1", "new_sqlite_classes": ["CityEventsStore"] }],
+  // 00:50 UTC is 05:50 in Astana: the listing is collected before the morning walks.
+  "triggers": { "crons": ["50 0 * * *"] }
 }

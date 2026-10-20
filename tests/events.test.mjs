@@ -16,6 +16,8 @@ test('dates are read the way the listing writes them', () => {
   assert.deepEqual(parseWhen('18 октября - 28 ноября', 2026), { from: '2026-10-18', to: '2026-11-28', time: null });
   assert.deepEqual(parseWhen('20 октября и 27 октября', 2026), { dates: ['2026-10-20', '2026-10-27'], time: null });
   assert.deepEqual(parseWhen('6 декабря - 27 января', 2026), { from: '2026-12-06', to: '2027-01-27', time: null }, 'a range across the new year');
+  assert.deepEqual(parseWhen('18 - 20 октября в 20:00', 2026), { from: '2026-10-18', to: '2026-10-20', time: '20:00' }, 'days of one month');
+  assert.deepEqual(parseWhen('20, 21 и 22 октября', 2026), { dates: ['2026-10-20', '2026-10-21', '2026-10-22'], time: null });
   assert.equal(parseWhen(null, 2026), null);
 });
 

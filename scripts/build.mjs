@@ -2,6 +2,7 @@ import { readFile, mkdir, copyFile, readdir } from 'node:fs/promises';
 import { resolve, extname, relative, sep } from 'node:path';
 import { build } from 'esbuild';
 import { preparePublic } from './prepare-public.mjs';
+import { venueIndexData } from '../src/events-venues.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const publicRoot = resolve(root, 'public');
@@ -30,14 +31,19 @@ if (assets['/watch.html']) assets['/watch'] = assets['/watch.html'];
 if (assets['/friends.html']) assets['/friends'] = assets['/friends.html'];
 if (assets['/agent.html']) assets['/agent'] = assets['/agent.html'];
 const data = JSON.parse(await readFile(resolve(root, 'data/places.json'), 'utf8'));
+// Venue names and addresses for placing city events, worked out here so the Worker does not spend its CPU budget on them.
+const venues = venueIndexData(Array.isArray(data) ? data : data.pois);
 const code = `import {handleApi,prepareApi} from './src/api.mjs';
 import {prepareDataset} from './src/retrieval.mjs';
+import {prepareCityEvents,refreshCityEvents} from './src/events-live.mjs';
 export {SocialHub} from './src/social/hub.mjs';
 export {WatchPush} from './src/watch-push.mjs';
+export {CityEventsStore} from './src/events-live.mjs';
 const assets=${JSON.stringify(assets)};
 const data=${JSON.stringify(data)};
 prepareDataset(data);
 prepareApi(data);
+prepareCityEvents(data,${JSON.stringify(venues)});
 const cacheFor=path=>path==='/'||path.endsWith('.html')||path==='/watch'||path==='/friends'||path==='/agent'||path==='/sw.js'?'no-cache':path.startsWith('/vendor/')||path.startsWith('/assets/')?'public,max-age=86400':'public,max-age=120';
 // Bodies are decoded once per isolate and reused, which keeps each request well under the CPU limit.
 const decoded=new Map();
@@ -49,7 +55,9 @@ export default {async fetch(request,env,ctx){
   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
   const body=request.method==='HEAD'?null:bytesOf(url.pathname,asset);
   return new Response(body,{headers:{'Content-Type':asset.type,'X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','Cache-Control':cacheFor(url.pathname)}});
-}};`;
+},
+// Cron Trigger (wrangler.jsonc): today's collection of the sxodim.com listing.
+async scheduled(controller,env,ctx){ctx.waitUntil(refreshCityEvents(env));}};`;
 await mkdir(resolve(root, 'dist/server'), { recursive: true });
 await mkdir(resolve(root, 'dist/.openai'), { recursive: true });
 await build({ stdin: { contents: code, resolveDir: root, sourcefile: 'smartwalk-worker.mjs' }, bundle: true, platform: 'browser', format: 'esm', target: 'es2022', minify: true, outfile: resolve(root, 'dist/server/index.js') });
