@@ -81,7 +81,7 @@ export async function handleSocial(request, env, dataset) {
   const url = new URL(request.url);
   const name = url.pathname.slice('/api/social/'.length);
   const origin = request.headers.get('Origin');
-  if (origin && origin !== url.origin) return json({ error: 'Запрос должен исходить с сайта Ulger' }, 403);
+  if (origin && origin !== url.origin) return json({ error: 'Запрос должен исходить с сайта Aidem' }, 403);
   if (name === 'places') return request.method === 'GET' ? searchPlaces(url, dataset) : json({ error: 'Метод не поддерживается' }, 405);
   const hub = socialHub(env);
   if (!hub) return json({ error: 'Друзья и встречи на этом сервере выключены', code: 'SOCIAL_DISABLED' }, 503);

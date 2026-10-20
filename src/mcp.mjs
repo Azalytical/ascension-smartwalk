@@ -1,11 +1,11 @@
-// Ulger as a remote MCP server (Streamable HTTP, stateless, JSON responses) at /mcp.
-// Gemini CLI, Google ADK agents, Claude and other MCP clients call the same tools as the Ulger agent.
+// Aidem as a remote MCP server (Streamable HTTP, stateless, JSON responses) at /mcp.
+// Gemini CLI, Google ADK agents, Claude and other MCP clients call the same tools as the Aidem agent.
 import { TOOLS, runTool, ToolError } from './tools.mjs';
 
 const VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
-const SERVER = { name: 'ulger', title: 'Ulger — прогулки по Астане', version: '2.0.0',
+const SERVER = { name: 'aidem', title: 'Aidem — прогулки по Астане', version: '2.0.0',
   websiteUrl: 'https://ascension-smartwalk.azamatbreach.workers.dev' };
-const INSTRUCTIONS = 'Ulger подбирает прогулки по Астане ровно на время человека. Начинайте с plan_walk (нужны lat и lon старта; если человек назвал место, '
+const INSTRUCTIONS = 'Aidem подбирает прогулки по Астане ровно на время человека. Начинайте с plan_walk (нужны lat и lon старта; если человек назвал место, '
   + 'найдите его координаты через search_places). Для 2–3 мест подряд используйте build_route, для подробностей place_details, для погоды get_weather. '
   + 'Факты о местах берите только из ответов инструментов и называйте источник из поля dataSource (OpenStreetMap или Overture Maps); не утверждайте «открыто сейчас», если hours.status не open. '
   + 'Время пешком — оценка, не обещание.';

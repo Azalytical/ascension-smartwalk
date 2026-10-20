@@ -1,6 +1,6 @@
 {
-  "name": "Ulger: прогулки по Астане",
-  "short_name": "Ulger",
+  "name": "Aidem: прогулки по Астане",
+  "short_name": "Aidem",
   "description": "ИИ подберёт место рядом и вернёт вас вовремя.",
   "id": "/",
   "start_url": "/?source=pwa",

@@ -1,4 +1,4 @@
-// Ulger bootstrap: theme, shell, bottom sheet, map, tabs, offline support.
+// Aidem bootstrap: theme, shell, bottom sheet, map, tabs, offline support.
 import { $, h, icon } from './core/dom.js';
 import { t } from './core/i18n.js';
 import * as store from './core/store.js';

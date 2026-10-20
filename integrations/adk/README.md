@@ -22,4 +22,4 @@ adk web        # или: adk run ulger_agent
 adk deploy agent_engine --project <PROJECT_ID> --region europe-west1 --staging_bucket gs://<BUCKET> ulger_agent
 ```
 
-Агенту нужен только доступ в интернет к `ULGER_MCP_URL`; данные и логика остаются в Айдём.
+Агенту нужен только доступ в интернет к `ULGER_MCP_URL`; данные и логика остаются в Aidem.
