@@ -139,6 +139,7 @@ export function mountSocial(root, ctx = {}) {
 
   function toast(message, kind = 'info') {
     if (ctx.toast) { ctx.toast(message, kind); return; }
+    for (const previous of document.querySelectorAll('.sx-toast')) previous.remove();
     const node = h('div', { class: `sx-toast is-${kind}`, role: 'status' }, message);
     document.body.append(node);
     setTimeout(() => node.classList.add('is-leaving'), 3200);
@@ -347,7 +348,8 @@ export function mountSocial(root, ctx = {}) {
           h('span', { class: 'sx-row-text' }, h('strong', {}, item.name), h('span', {}, friendSubtitle(item))),
           h('span', { class: 'sx-chevron', 'aria-hidden': 'true' }, '›')))))
         : h('div', { class: 'sx-empty' }, h('p', {}, 'Пока нет друзей. Отправьте ссылку или покажите QR-код: друг откроет его и сразу окажется у вас в списке.'),
-          button('Пригласить друга', () => open({ type: 'invite' }), 'primary')));
+          button('Пригласить друга', () => open({ type: 'invite' }), 'primary')),
+      h('button', { type: 'button', class: 'sx-link sx-watch-entry', onclick: () => { open({ type: 'profile' }); document.getElementById('sx-watch-link')?.scrollIntoView({ block: 'center' }); } }, '⌚ Связать часы: встречи и друзья на запястье'));
   }
 
   function friendDetail(id) {
@@ -459,7 +461,21 @@ export function mountSocial(root, ctx = {}) {
         h('div', { class: 'sx-actions' },
           button('Позвать сюда', event => { event.stopPropagation(); inviteHere(option); }, index === meeting.selected ? 'gold' : 'ghost'),
           h('a', { class: 'sx-link', href: option.place.sourceUrl, target: '_blank', rel: 'noopener noreferrer', onclick: event => event.stopPropagation() }, 'Источник: OSM')))),
+      result.options.length >= 2 ? h('div', { class: 'sx-vote-cta' },
+        h('p', {}, 'Не можете решить? Отправьте друзьям все варианты: место выберется голосованием.'),
+        button(`Предложить на выбор (${result.options.length})`, () => inviteToVote(), 'primary', { class: 'btn btn-primary sx-btn sx-wide' })) : null,
       h('p', { class: 'sx-hint' }, result.method.note));
+  }
+
+  async function inviteToVote() {
+    const meeting = view.meeting;
+    if (!meeting.invitees.length) { toast('Выберите хотя бы одного друга', 'error'); return; }
+    const longest = Math.max(...meeting.result.options.map(option => option.maxMinutes));
+    const startsAt = roundTo5(Date.now() + (longest + 15) * 60000);
+    const titles = { coffee: 'Кофе', food: 'Поесть вместе', park: 'Прогулка', indoor: 'Встреча', any: 'Встреча' };
+    const options = meeting.result.options.map(option => ({ id: option.place.id, name: option.place.name, lat: option.place.lat, lon: option.place.lon }));
+    const created = await run(() => social.act('createMeetup', { title: titles[meeting.result.kind] || 'Встреча', options, startsAt, invitees: meeting.invitees }), 'Друзья выбирают место');
+    if (created) { layer?.clearMeeting(); view.meeting = null; view.tab = 'meetups'; open({ type: 'meetup', id: created.meetup.id }); }
   }
 
   async function inviteHere(option) {
@@ -538,7 +554,7 @@ export function mountSocial(root, ctx = {}) {
       h('span', { class: 'sx-when' }, h('strong', {}, clock(item.startsAt)), h('span', {}, dayLabel(item.startsAt))),
       h('span', { class: 'sx-row-text' }, h('strong', {}, item.title),
         h('span', {}, item.status === 'cancelled' ? 'отменена' : `${item.place.name} · ${until(item.startsAt)}`),
-        h('span', { class: 'sx-faces' }, going.slice(0, 5).map(member => avatar(member, 'xs')), item.myStatus === 'invited' ? h('span', { class: 'sx-pill is-gold' }, 'Ждут ответа') : item.changed ? h('span', { class: 'sx-pill is-amber' }, 'Изменено') : null)),
+        h('span', { class: 'sx-faces' }, going.slice(0, 5).map(member => avatar(member, 'xs')), item.poll?.open ? h('span', { class: 'sx-pill is-gold' }, item.poll.myVote === null ? 'Голосуйте за место' : 'Идёт голосование') : item.myStatus === 'invited' ? h('span', { class: 'sx-pill is-gold' }, 'Ждут ответа') : item.changed ? h('span', { class: 'sx-pill is-amber' }, 'Изменено') : null)),
       h('span', { class: 'sx-chevron', 'aria-hidden': 'true' }, '›'));
   }
 
@@ -586,6 +602,7 @@ export function mountSocial(root, ctx = {}) {
         h('h3', {}, item.title), h('p', {}, `${when(item.startsAt)} · ${item.place.name}`),
         item.changed ? h('p', { class: 'sx-warning' }, 'Организатор изменил время или место. Подтвердите, что придёте.') : null,
         item.note ? h('p', { class: 'sx-note' }, item.note) : null),
+      pollBlock(item),
       statusButtons,
       h('h4', { class: 'sx-label' }, 'Кто идёт'),
       h('ul', { class: 'sx-members' }, item.members.map(member => h('li', { class: `is-${member.status}` }, avatar(member, 'sm'),
@@ -601,6 +618,30 @@ export function mountSocial(root, ctx = {}) {
       item.isHost && item.status !== 'cancelled' ? h('details', { class: 'sx-details' }, h('summary', {}, 'Управление встречей'),
         h('div', { class: 'sx-form' }, h('span', { class: 'sx-label' }, 'Перенести'), (() => { let next = item.startsAt; return [timePicker(next, value => { next = value; }), button('Сохранить новое время', () => run(() => social.act('updateMeetup', { id, startsAt: next }), 'Участники получили уведомление'), 'ghost')]; })(),
           button('Отменить встречу', async () => { if (confirm('Отменить встречу для всех?')) await run(() => social.act('cancelMeetup', { id }), 'Встреча отменена'); }, 'ghost', { class: 'btn btn-ghost sx-btn sx-danger' }))) : null);
+  }
+
+  function pollBlock(item) {
+    const poll = item.poll;
+    if (!poll) return null;
+    if (!poll.open) return h('p', { class: 'sx-hint' }, `Место выбрано голосованием: ${item.place.name}.`);
+    const members = new Map(item.members.map(member => [member.id, member]));
+    const mine = myPoint();
+    const most = Math.max(1, ...poll.options.map(option => option.voters.length));
+    return h('section', { class: 'sx-poll', 'aria-label': 'Голосование за место' },
+      h('div', { class: 'sx-poll-head' }, h('h4', { class: 'sx-label' }, 'Где встречаемся? Голосуйте'), h('span', { class: 'sx-pill' }, `${poll.voted} из ${poll.eligible}`)),
+      h('ul', { class: 'sx-poll-options' }, poll.options.map(option => {
+        const chosen = poll.myVote === option.index;
+        const walk = mine ? ` · ≈${social.walkMinutes(mine, option.place)} мин от вас` : '';
+        return h('li', { class: chosen ? 'is-chosen' : '' },
+          h('button', { type: 'button', class: 'sx-poll-option', 'aria-pressed': String(chosen), onclick: () => run(() => social.act('voteMeetup', { id: item.id, option: option.index }), chosen ? null : 'Голос учтён') },
+            h('span', { class: 'sx-option-number' }, option.index + 1),
+            h('span', { class: 'sx-row-text' }, h('strong', {}, option.place.name), h('span', {}, `${option.voters.length ? `${option.voters.length} ${plural(option.voters.length, 'голос', 'голоса', 'голосов')}` : 'пока без голосов'}${walk}`),
+              h('span', { class: 'sx-poll-bar' }, h('span', { style: { width: `${Math.round(option.voters.length / most * 100)}%` } })),
+              h('span', { class: 'sx-faces' }, option.voters.map(voter => members.get(voter)).filter(Boolean).map(member => avatar(member, 'xs')))),
+            h('span', { class: 'sx-poll-check', 'aria-hidden': 'true' }, chosen ? '✓' : '')),
+          item.isHost ? button('Выбрать это место', () => run(() => social.act('decideMeetup', { id: item.id, option: option.index }), 'Место выбрано, участники получили уведомление'), 'ghost', { class: 'btn btn-ghost sx-btn sx-small' }) : null);
+      })),
+      h('p', { class: 'sx-hint' }, item.isHost ? 'Место выберется само, когда проголосуют все. Можно выбрать и раньше.' : 'Место выберется само, когда проголосуют все.'));
   }
 
   function addToMeetupView(id) {
@@ -723,7 +764,7 @@ export function mountSocial(root, ctx = {}) {
 
   function notificationsView() {
     const list = data().notifications;
-    const target = item => ['meetup_invite', 'meetup_changed', 'meetup_cancelled', 'meetup_going', 'meetup_declined', 'meetup_on_way', 'meetup_arrived'].includes(item.type) ? { type: 'meetup', id: item.entityId }
+    const target = item => ['meetup_invite', 'meetup_changed', 'meetup_cancelled', 'meetup_vote', 'meetup_going', 'meetup_declined', 'meetup_on_way', 'meetup_arrived'].includes(item.type) ? { type: 'meetup', id: item.entityId }
       : ['event_invite', 'event_spot', 'event_cancelled', 'event_joined'].includes(item.type) ? { type: 'event', id: item.entityId }
         : ['friend_added', 'location_shared'].includes(item.type) ? { type: 'friend', id: item.entityId }
           : item.type === 'location_request' ? { type: 'share' } : null;
@@ -750,12 +791,14 @@ export function mountSocial(root, ctx = {}) {
       h('div', { class: 'sx-profile-head' }, avatar(me, 'xl'), h('h3', {}, me.name)),
       h('form', { class: 'sx-form', onsubmit: async event => { event.preventDefault(); await run(() => social.act('updateProfile', { name: name.value, emoji }), 'Сохранено'); } },
         h('span', { class: 'sx-label' }, 'Имя'), name, h('span', { class: 'sx-label' }, 'Значок'), picker, h('button', { type: 'submit', class: 'btn btn-ghost sx-btn' }, 'Сохранить')),
-      h('section', { class: 'sx-card' }, h('strong', {}, 'Подключить часы или ещё одно устройство'),
-        h('p', { class: 'sx-hint' }, 'Получите код и введите его на другом устройстве. Код действует 10 минут и срабатывает один раз.'),
-        button('Получить код', async () => {
+      h('section', { class: 'sx-card', id: 'sx-watch-link' }, h('strong', {}, '⌚ Связать часы'),
+        h('p', { class: 'sx-hint' }, 'На часах будут ваши встречи и друзья. Код действует 10 минут и срабатывает один раз. Также можно подключить второй телефон или планшет.'),
+        button('Связать часы', async () => {
           const result = await run(() => social.act('linkDevice'));
-          if (result) linkBox.replaceChildren(h('p', { class: 'sx-invite-code' }, result.code.replace(/(\d{3})(\d{3})/, '$1 $2')), h('p', { class: 'sx-hint' }, `Действует до ${clock(result.expiresAt)}`));
-        }, 'ghost'), linkBox),
+          if (result) linkBox.replaceChildren(h('p', { class: 'sx-invite-code sx-watch-code', 'aria-label': `Код ${result.code.split('').join(' ')}` }, result.code.replace(/(\d{3})(\d{3})/, '$1 $2')),
+            h('p', {}, 'Откройте на часах ', h('strong', {}, `${location.host}/watch`), ' → Встречи → Ввести код'),
+            h('p', { class: 'sx-hint' }, `Код действует до ${clock(result.expiresAt)}. На другом телефоне или планшете: «Друзья и встречи» → «Войти по коду».`));
+        }, 'primary'), linkBox),
       blocked.length ? h('section', { class: 'sx-card' }, h('strong', {}, 'Заблокированные'), h('ul', { class: 'sx-list' }, blocked.map(person => h('li', { class: 'sx-row' }, avatar(person, 'sm'), h('span', { class: 'sx-row-text' }, h('strong', {}, person.name)),
         button('Разблокировать', () => run(() => social.act('unblockUser', { userId: person.id }), 'Разблокировано'), 'ghost'))))) : null,
       h('section', { class: 'sx-card' }, h('strong', {}, 'Данные и приватность'),

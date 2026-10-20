@@ -212,3 +212,26 @@ textarea.sx-input { resize: vertical; min-height: 88px; }
 @media (prefers-reduced-motion: reduce) {
   .sx-root *, .sx-map-avatar-face, .sx-live-dot { animation: none !important; transition: none !important; }
 }
+
+/* Voting on the meeting place */
+.sx-pill:not([class*="is-"]) { background: var(--sx-soft); color: var(--sx-ink); }
+.sx-vote-cta { display: grid; gap: 10px; padding: 14px; border-radius: var(--sx-radius); background: var(--sx-soft); }
+.sx-vote-cta p { margin: 0; color: var(--sx-muted); font-size: 14px; }
+.sx-poll { display: grid; gap: 10px; padding: 14px; border: 2px solid var(--sx-gold); border-radius: var(--sx-radius); }
+.sx-poll-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sx-poll-head .sx-label { margin: 0; }
+.sx-poll-options { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.sx-poll-options li { display: grid; gap: 6px; }
+.sx-poll-option { display: flex; gap: 12px; align-items: center; width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid var(--sx-line); border-radius: 14px;
+  background: var(--sx-surface); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color 140ms var(--sx-ease), background 140ms var(--sx-ease); }
+.sx-poll-option[aria-pressed="true"] { border-color: var(--sx-gold); background: color-mix(in srgb, var(--sx-gold) 12%, var(--sx-surface)); }
+.sx-poll-option .sx-row-text { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.sx-poll-option .sx-row-text > span:first-of-type { font-size: 13px; color: var(--sx-muted); }
+.sx-poll-bar { height: 6px; border-radius: 3px; background: var(--sx-soft); overflow: hidden; }
+.sx-poll-bar span { display: block; height: 100%; border-radius: 3px; background: var(--sx-gold); transition: width 420ms var(--sx-ease); }
+.sx-poll-check { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 50%; border: 2px solid var(--sx-line); font-weight: 800; }
+.sx-poll-option[aria-pressed="true"] .sx-poll-check { border-color: var(--sx-gold); background: var(--sx-gold); color: #0E1621; }
+.sx-btn.sx-small { min-height: 44px; justify-self: start; font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { .sx-poll-option, .sx-poll-bar span { transition: none; } }
+.sx-watch-entry { justify-self: start; min-height: 44px; padding: 0 2px; border: 0; background: none; cursor: pointer; font-family: inherit; }
+.sx-watch-code { font-size: 44px; letter-spacing: .08em; }
