@@ -12,8 +12,8 @@
     child: { start: 'baiterek', minutes: 60, maxWalk: 10, child: true, query: 'Прогуляться с ребёнком: парк, сквер или интересное место на свежем воздухе.' },
     water: { start: 'embankment', minutes: 45, maxWalk: 15, child: false, query: 'Хочу выдохнуть у воды, спокойно пройтись и полюбоваться видом.' }
   };
-  const categoryNames = { cafe: 'Кофе и еда', coffee: 'Кофе', restaurant: 'Кофе и еда', park: 'Зелёное место', garden: 'Зелёное место', nature: 'На природе', waterfront: 'У воды', water: 'У воды', attraction: 'Достопримечательность', museum: 'Музей', culture: 'Культура', playground: 'С ребёнком', leisure: 'Отдых', viewpoint: 'Красивый вид', monument: 'Городская история', square: 'Городское пространство', tourism: 'Открыть город', art: 'Искусство', mall: 'В помещении' };
-  const categoryIcons = { cafe: 'coffee', coffee: 'coffee', restaurant: 'food', park: 'park', garden: 'park', nature: 'park', waterfront: 'waterfront', water: 'waterfront', attraction: 'landmark', museum: 'museum', culture: 'museum', playground: 'family', leisure: 'park', viewpoint: 'landmark', monument: 'landmark', square: 'landmark', tourism: 'landmark', art: 'museum', mall: 'indoor' };
+  const categoryNames = { cafe: 'Кофе и еда', coffee: 'Кофе', restaurant: 'Кофе и еда', park: 'Зелёное место', garden: 'Зелёное место', nature: 'На природе', waterfront: 'У воды', water: 'У воды', attraction: 'Достопримечательность', museum: 'Музей', culture: 'Культура', playground: 'С ребёнком', leisure: 'Отдых', viewpoint: 'Красивый вид', monument: 'Городская история', square: 'Городское пространство', tourism: 'Открыть город', art: 'Искусство', mall: 'В помещении', family: 'Семейный отдых' };
+  const categoryIcons = { cafe: 'coffee', coffee: 'coffee', restaurant: 'food', park: 'park', garden: 'park', nature: 'park', waterfront: 'waterfront', water: 'waterfront', attraction: 'landmark', museum: 'museum', culture: 'museum', playground: 'family', leisure: 'park', viewpoint: 'landmark', monument: 'landmark', square: 'landmark', tourism: 'landmark', art: 'museum', mall: 'indoor', family: 'family' };
   const utilityIcons = new Set(['search', 'location', 'pin', 'clock', 'walk', 'return', 'family', 'lock', 'expand', 'download', 'external', 'info', 'warning', 'close', 'nearby', 'route', 'saved', 'layers']);
   const state = { start: { ...starts.mega }, map: null, startMarker: null, placesLayer: null, routeLayer: null, markers: [], mapPick: false, result: null, request: null, loading: false, status: null, tileErrors: 0, hasTiles: false, selected: null };
 
@@ -345,7 +345,8 @@
     const labels = element('span', 'card-labels');
     const category = element('span', 'category-label');
     category.append(categoryIcon(place.category), element('span', '', Object.hasOwn(categoryNames, place.category) ? categoryNames[place.category] : 'Место в городе'));
-    labels.append(element('span', 'source-badge', 'Данные OSM'), category);
+    const fromOverture = place.source && place.source.id === 'overture';
+    labels.append(element('span', 'source-badge', fromOverture ? `Данные ${cleanText(place.source.dataset, 'Overture')} · Overture` : 'Данные OSM'), category);
     top.append(element('span', 'place-number', `ВАРИАНТ 0${index + 1}`), labels);
     const name = cleanText(place.name, 'Место в Астане');
     card.append(top, element('h3', '', name), element('p', 'place-why', cleanText(place.why, 'Подходит по расстоянию и времени на прогулку.')));
@@ -422,7 +423,8 @@
     });
     if (!facts.childElementCount) facts.append(element('p', '', 'Место найдено в базе городских объектов. Полнота сведений может различаться.'));
     if (sourceUrl) {
-      const sourceName = /openstreetmap\.org/.test(new URL(sourceUrl).hostname) ? 'Открыть источник: OpenStreetMap' : 'Открыть источник';
+      const host = new URL(sourceUrl).hostname;
+      const sourceName = /openstreetmap\.org/.test(host) ? 'Открыть источник: OpenStreetMap' : /overturemaps\.org/.test(host) ? 'Открыть источник: Overture Maps' : 'Открыть источник';
       facts.append(externalLink(sourceName, sourceUrl));
     }
     const dateLabel = formatDate(date);
@@ -517,7 +519,7 @@
       state.status = await response.json();
       const count = Math.max(0, Math.floor(numeric(state.status.poiCount)));
       const date = formatDate(state.status.updatedAt);
-      $('data-status').textContent = `${count ? `${count.toLocaleString('ru-RU')} мест в базе` : 'База городских мест'}${date ? ` · снимок ${date}` : ''} · OpenStreetMap`;
+      $('data-status').textContent = `${count ? `${count.toLocaleString('ru-RU')} мест в базе` : 'База городских мест'}${date ? ` · снимок ${date}` : ''} · ${cleanText(state.status.source, 'OpenStreetMap')}`;
     } catch {
       $('data-status').textContent = 'Сведения о базе сейчас недоступны';
     }
@@ -530,6 +532,8 @@
       content.append(element('h2', '', 'Вы выбираете, чем поделиться.'), element('p', '', 'Геолокация запрашивается только после нажатия «Я здесь». Можно обойтись без неё: выбрать известную точку или нажать на карту.'), element('p', '', 'Координаты старта и пожелания отправляются сервису для подбора этой прогулки. Точная локация не записывается в историю приложения. Запрос может обрабатываться внешним сервисом генерации текста; не указывайте персональные данные.'), element('p', '', 'Карта загружается с серверов OpenStreetMap, а шрифт — с Google Fonts. При загрузке эти сервисы получают обычные сетевые данные, включая IP-адрес.'), element('p', '', 'При сохранении плана координаты старта попадут в скачанный JSON-файл. Файл остаётся у вас — учитывайте это, если делитесь им.'), element('p', 'dialog-footnote', 'База собрана из открытых источников. Часы работы, доступность, наличие розеток и другие условия могут быть неполными или устаревшими. Отсутствие сведений не считается подтверждением.'));
       const source = externalLink('Данные OpenStreetMap и условия использования', 'https://www.openstreetmap.org/copyright');
       if (source) content.append(source);
+      const overture = externalLink('Данные Overture Maps и лицензии источников', 'https://docs.overturemaps.org/attribution/');
+      if (overture) content.append(overture);
     } else {
       content.append(element('h2', '', 'Хорошему дню достаточно небольшой прогулки.'), element('p', '', 'SmartWalk помогает выбрать место в Астане, когда свободного времени немного. У каждого варианта есть оценка дороги туда, времени на месте и возвращения к началу.'), element('p', '', 'Подбор опирается на базу настоящих городских объектов и ваши ограничения. Мы показываем источники и отмечаем неподтверждённые сведения.'), element('p', '', 'Пунктир на карте связывает точки по прямой. Это ориентир для выбора, а не готовая пешеходная навигация. Для прогулки проверьте реальные переходы и маршрут.'), element('p', 'dialog-footnote', 'Ascension · Build with AI Hackathon 2026 · Smart City · Астана'));
     }

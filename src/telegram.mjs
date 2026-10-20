@@ -59,7 +59,7 @@ function formatResult(result, generation) {
       `~${place.walkMinutes} мин туда · ~${place.totalMinutes} мин всего с возвращением`,
       escape(place.why),
       `⚠️ ${escape(place.warnings[0])}`,
-      `<a href="${escape(place.sourceUrl)}">Источник: OpenStreetMap</a>`, '');
+      `<a href="${escape(place.sourceUrl)}">Источник: ${escape(place.source?.label ?? 'OpenStreetMap')}</a>`, '');
   });
   lines.push(generation?.mode === 'llm'
     ? 'Первую строку написал Gemini только по данным этих карточек. Время, расстояние и часы считает сервер.'
