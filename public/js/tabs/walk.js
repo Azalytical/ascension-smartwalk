@@ -10,7 +10,7 @@ import * as layers from '../map/layers.js';
 import { setSnap, ensureAtLeast, getSnap } from '../ui/sheet.js';
 import { toast, announce } from '../ui/toast.js';
 import { timeRing } from '../ui/ring.js';
-import { art, categoryArt, categoryName, hoursStatus, hoursChip, share, backTime, confidenceChip, backButton, listenButton } from '../ui/common.js';
+import { art, categoryArt, categoryName, hoursStatus, hoursChip, share, backTime, confidenceChip, versusText, backButton, listenButton } from '../ui/common.js';
 import { placeView } from '../ui/place.js';
 import { ratingChip } from '../ui/rating.js';
 import { understand, canListen, startListening } from '../core/voice.js';
@@ -23,12 +23,14 @@ import { applyTheme } from '../core/theme.js';
 
 const MINUTES = [30, 45, 60, 90, 120];
 const MAX_WALK = [10, 15, 20, 30];
+// Minutes kept spare before «вернётесь к»; the server counts them in every option.
+const RESERVES = [5, 10, 15];
 const MOODS = [
   ['coffee', 'coffee'], ['food', 'food'], ['park', 'park'], ['water', 'waterfront'],
   ['kids', 'family'], ['culture', 'museum'], ['sights', 'landmark'], ['indoor', 'indoor'],
 ];
 
-const defaults = { minutes: 45, maxWalk: 15, query: '', mood: null, when: 'now' };
+const defaults = { minutes: 45, maxWalk: 15, query: '', mood: null, when: 'now', reserve: 5 };
 let plan = { ...defaults, ...(store.get('plan') || {}) };
 let start = store.get('start') || presetStart('baiterek');
 let view = store.get('walk') ? 'live' : 'plan';
@@ -40,6 +42,8 @@ let inflight = null;
 let root = null;
 let liveCleanup = null;
 let lastRoute = null;
+// «Удиви меня»: places already shown as a surprise in this session, so «Другой сюрприз» brings a new one.
+let surpriseSeen = [];
 // Where the walk starts: a fresh GPS fix by default. A start picked by hand (a place, a map point, a shared link) is kept
 // for half an hour. A fix older than FRESH_MS is refreshed before planning, and one older than STALE_MS is never used.
 let locating = null;
@@ -186,17 +190,25 @@ function renderPlan() {
     ['now', 'in1h', 'evening'].map((value) => h('button', { type: 'button', role: 'radio', class: 'seg', 'aria-checked': String(plan.when === value),
       onclick: () => { plan.when = value; savePlan(); updatePlanLive(); whenGroup.querySelectorAll('.seg').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.when === value))); }, dataset: { when: value } }, t(`plan.${value}`))));
 
-  const more = h('details', { class: 'disclosure plan-more', open: plan.maxWalk !== defaults.maxWalk || plan.when !== 'now' },
+  const reserveGroup = h('div', { class: 'segmented segmented-sm', role: 'radiogroup', 'aria-label': t('plan.reserve') },
+    RESERVES.map((value) => h('button', { type: 'button', role: 'radio', class: 'seg', 'aria-checked': String(plan.reserve === value), dataset: { reserve: value },
+      onclick: () => { plan.reserve = value; savePlan(); updatePlanLive(); reserveGroup.querySelectorAll('.seg').forEach((b) => b.setAttribute('aria-checked', String(Number(b.dataset.reserve) === value))); } },
+    h('span', { class: 'num', text: t('plan.min', { n: value }) }))));
+
+  const more = h('details', { class: 'disclosure plan-more', open: plan.maxWalk !== defaults.maxWalk || plan.when !== 'now' || plan.reserve !== defaults.reserve },
     h('summary', {}, icon('filter'), t('plan.more')),
     h('div', { class: 'field' }, h('span', { class: 'field-label', text: t('plan.maxWalk') }), walkGroup),
+    h('div', { class: 'field' }, h('span', { class: 'field-label', text: t('plan.reserve') }), reserveGroup, h('small', { class: 'fine', text: t('plan.reserveHint') })),
     h('div', { class: 'field' }, h('span', { class: 'field-label', text: t('plan.when') }), whenGroup));
+  // «Удиви меня»: one place picked at random, only among those that fit the time and the conditions.
+  const surprise = h('button', { class: 'btn btn-quiet surprise-btn', type: 'button', onclick: () => { surpriseSeen = []; submit({ surprise: true }); } }, icon('sparkle'), t('plan.surprise'));
 
   const returnLine = h('span', { class: 'cta-sub num' });
   const cta = h('button', { class: 'btn btn-gold btn-xl cta', type: 'button', onclick: submit }, h('span', { class: 'cta-main' }, icon('sparkle'), t('plan.submit')), returnLine);
   cta.addEventListener('refresh', () => updatePlanLive());
   function updatePlanLive() {
     returnLine.textContent = t('plan.returnBy', { time: time(leaveAt() + plan.minutes * 60000) });
-    layers.updateReach(start, reachMeters(plan.minutes, plan.maxWalk));
+    layers.updateReach(start, reachMeters(plan.minutes, plan.maxWalk, plan.reserve));
   }
 
   const weatherHost = h('div');
@@ -212,6 +224,7 @@ function renderPlan() {
     h('div', { class: 'search-field' }, icon('search', 'search-icon'), query, mic),
     moods,
     startRow,
+    surprise,
     more,
     cta));
   updatePlanLive();
@@ -342,8 +355,8 @@ function startPlace(place, spoken) {
 function drawPlanMap() {
   layers.hidePins(); layers.hideRoutes();
   layers.showStart(start, startName(), { tag: true });
-  layers.showReach(start, reachMeters(plan.minutes, plan.maxWalk));
-  const radius = reachMeters(plan.minutes, plan.maxWalk);
+  layers.showReach(start, reachMeters(plan.minutes, plan.maxWalk, plan.reserve));
+  const radius = reachMeters(plan.minutes, plan.maxWalk, plan.reserve);
   const dLat = radius / 111320; const dLon = radius / (111320 * Math.cos(start.lat * Math.PI / 180));
   if (getMap()) fitPoints([[start.lon - dLon, start.lat - dLat], [start.lon + dLon, start.lat + dLat]], { maxZoom: 15, duration: 600 });
 }
@@ -410,11 +423,13 @@ function renderPick() {
 }
 
 // ---------- request ----------
-function buildRequest() {
-  const body = { ...outbound(start), minutes: plan.minutes, maxWalkMinutes: plan.maxWalk, query: plan.query.trim(), withChild: plan.mood === 'kids', category: 'any', returnToStart: true };
+function buildRequest(surprise = false) {
+  const body = { ...outbound(start), minutes: plan.minutes, maxWalkMinutes: plan.maxWalk, query: plan.query.trim(), withChild: plan.mood === 'kids', category: 'any', returnToStart: true,
+    reserveMinutes: RESERVES.includes(plan.reserve) ? plan.reserve : defaults.reserve };
   if (plan.when !== 'now') body.visitDate = isoWithOffset(leaveAt());
-  const hidden = store.hiddenIds();
-  if (hidden.length) body.excludeIds = hidden;
+  const hidden = [...store.hiddenIds(), ...(surprise ? surpriseSeen : [])];
+  if (hidden.length) body.excludeIds = hidden.slice(0, 120);
+  if (surprise) body.surprise = true;
   return body;
 }
 
@@ -438,7 +453,8 @@ async function submit(options) {
   inflight?.abort();
   const controller = new AbortController();
   inflight = controller;
-  request = buildRequest();
+  const surprise = options?.surprise === true;
+  request = buildRequest(surprise);
   result = null; error = null; selected = 0;
   view = 'loading'; render();
   try {
@@ -446,6 +462,16 @@ async function submit(options) {
     if (controller.signal.aborted) return;
     // Places hidden with «Больше не предлагать» stay out even where the server does not know the list.
     data.recommendations = data.recommendations.filter((place) => !store.isHidden(place.id));
+    // A surprise is one place. Where the server sent several, each already fits the time and the conditions,
+    // so picking one of them at random keeps that promise.
+    if (surprise && data.recommendations.length) {
+      const fresh = data.recommendations.filter((place) => !surpriseSeen.includes(place.id));
+      const pool = fresh.length ? fresh : data.recommendations;
+      const chosen = data.recommendations.length === 1 ? data.recommendations[0] : pool[Math.floor(Math.random() * pool.length)];
+      data.recommendations = [chosen];
+      data.surprise = { ...(typeof data.surprise === 'object' && data.surprise ? data.surprise : {}), from: data.surprise?.from ?? pool.length };
+      surpriseSeen = [...surpriseSeen, chosen.id];
+    }
     result = data;
     view = 'results';
     store.addHistory({ key: JSON.stringify([request.lat.toFixed(3), request.lon.toFixed(3), request.minutes, request.query]), kind: 'plan', plan: { ...plan }, start, count: data.recommendations.length });
@@ -501,8 +527,11 @@ function renderResults() {
   const tip = llm ? aiCard(generation) : h('div', { class: 'ai-card is-quiet' }, h('p', { class: 'fine', text: t('results.fallback') }));
   const demo = result.demo;
   const minutes = demo?.minutes ?? request.minutes;
+  const surprise = result.surprise && !demo ? result.surprise : null;
 
+  const surpriseMode = Boolean(result.surprise && !result.demo);
   const rows = recs.map((place, index) => {
+    const versus = surpriseMode ? null : versusText(place);
     const status = hoursStatus(place, place.walkMinutes, place.visitMinutes, place.hoursCheck);
     return h('button', { class: `result-row${index === selected ? ' is-selected' : ''}`, type: 'button', dataset: { index }, onclick: () => openResult(index),
       onmouseenter: () => highlight(index), onfocus: () => highlight(index) },
@@ -510,7 +539,8 @@ function renderResults() {
     categoryArt(place.category, 44, 'art'),
     h('span', { class: 'result-text' }, h('strong', { class: 'result-name', text: place.name }),
       h('span', { class: 'meta' }, categoryName(place.category), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }), t('explore.walk', { n: place.walkMinutes })),
-      h('span', { class: 'result-badges' }, hoursChip(status), confidenceChip(place.confidence), ratingChip(place))),
+      h('span', { class: 'result-badges' }, hoursChip(status), confidenceChip(place.confidence), ratingChip(place)),
+      versus ? h('span', { class: 'result-versus', text: versus }) : null),
     h('span', { class: 'result-time' }, timeRing({ there: place.walkMinutes, visit: place.visitMinutes, back: place.returnMinutes, reserve: place.safetyReserveMinutes, size: 50, stroke: 6 }),
       h('span', { class: 'num result-total', text: t('plan.min', { n: place.totalMinutes }) })));
   });
@@ -519,12 +549,15 @@ function renderResults() {
     h('div', { class: 'view-bar' }, back, h('div', { class: 'view-bar-actions' }, voiceButton(),
       demo ? null : h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: 'Aidem', text: t('results.title', { min: request.minutes }), url: shareLink() }) }, icon('share')))),
     demo ? demoBanner(demo) : null,
-    h('h2', { id: 'results-title', class: 'title-1', text: t('results.title', { min: minutes }) }),
+    h('h2', { id: 'results-title', class: 'title-1', text: t(surprise ? 'results.surprise' : 'results.title', { min: minutes }) }),
     h('p', { class: 'meta' }, icon('pin', 'icon-xs'), t('results.start', { name: originName() }), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }),
       demo ? t('demo.at', { time: demo.time }) : t('plan.returnBy', { time: time(leave + request.minutes * 60000) })),
-    tip,
+    surprise ? h('p', { class: 'surprise-note' }, icon('sparkle', 'icon-xs'), h('span', { text: surprise.poolSize > 1 ? t('surprise.notePool', { n: surprise.poolSize }) : t('surprise.note') })) : null,
+    // The Gemini tip compares all the options, so it stays out when only the surprise is shown.
+    surprise ? null : tip,
     notes.notices,
     h('div', { class: 'result-list' }, rows),
+    surprise ? h('button', { class: 'btn btn-quiet surprise-btn', type: 'button', onclick: () => submit({ surprise: true }) }, icon('sparkle'), t('surprise.again')) : null,
     understoodRow(result.understood),
     routeCard(result.route),
     eventsCard(result.cityEvents),
@@ -532,7 +565,7 @@ function renderResults() {
   drawResultsMap(recs);
   if (speakNext) {
     // The Gemini tip is read through its own «Слушать» button, so «Стоп» there also ends the conversation.
-    const listen = llm && tip.querySelector('.listen-btn');
+    const listen = llm && !surprise && tip.querySelector('.listen-btn');
     if (listen?.play) answer(null, listen.play());
     else answer(t('voice.answer', { n: recs.length, name: recs[0].name, walk: recs[0].walkMinutes, time: backOf(recs[0]) }));
   }
@@ -574,7 +607,7 @@ function notesView(recs, { skip = null } = {}) {
 function understoodRow(items) {
   const shown = (items || []).filter((item) => item.key !== 'location' && item.label);
   if (!shown.length) return null;
-  const icons = { time: 'clock', categories: 'filter', child: 'user', night: 'moon', group: 'friends', accessible: 'accessible', weather: 'cloud', hours: 'clock' };
+  const icons = { hidden: 'close', time: 'clock', categories: 'filter', child: 'user', night: 'moon', group: 'friends', accessible: 'accessible', weather: 'cloud', hours: 'clock' };
   return h('div', { class: 'understood' }, h('p', { class: 'understood-title', text: t('results.understood') }),
     h('div', { class: 'chip-row no-drag' }, shown.map((item) => h('span', { class: 'chip is-static' }, icon(icons[item.key] || 'check', 'icon-xs'), h('span', { class: 'chip-text', text: item.label })))));
 }
@@ -690,7 +723,7 @@ function renderEmpty(back) {
     notes.notices,
     h('div', { class: 'stack' }, actions),
     notes.unchecked));
-  layers.hidePins(); layers.hideRoutes(); layers.showReach(start, reachMeters(plan.minutes, plan.maxWalk));
+  layers.hidePins(); layers.hideRoutes(); layers.showReach(start, reachMeters(plan.minutes, plan.maxWalk, plan.reserve));
   if (speakNext) answer(`${t('results.empty.title')} ${nearest?.name ? t('voice.nearest', { name: nearest.name, n: nearest.neededMinutes }) : ''}`);
 }
 
@@ -721,7 +754,7 @@ function renderPlace() {
   clear(root, placeView({ place, timing, start, serverHours: place.hoursCheck, why: place.why, activities: place.activities || [], warnings: place.warnings || [],
     backLabel: t('common.back'), onBack: () => { view = 'results'; render(); },
     onStart: () => { voiceTurns = 0; view = 'ready'; render(); }, voice: voiceButton(), onHide: () => hidePlace(place),
-    routeInfo: lastRoute?.id === place.id ? lastRoute.route : null, shareUrl: url.href, backAt: backOf(place) }));
+    routeInfo: lastRoute?.id === place.id ? lastRoute.route : null, shareUrl: url.href, backAt: backOf(place), spareAt: place.plan?.spareUntil || null }));
   // Opened by voice («второй»): say why it fits and how long it takes, then wait for «поехали».
   // The server's «why» is written for reading (all the minutes), so only Gemini's idea is said aloud.
   if (speakNext) answer(`${place.name}. ${place.aiWhy || ''} ${t('voice.place', { walk: place.walkMinutes, time: backOf(place) })}`);

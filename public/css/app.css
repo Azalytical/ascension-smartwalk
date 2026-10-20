@@ -144,6 +144,11 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .time-card-side { flex: 1; display: grid; gap: 12px; min-width: 0; }
 .return-by { display: flex; align-items: center; gap: 6px; font-size: var(--fs-15); font-weight: 650; color: var(--gold-ink); }
 .return-by .icon { width: 18px; height: 18px; }
+.spare-by { margin: -4px 0 0; padding-left: 24px; font-size: var(--fs-13); color: var(--ink-3); }
+.versus-line { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface); font-size: var(--fs-15); line-height: 1.45; color: var(--ink-2); text-wrap: pretty; }
+.versus-line .icon { flex: none; margin-top: 3px; color: var(--green); }
+.versus-line strong { color: var(--ink); font-weight: 650; }
+.result-versus { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: var(--fs-13); line-height: 1.35; color: var(--ink-2); text-wrap: pretty; }
 .nav-links { display: grid; gap: 8px; }
 .nav-links-label { font-size: var(--fs-13); color: var(--ink-3); font-weight: 550; }
 .nav-links-row { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -349,6 +354,12 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .setting-label { display: grid; gap: 2px; }
 .setting-label small { font-size: var(--fs-13); font-weight: 400; color: var(--ink-3); line-height: 1.4; }
 .setting .btn-sm { justify-self: start; }
+
+/* «Удиви меня» */
+.surprise-btn { width: 100%; }
+.surprise-btn .icon { color: var(--gold-ink); }
+.surprise-note { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-size: var(--fs-13); line-height: 1.45; color: var(--ink-2); }
+.surprise-note .icon { flex: none; margin-top: 2px; color: var(--gold-ink); }
 
 /* «Перед выходом» */
 .ready-place { display: flex; align-items: center; gap: 10px; font-size: var(--fs-17); min-width: 0; }
