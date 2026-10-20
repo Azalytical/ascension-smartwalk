@@ -182,3 +182,43 @@ test('API never takes weather from the request body', async () => {
   assert.equal(data.weather, null);
   assert.equal(data.recommendations[0].category, 'park');
 });
+
+test('jury v2: nameless «Фонтан» drops out of the Mega walk, nameless playgrounds carry a nearby name', () => {
+  const walk = ask('mega', { minutes: 60, maxWalkMinutes: 20, query: 'Я сейчас возле Mega Silk Way, хочу прогуляться 30–60 минут — что посоветуете?', visitDate: '2026-10-22T18:00:00+05:00' });
+  assert.ok(walk.recommendations.every(place => !place.nameIsGenerated));
+  const child = ask('baiterek', { minutes: 90, maxWalkMinutes: 15, withChild: true, query: 'Еду с ребёнком — где рядом есть детские площадки или музей с интерактивами?', visitDate: '2026-10-22T12:00:00+05:00' });
+  assert.equal(child.recommendations[0].nameIsGenerated, undefined);
+  for (const place of child.recommendations.filter(item => item.nameIsGenerated)) {
+    assert.match(place.name, /^Детская площадка у «.+»$/);
+    assert.ok(place.landmark.distanceMeters <= 250);
+    assert.ok(place.warnings.some(warning => warning.includes(`подписали по ближайшему месту «${place.landmark.name}»`)));
+  }
+  assert.equal(new Set(child.recommendations.map(place => place.name)).size, child.recommendations.length);
+});
+
+test('jury v2: a named category that does not fit gets the nearest one and the time it needs', () => {
+  const child = ask('baiterek', { minutes: 90, maxWalkMinutes: 15, withChild: true, query: 'Еду с ребёнком — где рядом есть детские площадки или музей с интерактивами?', visitDate: '2026-10-22T12:00:00+05:00' });
+  const museum = child.nearestMissing.find(item => item.category === 'museum');
+  assert.ok(museum.walkMinutes > 15);
+  assert.ok(child.warnings[0].startsWith(`Музей в ваше время не помещается: ближайший вариант «${museum.name}»`));
+  const empty = ask('baiterek', { minutes: 120, maxWalkMinutes: 30, query: 'I want to see a museum nearby', visitDate: '2026-10-22T15:00:00+05:00' });
+  assert.ok(empty.warnings[0].startsWith('Ближе всего подходит'));
+  assert.ok(empty.warnings[0].includes(`Разрешите до ${empty.nearestBeyondLimits.walkMinutes} мин пешком`));
+});
+
+test('jury v2: one record mapped twice is shown once, two cafes in one mall both stay', () => {
+  const sights = ask('baiterek', { minutes: 120, maxWalkMinutes: 20, query: 'Составь маршрут по достопримечательностям на 2 часа', visitDate: '2026-10-22T14:00:00+05:00' });
+  const fountains = sights.recommendations.filter(place => /субұрқақ|фонтан/i.test(place.name));
+  assert.ok(fountains.length <= 1);
+  const coffee = ask('mega', { minutes: 45, maxWalkMinutes: 15, query: 'Маған жақын жерде кофе ішкім келеді', visitDate: '2026-10-22T15:00:00+05:00' });
+  assert.ok(coffee.recommendations.some(place => place.name === 'Starbucks'));
+  assert.ok(coffee.recommendations.find(place => place.name === 'Starbucks').why.includes('по данным источника: кофейня'));
+});
+
+test('jury v2: a mini-route has at most one place to eat unless food is the request', () => {
+  const food = ['cafe', 'restaurant', 'nightlife'];
+  for (const [where, query] of [['baiterek', 'Я на коляске, нужно доступное место без ступенек'], ['baiterek', 'Куда сходить на полтора часа?'], ['mega', 'Погулять 90 минут']]) {
+    const route = ask(where, { minutes: 90, maxWalkMinutes: 15, query, visitDate: '2026-10-22T15:00:00+05:00' }).route;
+    if (route) assert.ok(route.stops.filter(stop => food.includes(stop.category)).length <= 1, query);
+  }
+});
