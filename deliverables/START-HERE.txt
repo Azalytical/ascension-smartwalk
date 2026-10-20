@@ -8,8 +8,10 @@ https://ascension-smartwalk.azamatbreach.workers.dev
 Часы: https://ascension-smartwalk.azamatbreach.workers.dev/watch
 Агент Gemini с шагами: https://ascension-smartwalk.azamatbreach.workers.dev/agent
 
-Видео на YouTube (доступ по ссылке):
-ссылка на финальный ролик (3:41) появится здесь 20 октября
+Видео (3:41):
+файл в репозитории: deliverables/video/aidem-final.mp4
+https://github.com/Azalytical/ascension-smartwalk/blob/main/deliverables/video/aidem-final.mp4
+YouTube (доступ по ссылке): ссылка появится здесь, как только ролик загрузится
 
 Репозиторий:
 https://github.com/Azalytical/ascension-smartwalk

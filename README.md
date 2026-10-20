@@ -20,7 +20,7 @@
 | | Что | Ссылка |
 |---|---|---|
 | 🌐 | Работающее демо, телефон или компьютер | [ascension-smartwalk.azamatbreach.workers.dev](https://ascension-smartwalk.azamatbreach.workers.dev) |
-| 🎬 | Видео на YouTube | [раздел «Видео»](#видео) |
+| 🎬 | Видео, 3:41 | [скачать MP4](deliverables/video/aidem-final.mp4) · [YouTube](#видео) |
 | 📊 | Презентация, 14 слайдов на 6 минут | [PDF](deliverables/ascension-smartwalk-presentation.pdf) · [живая версия с анимацией](deliverables/deck/) |
 | 🧪 | Тестовые сценарии и ограничения | [PDF](deliverables/ascension-smartwalk-tests-and-limitations.pdf) · [протокол 15 сценариев](docs/test-protocol.md) |
 | 💡 | Концепция, аудитория, бизнес-идея, риски, план | [docs/concept.md](docs/concept.md) |
@@ -144,7 +144,9 @@ npm run build && npx wrangler deploy     # ключ один раз: npx wrangle
 ## Видео
 
 <!-- VIDEO-LINK: заменить строку ниже ссылкой YouTube, когда ролик загружен -->
-Ролик на 3:41: сайт, телефон и часы в работе, озвучивает команда. **Ссылка на YouTube появится здесь 20 октября, до конца приёма работ.** Пока можно открыть [живое демо](https://ascension-smartwalk.azamatbreach.workers.dev) или посмотреть фрагмент выше.
+Ролик на 3:41: сайт, телефон и часы в работе, озвучивает команда.
+
+**[Скачать видео (MP4, 85 МБ)](deliverables/video/aidem-final.mp4)** · ссылка на YouTube появится здесь, как только ролик загрузится.
 <!-- /VIDEO-LINK -->
 
 ## Что в репозитории
@@ -157,7 +159,7 @@ scripts/        сбор данных, сборка, локальный серв
 tests/          автотесты (npm test), включая сценарии из задания на полной базе
 integrations/   агент на Google ADK
 docs/           концепция, этика, RAG, функции, деплой, часы, интеграции, протокол
-deliverables/   презентация (PDF и живая), PDF сценариев и ограничений, START-HERE
+deliverables/   видео, презентация (PDF и живая), PDF сценариев и ограничений, START-HERE
 archive/        материалы первой сдачи: старый ролик, скриншоты, сборщики
 ```
 
