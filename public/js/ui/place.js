@@ -6,7 +6,7 @@ import { formatDistance } from '../core/geo.js';
 import { lang } from '../core/i18n.js';
 import * as store from '../core/store.js';
 import { timeRing } from './ring.js';
-import { categoryArt, categoryName, hoursStatus, hoursChip, navLinks, share, backTime, confidenceChip, backButton, watchButton, listenButton } from './common.js';
+import { categoryArt, categoryName, hoursStatus, hoursChip, navLinks, share, backTime, confidenceChip, notabilityChip, backButton, watchButton, listenButton } from './common.js';
 import { toast } from './toast.js';
 
 const WHEELCHAIR = { yes: 'place.wheelchair.yes', limited: 'place.wheelchair.limited', no: 'place.wheelchair.no' };
@@ -45,6 +45,7 @@ export function placeView({ place, timing, start, serverHours, why, activities =
     ['check', 'good', t('place.check.coords')],
     place.openingHours ? ['check', 'good', t('place.check.hours')] : ['info', 'muted', t('place.check.noHours')],
     ...(place.confidence?.reasons || []).slice(0, 3).map((reason) => ['info', 'muted', capitalize(reason)]),
+    ...(place.notability?.reasons?.length ? [['info', 'muted', t('place.check.notability', { list: place.notability.reasons.join(', ') })]] : []),
     ['info', 'muted', t('place.check.live')],
   ];
   const snapshot = formatDate(place.retrievedAt);
@@ -63,7 +64,7 @@ export function placeView({ place, timing, start, serverHours, why, activities =
       h('div', {}, h('h2', { id: 'place-title', class: 'title-2', text: place.name }),
         h('p', { class: 'meta' }, categoryName(place.category), timing.distanceMeters ? h('span', { class: 'meta-sep', 'aria-hidden': 'true' }) : null,
           timing.distanceMeters ? t('place.straight', { d: formatDistance(timing.distanceMeters, lang()) }) : null),
-        h('div', { class: 'place-badges' }, hoursChip(hours), confidenceChip(place.confidence)))),
+        h('div', { class: 'place-badges' }, hoursChip(hours), confidenceChip(place.confidence), notabilityChip(place.notability)))),
     h('section', { class: 'time-card' },
       timeRing({ there: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, reserve: timing.safetyReserveMinutes, size: 132, stroke: 13, label: `${total}`, sublabel: t('plan.min', { n: '' }).trim() }),
       h('div', { class: 'time-card-side' }, h('ul', { class: 'legend' }, legend), h('p', { class: 'return-by' }, icon('return'), t('place.returnNow', { time: back })))),
