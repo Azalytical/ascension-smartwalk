@@ -32,6 +32,15 @@ test('merged dataset holds no betting shops or pet shops posing as bars and zoos
   assert.deepEqual(junk.map(place => place.name), []);
 });
 
+test('every place has a short Russian description built from its tags', () => {
+  const bad = places.filter(place => !/^[А-ЯЁ][а-яё ,-]*[а-яё]$/u.test(place.description.replace('Wi‑Fi', 'вайфай'))
+    || place.description.length > 120);
+  assert.deepEqual(bad.slice(0, 5).map(place => place.description), []);
+  const byId = id => places.find(place => place.id === id).description;
+  assert.equal(byId('osm:node:4931059138'), 'Фастфуд с бургерами, есть Wi‑Fi, можно взять с собой');
+  assert.equal(byId('osm:node:4874140222'), 'Ресторан грузинской кухни');
+});
+
 test('recommendations over the full dataset stay far below the Workers CPU limit', () => {
   prepareDataset(places);
   const queries = ['', 'кофе', 'погулять', 'с ребёнком', 'дождь', 'поесть', 'мечеть', 'фонтан', 'кино'];

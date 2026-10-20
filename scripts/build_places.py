@@ -216,6 +216,105 @@ def keywords(kind, feats):
     return " ".join(w for w in words if w) or None
 
 
+# Short descriptions: one Russian phrase per place, built only from the source's category, cuisine and tags.
+CUISINE_STYLE = {  # «… кухни»
+    "italian": "итальянской", "asian": "азиатской", "regional": "местной", "local": "местной", "chinese": "китайской",
+    "turkish": "турецкой", "japanese": "японской", "korean": "корейской", "russian": "русской", "european": "европейской",
+    "oriental": "восточной", "french": "французской", "georgian": "грузинской", "international": "международной",
+    "eastern_european": "восточноевропейской", "thai": "тайской", "mediterranean": "средиземноморской",
+    "indian": "индийской", "american": "американской", "lebanese": "ливанской", "german": "немецкой",
+    "mexican": "мексиканской", "filipino": "филиппинской", "ethiopian": "эфиопской", "croatian": "хорватской",
+    "kazakh": "казахской", "burmese": "бирманской", "brazilian": "бразильской", "uzbek": "узбекской",
+    "vietnamese": "вьетнамской", "arab": "арабской", "spanish": "испанской", "greek": "греческой",
+    "fine_dining": "высокой", "comfort_food": "домашней",
+}
+CUISINE_DISH = {  # «с …»
+    "burger": "бургерами", "pizza": "пиццей", "italian_pizza": "пиццей", "chicken": "курицей", "sushi": "суши",
+    "breakfast": "завтраками", "brunch": "бранчами", "breakfast_and_brunch": "завтраками и бранчами",
+    "bar_and_grill": "блюдами на гриле", "grill": "блюдами на гриле", "barbecue": "барбекю", "cake": "тортами",
+    "pastry": "выпечкой", "sandwich": "сэндвичами", "kebab": "кебабами", "doner_kebab": "донерами",
+    "shawarma": "шаурмой", "steak_house": "стейками", "steak": "стейками", "pasta": "пастой", "hot_dog": "хот-догами",
+    "beef_bowl": "боулами", "curry": "карри", "bubble_tea": "бабл-ти", "tea": "чаем", "crepe": "блинами",
+    "fish_and_chips": "фиш-энд-чипс", "seafood": "морепродуктами", "fish": "рыбой", "donut": "пончиками",
+    "dessert": "десертами", "fries": "картофелем фри", "friture": "блюдами во фритюре", "ramen": "раменом",
+    "deli": "деликатесами", "coffee_shop": "кофе", "ice_cream": "мороженым",
+}
+OVERTURE_HEADS = {
+    "coffee_shop": "Кофейня", "tea_room": "Чайная", "bubble_tea_shop": "Кафе с бабл-ти",
+    "smoothie_juice_bar": "Бар соков и смузи", "ice_cream_shop": "Кафе-мороженое", "chocolatier": "Шоколадная лавка",
+    "dessert_shop": "Кондитерская", "cupcake_shop": "Кондитерская", "karaoke_venue": "Караоке-бар",
+    "hookah_bar": "Кальянная", "beer_bar": "Пивной бар", "cocktail_bar": "Коктейльный бар", "sports_bar": "Спорт-бар",
+    "wine_bar": "Винный бар", "hotel_bar": "Бар при отеле", "irish_pub": "Ирландский паб", "salsa_club": "Клуб сальсы",
+    "theme_restaurant": "Тематический ресторан", "steakhouse": "Стейк-хаус", "salad_bar": "Салат-бар",
+    "history_museum": "Исторический музей", "art_museum": "Художественный музей", "science_museum": "Научный музей",
+    "botanical_garden": "Ботанический сад", "opera_and_ballet": "Театр оперы и балета",
+}
+KIND_HEADS = {
+    "fast_food": "Фастфуд", "dessert": "Кондитерская", "ice_cream": "Кафе-мороженое", "gallery": "Художественная галерея",
+    "amusement_park": "Парк аттракционов", "theme_park": "Тематический парк развлечений", "beach": "Городской пляж",
+    "viewpoint": "Смотровая площадка", "drinking_water": "Питьевая вода", "toilets": "Общественный туалет",
+    "bicycle_rental": "Станция проката велосипедов", "exhibition_centre": "Выставочный центр",
+}
+MONUMENT_HEADS = {"statue": "Памятник-статуя", "bust": "Памятник-бюст", "obelisk": "Обелиск",
+                  "war_memorial": "Военный мемориал", "sculpture": "Скульптура", "mural": "Мурал", "tank": "Танк-памятник"}
+
+
+def join_ru(words):
+    words = list(dict.fromkeys(words))
+    return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " и " + words[-1]
+
+
+def describe(record):
+    """«Кофейня с десертами, есть веранда»: nothing here that the source's tags don't say."""
+    kind, tags, feats = record["category"], record.get("tags") or {}, record.get("features") or {}
+    overture = tags.get("overture:category") or ""
+    cuisines = [c.strip().lower() for c in re.split(r"[;,]", tags.get("cuisine") or "") if c.strip()]
+    if overture.endswith("_restaurant"):
+        cuisines.append(overture.removesuffix("_restaurant"))
+    head = OVERTURE_HEADS.get(overture) or KIND_HEADS.get(kind) or LABELS.get(kind, "Место")
+    if kind == "cafe" and "coffee_shop" in cuisines and head == "Кафе":
+        head = "Кофейня"
+    if kind in ("monument", "memorial", "artwork"):
+        head = next((MONUMENT_HEADS[v] for v in (tags.get("memorial"), tags.get("artwork_type"), tags.get("historic"))
+                     if v in MONUMENT_HEADS), head)
+    if kind == "place_of_worship":
+        text = f"{record['name']} {overture}".lower()
+        head = ("Мечеть" if re.search(r"мешіт|мечеть|mosque|masjid|muslim", text)
+                else "Католический храм" if "roman_catholic" in text
+                else "Храм" if re.search(r"собор|храм|церк|cathedral|church|christian", text) else head)
+    phrase = head
+    if kind in FOOD:
+        styles = [CUISINE_STYLE[c] for c in cuisines if c in CUISINE_STYLE][:2]
+        dishes = [CUISINE_DISH[c] for c in cuisines if c in CUISINE_DISH and not (c == "coffee_shop" and head in
+                  ("Кофейня", "Ресторан", "Бар", "Паб"))][:2]
+        # «Кафе итальянской кухни с пиццей», but «Фастфуд с кофе и блюдами местной кухни».
+        if styles and kind in ("cafe", "restaurant"):
+            phrase += f" {join_ru(styles)} кухни"
+        elif styles:
+            dishes.append(f"блюдами {join_ru(styles)} кухни")
+        if dishes:
+            phrase += f" с {join_ru(dishes)}"
+    extras = []
+    if kind == "toilets" and record.get("fee") in ("no", "yes"):
+        extras.append("бесплатный" if record["fee"] == "no" else "платный")
+    wheelchair = record.get("wheelchair") or feats.get("wheelchair")
+    extras.append({"yes": "доступно для колясок", "limited": "частично доступно для колясок",
+                   "no": "недоступно для колясок"}.get(wheelchair, ""))
+    if record.get("openingHours") == "24/7":
+        extras.append("работает круглосуточно")
+    if feats.get("outdoorSeating"):
+        extras.append("есть веранда")
+    if feats.get("wifi"):
+        extras.append("есть Wi‑Fi")
+    if feats.get("vegetarian"):
+        extras.append("есть вегетарианские блюда")
+    if feats.get("halal") or "halal" in cuisines:
+        extras.append("халяльная кухня")
+    if feats.get("takeaway"):
+        extras.append("можно взять с собой")
+    return ", ".join([phrase] + [e for e in extras if e][:3])
+
+
 def osm_url(record_id):
     match = re.match(r"^([nwr])(\d+)@(\d+)$", str(record_id or ""))
     if not match:
@@ -350,7 +449,7 @@ def unnamed_osm_playgrounds(raw, retrieved_at, known):
         url = f"https://www.openstreetmap.org/{element['type']}/{element['id']}"
         yield base_record(
             id=uid, name="Детская площадка", lat=point["lat"], lon=point["lon"], category="playground",
-            description="Детская площадка. Название в OpenStreetMap не указано.",
+            description="Детская площадка",
             tags={k: tags[k] for k in SLIM_TAGS if k in tags}, sourceUrl=url, retrievedAt=retrieved_at,
             access=tags.get("access"), nameIsGenerated=True,
             source={**OSM_SOURCE, "osmVersion": element.get("version"), "osmUpdatedAt": element.get("timestamp")})
@@ -379,7 +478,7 @@ def from_overture_osm(row, kind, retrieved_at, release):
     label = LABELS.get(kind, "Место")
     return base_record(
         id=uid, name=primary or label, nameRu=ru, nameKk=kk, nameEn=en, lat=row["lat"], lon=row["lon"], category=kind,
-        description=f"{label}." + ("" if primary else " Название в OpenStreetMap не указано."),
+        description=label,
         keywords=keywords(kind, feats), tags={k: tags[k] for k in SLIM_TAGS if k in tags}, sourceUrl=url,
         retrievedAt=retrieved_at, access=tags.get("access"), fee=tags.get("fee"), wheelchair=tags.get("wheelchair"),
         wikipedia=wikipedia_url(tags.get("wikipedia")), wikidata=row.get("wikidata") or tags.get("wikidata"),
@@ -409,10 +508,9 @@ def from_overture_place(row, kind, retrieved_at, release):
     address = next((a.get("freeform") for a in row.get("addresses") or [] if a.get("freeform")), None)
     primary = (row.get("taxonomy") or {}).get("primary")
     cuisine = primary.removesuffix("_restaurant") if primary and primary.endswith("_restaurant") else None
-    description = f"{LABELS[kind]}." + (f" Адрес по данным {dataset}: {address}." if address else "")
     return base_record(
         id=f"overture:{row['id']}", name=name, nameRu=ru, nameKk=kk, nameEn=en, lat=row["lat"], lon=row["lon"],
-        category=kind, description=description, keywords=keywords(kind, {}),
+        category=kind, description=LABELS[kind], keywords=keywords(kind, {}),
         tags={k: v for k, v in (("overture:category", primary), ("cuisine", cuisine)) if v},
         sourceUrl=f"https://explore.overturemaps.org/#18/{row['lat']}/{row['lon']}", retrievedAt=retrieved_at,
         phone=(row.get("phones") or [None])[0], website=(row.get("websites") or [None])[0],
@@ -573,6 +671,7 @@ def main():
 
     for record in records:
         record.pop("_names", None)
+        record["description"] = describe(record)
         if not record["keywords"]:
             record.pop("keywords")
         for key in ("aliases", "socials", "features", "tags"):
