@@ -1,27 +1,28 @@
-ASCENSION · SMARTWALK · BUILD WITH AI 2026
+ASCENSION · SERUEN · BUILD WITH AI 2026
 
-Проект: «Успею вернуться», секция AI for Smart City.
+Проект: Seruen, прогулка по Астане ровно на ваше время, секция AI for Smart City.
+SmartWalk — рабочее имя до 20 октября, оно осталось в адресе сайта, в репозитории и в первом ролике.
 
 Работающий прототип:
 https://ascension-smartwalk.azamatbreach.workers.dev
 
 Видеообзор на YouTube (доступ по ссылке):
-https://youtu.be/EKrwOn43a5w
+https://youtu.be/6RCol9jsG4w
 
 Репозиторий:
 https://github.com/Azalytical/ascension-smartwalk
 
 Презентация (11 слайдов): ascension-smartwalk-presentation.pdf, исходник в deck/index.html (открыть в браузере).
 Прежняя редактируемая версия: ascension-smartwalk-presentation.pptx
-Сценарии и ограничения: ascension-smartwalk-tests-and-limitations.pdf
+Сценарии, ограничения и этика: ascension-smartwalk-tests-and-limitations.pdf (протокол 15 сценариев с Pass/Fail)
+Концепция и бизнес-идея: docs/concept.md, этика: docs/ethics.md, интеграции с Google: docs/integrations.md в репозитории
 Речь и демонстрация: ascension-smartwalk-defense-and-screencast.pdf
-Локальное видео: ascension-smartwalk-demo.mp4
+Локальное видео: ascension-smartwalk-video.mp4
 
-930 канонических POI из 933 исходных записей OpenStreetMap.
-35 автоматизированных тестов пройдены. Генерация: Gemini (gemini-3.5-flash-lite на демо), запасной ответ без модели.
-Три сценария ранее проверены в опубликованном интерфейсе.
-Каждая карточка — отдельная альтернатива, а не часть общего маршрута.
+2255 мест из OpenStreetMap и Overture Maps.
+105 автоматизированных тестов пройдены, 15 из 15 тестовых сценариев Pass. Генерация: Gemini (gemini-3.5-flash-lite на демо), запасной ответ без модели.
+Карточки — 1–3 альтернативы; при запасе от 45 минут дополнительно предлагается мини-маршрут из трёх мест.
 Пешее время является оценкой по расстоянию. Открытие и условия посещения не гарантируются.
 
-Данные © OpenStreetMap contributors, ODbL 1.0.
+Данные © OpenStreetMap contributors, ODbL 1.0, и Overture Maps Foundation.
 https://www.openstreetmap.org/copyright

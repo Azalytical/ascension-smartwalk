@@ -1,0 +1,118 @@
+{
+  "generatedFrom": {
+    "openStreetMap": {
+      "retrievedAt": "2026-10-19T11:22:05Z",
+      "rawSha256": "674f30902d3e8268f834bcc142fcf0e391d4b96ec83b6c3117b9632233a8db08"
+    },
+    "overture": {
+      "release": "2026-09-23.1",
+      "retrievedAt": "2026-10-20T09:54:39Z",
+      "files": {
+        "places.json": "6adb411809b99edd7fb122090827024e2442e7025a474b29ca4d1c00a4deff12",
+        "land_use.json": "38bce561e9fc236ba1514e56099900ed0c665281950bba9c3665ba9a10f80601",
+        "infrastructure.json": "7a502ba5ac9d4ced0810043e69c82145e691a0613eca3295f73bd637ac2c49a7",
+        "buildings.json": "766773924b2f465daa24da628fd1ac6fdaa2978b5be9253d355b2703d131389d"
+      }
+    }
+  },
+  "placesSha256": "86c5de63d120330a6cfe45adba92018d1ec36350721a20993ed310fc3971cf88",
+  "total": 2255,
+  "bySource": {
+    "OpenStreetMap": 1454,
+    "Overture Maps · Meta": 757,
+    "Overture Maps · Foursquare": 22,
+    "Overture Maps · Microsoft": 16,
+    "Overture Maps · AllThePlaces": 6
+  },
+  "byCategory": {
+    "cafe": 506,
+    "restaurant": 499,
+    "playground": 343,
+    "bar": 161,
+    "fast_food": 137,
+    "fountain": 86,
+    "mall": 80,
+    "park": 52,
+    "bicycle_rental": 47,
+    "toilets": 36,
+    "concert_hall": 28,
+    "pub": 27,
+    "memorial": 24,
+    "monument": 21,
+    "place_of_worship": 21,
+    "attraction": 19,
+    "museum": 17,
+    "plaza": 17,
+    "theatre": 16,
+    "artwork": 15,
+    "cinema": 13,
+    "library": 13,
+    "bakery": 12,
+    "gallery": 11,
+    "arts_centre": 10,
+    "amusement_park": 9,
+    "drinking_water": 7,
+    "bridge": 7,
+    "dessert": 5,
+    "ice_cream": 4,
+    "garden": 4,
+    "nightclub": 4,
+    "beach": 2,
+    "theme_park": 1,
+    "exhibition_centre": 1
+  },
+  "added": {
+    "osm_import": 911,
+    "osm_unnamed_playground": 323,
+    "overture_osm_land_use": 33,
+    "overture_osm_infrastructure": 175,
+    "overture_osm_buildings": 12,
+    "overture_places": 801
+  },
+  "enrichedExisting": {
+    "overture_osm_infrastructure": 8,
+    "overture_places": 242
+  },
+  "rejected": {
+    "osm_import:not_a_venue": 19,
+    "overture_osm_buildings:already_in_osm_import": 10,
+    "overture_osm_buildings:not_selected": 9,
+    "overture_osm_buildings:outside_or_private": 1,
+    "overture_osm_infrastructure:already_in_osm_import": 35,
+    "overture_osm_infrastructure:duplicate_nearby": 56,
+    "overture_osm_infrastructure:not_selected": 192,
+    "overture_osm_infrastructure:outside_or_private": 3,
+    "overture_osm_land_use:already_in_osm_import": 462,
+    "overture_osm_land_use:duplicate_nearby": 16,
+    "overture_osm_land_use:outside_or_private": 13,
+    "overture_osm_land_use:small_unnamed_green": 58,
+    "overture_places:category": 66,
+    "overture_places:landmark_mapped_elsewhere": 10,
+    "overture_places:low_confidence": 583,
+    "overture_places:name_not_a_place": 51,
+    "overture_places:not_a_venue": 3,
+    "overture_places:other_city": 6,
+    "overture_places:outside_bounds": 9
+  },
+  "generatedNames": 480,
+  "withOpeningHours": 315,
+  "withPhone": 923,
+  "withWebsite": 665,
+  "withSocials": 1047,
+  "withAddress": 1065,
+  "withWikipedia": 9,
+  "licenses": {
+    "ODbL-1.0": 1454,
+    "CDLA-Permissive-2.0": 773,
+    "Apache-2.0": 22,
+    "CC0-1.0": 6
+  },
+  "policy": [
+    "OpenStreetMap records keep priority; a matching Overture place only fills missing contacts, recorded in fieldSources and alsoIn.",
+    "Overture places need confidence >= 0.6 for food, 0.7 for parks and gardens, 0.5 for landmarks and culture; residential complexes, addresses, karaoke and hookah bars are excluded.",
+    "An Overture landmark whose name is already mapped up to 15 km away is dropped: business pages often pin the city centre.",
+    "Unnamed playgrounds, fountains, toilets and parks larger than 120 m get a generic name and nameIsGenerated=true.",
+    "Coordinates of areas are bbox centres, not entrances. Overture coordinates come from its sources (often business pages) and are less precise than OSM.",
+    "Opening hours exist only where OpenStreetMap has them; Overture has none."
+  ]
+}

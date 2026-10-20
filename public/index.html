@@ -1,97 +1,73 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#152b34">
-  <meta name="description" content="Куда сходить в Астане, если времени немного? SmartWalk подберёт места рядом и оставит время вернуться.">
-  <title>SmartWalk — хорошая прогулка, вовремя обратно</title>
-  <link rel="icon" href="/assets/brand/favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;450;500;550;600;650;700;750;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="/styles.css">
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
-  <script src="/app.js" defer></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F4F3EF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0B0B0D" media="(prefers-color-scheme: dark)">
+  <title>Seruen: прогулка по Астане ровно на ваше время</title>
+  <meta name="description" content="Seruen подбирает место в Астане под ваше свободное время: считает дорогу туда, время на месте и обратный путь, а ИИ объясняет выбор. Данные OpenStreetMap, совет Gemini.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Seruen: прогулка по Астане ровно на ваше время">
+  <meta property="og:description" content="ИИ подберёт место рядом и вернёт вас вовремя.">
+  <meta property="og:image" content="/assets/brand/seruen/og-1200x630.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/assets/brand/seruen/mark.svg" type="image/svg+xml">
+  <link rel="icon" href="/assets/brand/seruen/icon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/assets/brand/seruen/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Seruen">
+  <link rel="preload" href="/vendor/fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/vendor/maplibre/maplibre-gl.css">
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/friends.css">
+  <link rel="modulepreload" href="/js/main.js">
+  <script type="module" src="/js/main.js"></script>
 </head>
 <body>
-  <a class="skip-link" href="#planner">К планированию прогулки</a>
-  <header class="header page-width">
-    <a class="brand" href="/" aria-label="SmartWalk — главная">
-      <img class="brand-lockup" src="/assets/brand/smartwalk-light.svg" alt="SmartWalk by Ascension" width="194" height="48">
-    </a>
-    <nav class="header-nav" aria-label="Главная навигация">
-      <a href="#how-it-works">Как это работает</a>
-      <button class="plain-button" id="about-button" type="button">О проекте</button>
-    </nav>
-    <span class="city-badge"><span class="live-dot" aria-hidden="true"></span> Астана <span class="city-country">/ KZ</span></span>
-  </header>
+  <div class="app" id="app">
+    <div id="map" class="map" role="region" aria-label="Карта Астаны"></div>
+    <div class="map-crosshair" aria-hidden="true"><span></span></div>
+    <p id="map-note" class="map-note" role="status" hidden></p>
 
-  <main class="page-width">
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="hero-copy">
-        <p class="eyebrow"><span class="tiny-star" aria-hidden="true">✳</span> ГОРОД В ВАШЕМ ТЕМПЕ</p>
-        <h1 id="hero-title">Хорошая прогулка.<br><span>Вовремя обратно.</span></h1>
-        <p class="hero-description">Найдите своё место в Астане. Мы учтём дорогу,<br class="desktop-break"> время на месте и возвращение к началу.</p>
+    <header class="topbar" aria-label="Seruen">
+      <a class="brand" href="/" aria-label="Seruen">
+        <img src="/assets/brand/seruen/mark.svg" alt="" width="32" height="32">
+        <span class="wordmark">seruen</span>
+      </a>
+    </header>
+
+    <div class="map-fabs" role="group" aria-label="Карта">
+      <button id="fab-zoom-in" class="fab fab-desktop" type="button" aria-label="Приблизить"><svg class="icon" aria-hidden="true"><use href="/assets/icons/seruen.svg#plus"/></svg></button>
+      <button id="fab-zoom-out" class="fab fab-desktop" type="button" aria-label="Отдалить"><svg class="icon" aria-hidden="true"><use href="/assets/icons/seruen.svg#minus"/></svg></button>
+      <button id="fab-camera" class="fab fab-camera" type="button" aria-label="Что это за здание?"><svg class="icon" aria-hidden="true"><use href="/assets/icons/seruen.svg#camera"/></svg></button>
+      <button id="fab-tilt" class="fab" type="button" aria-pressed="false" aria-label="Наклонить карту"><span class="fab-text">3D</span></button>
+      <button id="fab-locate" class="fab" type="button" aria-label="Показать, где я"><svg class="icon" aria-hidden="true"><use href="/assets/icons/seruen.svg#locate"/></svg></button>
+    </div>
+
+    <section id="sheet" class="sheet" aria-label="Seruen">
+      <button id="sheet-handle" class="sheet-handle" type="button" aria-expanded="false" aria-label="Развернуть панель"><span></span></button>
+      <div class="sheet-brand">
+        <a class="brand" href="/" aria-label="Seruen">
+          <img src="/assets/brand/seruen/mark.svg" alt="" width="30" height="30">
+          <span class="wordmark">seruen</span>
+        </a>
+        <span class="brand-city">Астана</span>
       </div>
-      <div class="hero-note" aria-hidden="true">
-        <svg class="loop-illustration" viewBox="0 0 152 94" fill="none"><path d="M37 62C10 25 80 5 118 30c35 24-6 62-44 51-23-6-7-36 15-27" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 6"/><path d="m81 46 11 9-13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="37" cy="62" r="6" fill="#ee986d" stroke="#f6f5ef" stroke-width="4"/></svg>
-        <p>Немного времени.<br>Много города.</p>
-      </div>
+      <div id="sheet-body" class="sheet-body" role="tabpanel"></div>
     </section>
 
-    <section class="workspace" aria-label="Планирование прогулки">
-      <form id="planner" class="planner" novalidate>
-        <div class="section-topline"><span class="section-number">01 / ВАШ ПЛАН</span><span class="small-tag"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/ui.svg#sw-walk"/></svg>Пешком</span></div>
-        <h2>Куда хочется?</h2>
-        <label class="sr-only" for="query">Что хочется найти</label>
-        <div class="query-wrap"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/ui.svg#sw-search"/></svg><textarea id="query" name="query" rows="2" maxlength="500" placeholder="Например: тихое место, кофе или прогулка у воды"></textarea></div>
-
-        <div class="field-group start-group">
-          <div class="field-heading"><label for="start">Откуда идём</label><button id="locate-button" class="text-action" type="button" title="Использовать моё местоположение"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/ui.svg#sw-location"/></svg><span>Я здесь</span></button></div>
-          <div class="select-wrap"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/ui.svg#sw-pin"/></svg><select id="start" name="start"><option value="mega">Mega Silk Way</option><option value="baiterek">Байтерек</option><option value="embankment">Набережная Есиля</option></select><span class="select-chevron" aria-hidden="true">⌄</span></div>
-          <button id="pick-start-button" class="map-pick text-action" type="button">Или выбрать точку на карте <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/ui.svg#sw-external"/></svg></button>
-          <p class="inline-message" id="location-message" role="status" hidden></p>
-        </div>
-
-        <div class="field-group slider-group"><div class="field-heading"><label for="minutes">Сколько у вас времени?</label><output for="minutes" id="minutes-output">45 <span>мин</span></output></div><input id="minutes" name="minutes" type="range" min="20" max="120" step="5" value="45"><div class="range-captions"><span>20 мин</span><span>2 часа</span></div></div>
-        <div class="field-group slider-group compact-slider"><div class="field-heading"><label for="max-walk">Пешком до места</label><output for="max-walk" id="max-walk-output">15 <span>мин</span></output></div><input id="max-walk" name="maxWalkMinutes" type="range" min="5" max="30" step="5" value="15"><div class="range-captions"><span>5 мин</span><span>30 мин</span></div></div>
-
-        <label class="child-toggle"><input id="with-child" name="withChild" type="checkbox"><span class="toggle-visual" aria-hidden="true"></span><span>Иду с ребёнком</span><img class="child-category-icon" src="/assets/icons/categories/family-64.webp" srcset="/assets/icons/categories/family-32.webp 1x, /assets/icons/categories/family-64.webp 2x, /assets/icons/categories/family-128.webp 4x" alt="" width="28" height="28"></label>
-        <button class="primary-button" id="submit-button" type="submit"><span id="submit-label">Найти мою прогулку</span><span class="button-arrow" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/ui.svg#sw-external"/></svg></span></button>
-        <p class="privacy-note"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/ui.svg#sw-lock"/></svg>Точная локация не сохраняется.</p>
-      </form>
-
-      <div class="map-panel">
-        <div id="map" aria-label="Карта мест Астаны"></div>
-        <div class="map-fallback" id="map-fallback" hidden><img src="/assets/brand/smartwalk-mark.svg" alt="" width="48" height="48"><h3>Карта пока недоступна</h3><p>Подобрать прогулку всё равно можно.<br>Координаты и источники будут в карточках мест.</p></div>
-        <div class="map-topbar"><span class="map-label"><span class="live-dot" aria-hidden="true"></span> ИССЛЕДУЙТЕ АСТАНУ</span><button id="recenter-button" class="map-button" type="button" aria-label="Показать все точки" title="Показать все точки"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/ui.svg#sw-expand"/></svg></button></div>
-        <p id="map-pick-hint" class="map-pick-hint" role="status" hidden>Нажмите на карту, где начнётся прогулка <button id="cancel-pick-button" type="button" aria-label="Отменить выбор точки"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/ui.svg#sw-close"/></svg></button></p>
-        <p id="map-tile-warning" class="map-tile-warning" hidden>Подложка карты недоступна. Точки показаны по координатам.</p>
-        <div class="map-bottom-card" id="map-bottom-card"><div class="start-indicator" aria-hidden="true"><span></span></div><div><p class="map-bottom-kicker">НАЧАЛО И КОНЕЦ ПРОГУЛКИ</p><strong id="map-start-name">Mega Silk Way</strong><p id="map-bottom-description">Три хороших места рядом — и время на возвращение.</p></div><span class="map-bottom-time"><strong id="map-minutes">45</strong><span>минут</span></span></div>
-        <span class="map-estimate" id="map-estimate" hidden>Пунктир — прямая линия, не пешеходный маршрут</span>
-      </div>
-    </section>
-
-    <section class="quick-start" aria-labelledby="quick-title"><p id="quick-title">Есть настроение?<span> Начните с него.</span></p><div class="scenario-buttons"><button class="scenario-button" type="button" data-scenario="coffee"><img class="scenario-icon" src="/assets/icons/categories/coffee-64.webp" srcset="/assets/icons/categories/coffee-32.webp 1x, /assets/icons/categories/coffee-64.webp 2x, /assets/icons/categories/coffee-128.webp 4x" alt="" width="32" height="32"> Кофе за 45 минут <svg class="ui-icon scenario-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/ui.svg#sw-external"/></svg></button><button class="scenario-button" type="button" data-scenario="child"><img class="scenario-icon" src="/assets/icons/categories/family-64.webp" srcset="/assets/icons/categories/family-32.webp 1x, /assets/icons/categories/family-64.webp 2x, /assets/icons/categories/family-128.webp 4x" alt="" width="32" height="32"> Прогулка с ребёнком <svg class="ui-icon scenario-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/ui.svg#sw-external"/></svg></button><button class="scenario-button" type="button" data-scenario="water"><img class="scenario-icon" src="/assets/icons/categories/waterfront-64.webp" srcset="/assets/icons/categories/waterfront-32.webp 1x, /assets/icons/categories/waterfront-64.webp 2x, /assets/icons/categories/waterfront-128.webp 4x" alt="" width="32" height="32"> Выдохнуть у воды <svg class="ui-icon scenario-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/ui.svg#sw-external"/></svg></button></div></section>
-
-    <section id="results" class="results" aria-labelledby="results-title" hidden>
-      <div class="results-header"><div><p class="section-number">02 / ВАША ПРОГУЛКА</p><h2 id="results-title">Места, на которые хватит времени.</h2></div><button class="secondary-button" id="export-button" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/ui.svg#sw-download"/></svg>Сохранить план</button></div>
-      <div id="result-summary" class="result-summary" hidden></div>
-      <p id="generation-note" class="generation-note" hidden></p>
-      <div class="result-notices" id="result-notices" hidden></div>
-      <div class="result-grid" id="result-grid"></div>
-      <p class="results-footnote">Время в пути — ориентировочная оценка по расстоянию, без построения пешеходного маршрута. Проверьте переходы, погоду и режим работы перед выходом.</p>
-    </section>
-
-    <section id="feedback" class="feedback" tabindex="-1" role="status" aria-live="polite" hidden></section>
-
-    <section class="how-it-works" id="how-it-works" aria-labelledby="how-title"><div class="how-heading"><p class="section-number">ПРОСТО ВЫЙТИ ИЗ ДОМА</p><h2 id="how-title">Город ближе,<br>чем кажется.</h2></div><ol class="how-steps"><li><span>01</span><div><h3>Задайте свой ритм</h3><p>Откуда идёте, что нравится и когда нужно вернуться.</p></div></li><li><span>02</span><div><h3>Выберите место</h3><p>До трёх вариантов из базы городских мест, с объяснениями и источниками.</p></div></li><li><span>03</span><div><h3>Оставьте время на себя</h3><p>В расчёте есть дорога туда, время на месте и возвращение.</p></div></li></ol></section>
-  </main>
-
-  <footer class="footer page-width"><a href="/" class="footer-brand" aria-label="SmartWalk — главная"><img class="brand-lockup" src="/assets/brand/smartwalk-light.svg" alt="SmartWalk by Ascension" width="163" height="40"></a><p>Создано для коротких прогулок<br>и больших впечатлений от Астаны.</p><div class="footer-meta"><span id="data-status">Загружаем сведения о базе…</span><button id="privacy-button" class="plain-button" type="button">Данные и приватность <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/ui.svg#sw-external"/></svg></button></div><span class="footer-year">АСТАНА · 2026</span></footer>
-
-  <dialog id="info-dialog" class="info-dialog"><div class="dialog-top"><span class="section-number" id="dialog-kicker">SMARTWALK / ASCENSION</span><button id="close-dialog" class="dialog-close" type="button" aria-label="Закрыть"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/ui.svg#sw-close"/></svg></button></div><div id="dialog-content"></div></dialog>
+    <button id="live-pill" class="live-pill" type="button" hidden></button>
+    <nav id="tabbar" class="tabbar" role="tablist" aria-label="Разделы"></nav>
+  </div>
+  <div id="toasts" class="toasts"></div>
+  <div id="announcer" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+  <noscript><p class="noscript">Seruen работает в браузере с включённым JavaScript.</p></noscript>
 </body>
 </html>

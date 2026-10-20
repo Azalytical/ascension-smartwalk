@@ -1,0 +1,71 @@
+// Gemini media endpoints (docs/integrations.md): «что это за здание?» by photo and the answer read aloud.
+import { lang } from './i18n.js';
+
+/** Shrinks a photo to at most 768 px on the long side, as a JPEG data URL (the server's size limit). */
+export async function shrinkPhoto(file) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 768 / Math.max(bitmap.width, bitmap.height));
+  const canvas = Object.assign(document.createElement('canvas'), { width: Math.round(bitmap.width * scale), height: Math.round(bitmap.height * scale) });
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+  return canvas.toDataURL('image/jpeg', 0.8);
+}
+
+async function post(path, body, timeout = 45000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || String(response.status));
+    return data;
+  } finally { clearTimeout(timer); }
+}
+
+export const identify = ({ image, lat, lon }) => post('/api/vision', { image, lat, lon });
+
+let playing = null;
+export function stopSpeaking() {
+  playing?.stop();
+  playing = null;
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+}
+
+/** Reads the text with Gemini TTS (24 kHz 16-bit PCM); falls back to the browser voice. Resolves when done. */
+export async function speakText(text) {
+  stopSpeaking();
+  const clean = String(text || '').slice(0, 400);
+  if (!clean) return;
+  // The audio context is created inside the tap so iOS lets it play.
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  const context = AudioContext ? new AudioContext() : null;
+  try {
+    if (!context) throw new Error('no audio');
+    const data = await post('/api/speak', { text: clean }, 30000);
+    const bytes = Uint8Array.from(atob(data.data), (char) => char.charCodeAt(0));
+    const samples = new Int16Array(bytes.buffer, 0, Math.floor(bytes.length / 2));
+    const buffer = context.createBuffer(1, samples.length, data.sampleRate || 24000);
+    const channel = buffer.getChannelData(0);
+    for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768;
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(context.destination);
+    await context.resume?.();
+    source.start();
+    await new Promise((resolve) => {
+      playing = { stop: () => { try { source.stop(); } catch { /* already stopped */ } resolve(); } };
+      source.onended = resolve;
+    });
+  } catch {
+    if (!('speechSynthesis' in window)) return;
+    await new Promise((resolve) => {
+      const utterance = new SpeechSynthesisUtterance(clean);
+      utterance.lang = { ru: 'ru-RU', kk: 'kk-KZ', en: 'en-US' }[lang()] || 'ru-RU';
+      utterance.onend = resolve; utterance.onerror = resolve;
+      speechSynthesis.speak(utterance);
+    });
+  } finally {
+    playing = null;
+    context?.close?.().catch(() => {});
+  }
+}
