@@ -13,7 +13,7 @@
 Ссылки:
 
 - Работающее демо: https://ascension-smartwalk.azamatbreach.workers.dev (часы: `/watch`, агент Gemini: `/agent`)
-- Видео: [video/aidem-final.mp4](video/aidem-final.mp4), ссылка на YouTube в [README](../README.md#видео)
+- Видео на YouTube: https://youtu.be/7eWd4-gZa_I (файл: [video/aidem-final.mp4](video/aidem-final.mp4))
 - Репозиторий: https://github.com/Azalytical/ascension-smartwalk
 
 Протокол в PDF собирается заново командами из [docs/deploy.md](../docs/deploy.md#протокол-сценариев-и-pdf), презентация в PDF — по [deck/README.md](deck/README.md#pdf).
