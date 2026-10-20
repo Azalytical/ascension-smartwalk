@@ -1,6 +1,8 @@
 // Social state for the whole page: profile token, polling, and the location share that keeps running
 // while the person uses other tabs. Screens subscribe with onChange(); nothing here touches the DOM.
 import { coarse } from '../core/privacy.js';
+import { t, lang } from '../core/i18n.js';
+import './strings.js';
 
 const TOKEN_KEY = 'seruen.social.token';
 const FAST_POLL = 10_000;
@@ -39,9 +41,16 @@ export function onChange(listener) {
 
 export function getState() { return state; }
 
+// The server answers in Russian; in Kazakh and English the text comes from the error code.
+function errorText(body) {
+  if (body?.error && (lang() === 'ru' || body.local)) return body.error;
+  const key = `sx.err.${body?.code}`;
+  return body?.code && t(key) !== key ? t(key) : t('sx.err.generic');
+}
+
 export class ApiError extends Error {
   constructor(status, body) {
-    super(body?.error || 'Не получилось. Попробуйте ещё раз.');
+    super(errorText(body));
     this.status = status;
     this.code = body?.code;
     this.body = body;
@@ -57,7 +66,7 @@ export async function api(path, body) {
     response = await fetch(`/api/social/${path}`, { method: body === undefined ? 'GET' : 'POST', headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' });
   } catch {
     state.offline = true;
-    throw new ApiError(0, { error: 'Нет связи с сервером. Проверьте интернет.' });
+    throw new ApiError(0, { error: t('sx.err.offline'), local: true });
   }
   state.offline = false;
   let data = null;
@@ -177,7 +186,7 @@ function publish(point, force = false) {
 
 function startWatching() {
   if (watchId !== null || !('geolocation' in navigator)) {
-    if (!('geolocation' in navigator)) { state.geo.error = 'Браузер не умеет определять местоположение'; emit('geo'); }
+    if (!('geolocation' in navigator)) { state.geo.error = t('sx.geo.unsupported'); emit('geo'); }
     return;
   }
   state.geo.watching = true;
@@ -190,7 +199,7 @@ function startWatching() {
     publish(point, first);
     emit('geo');
   }, error => {
-    state.geo.error = error.code === 1 ? 'Браузер не дал доступ к геопозиции. Разрешите его в настройках сайта.' : 'Не удаётся определить местоположение. Выйдите на открытое место или проверьте GPS.';
+    state.geo.error = t(error.code === 1 ? 'sx.geo.denied' : 'sx.geo.failed');
     emit('geo');
   }, { enableHighAccuracy: true, maximumAge: 15_000, timeout: 30_000 });
 }

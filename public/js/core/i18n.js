@@ -254,6 +254,11 @@ export const date = (value) => {
 };
 export const number = (n) => new Intl.NumberFormat(locale()).format(n);
 
+/** Adds a feature's own strings ({ ru, kk, en }) to the dictionaries, e.g. the «Друзья» tab in social/strings.js. */
+export function addStrings(extra) {
+  for (const [code, entries] of Object.entries(extra)) Object.assign(dictionaries[code], entries);
+}
+
 export function setLang(next) {
   if (!dictionaries[next] || next === current) return;
   current = next;

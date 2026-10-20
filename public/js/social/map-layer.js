@@ -1,5 +1,7 @@
 // Friends, meetups, events and meeting-point options on the shared MapLibre map.
 // Everything this module adds is prefixed with "friends-" and removed by destroy().
+import { t } from '../core/i18n.js';
+import './strings.js';
 
 const STALE_MS = 10 * 60_000;
 const CATEGORY_EMOJI = { walk: '🚶', sport: '🏃', food: '🍽', culture: '🎭', study: '📚', kids: '🧸', other: '✨' };
@@ -113,7 +115,7 @@ export function createSocialLayer(map, maplibregl, { onFriend, onMeetup, onEvent
       const now = Date.now();
       if (me && Number.isFinite(me.lat)) {
         keep.add('friend:me');
-        place('friend:me', avatarElement({ ...me, name: 'Вы' }, { label: 'Вы' }), [me.lon, me.lat]);
+        place('friend:me', avatarElement({ ...me, name: t('sx.you') }, { label: t('sx.you') }), [me.lon, me.lat]);
       }
       for (const friend of friends) {
         const location = friend.location;
@@ -132,7 +134,7 @@ export function createSocialLayer(map, maplibregl, { onFriend, onMeetup, onEvent
         if (meetup.status !== 'active') continue;
         const key = `meetup:${meetup.id}`;
         meetupKeys.add(key);
-        place(key, pinElement('sx-map-pin is-meetup', '🤝', `Встреча: ${meetup.title}, ${meetup.place.name}`), [meetup.place.lon, meetup.place.lat], () => onMeetup?.(meetup.id));
+        place(key, pinElement('sx-map-pin is-meetup', '🤝', t('sx.map.meetup', { title: meetup.title, place: meetup.place.name })), [meetup.place.lon, meetup.place.lat], () => onMeetup?.(meetup.id));
       }
       sweep('meetup:', meetupKeys);
 
@@ -141,7 +143,7 @@ export function createSocialLayer(map, maplibregl, { onFriend, onMeetup, onEvent
         if (event.status !== 'active') continue;
         const key = `event:${event.id}`;
         eventKeys.add(key);
-        place(key, pinElement('sx-map-pin is-event', CATEGORY_EMOJI[event.category] || '✨', `Событие: ${event.title}`), [event.place.lon, event.place.lat], () => onEvent?.(event.id));
+        place(key, pinElement('sx-map-pin is-event', CATEGORY_EMOJI[event.category] || '✨', t('sx.map.event', { title: event.title })), [event.place.lon, event.place.lat], () => onEvent?.(event.id));
       }
       sweep('event:', eventKeys);
     },
@@ -152,7 +154,7 @@ export function createSocialLayer(map, maplibregl, { onFriend, onMeetup, onEvent
       result.options.forEach((option, index) => {
         const key = `option:${index}:${option.place.id}`;
         keep.add(key);
-        const element = pinElement(`sx-map-pin is-option${index === selected ? ' is-selected' : ''}`, String(index + 1), `Вариант ${index + 1}: ${option.place.name}`);
+        const element = pinElement(`sx-map-pin is-option${index === selected ? ' is-selected' : ''}`, String(index + 1), t('sx.map.option', { n: index + 1, place: option.place.name }));
         if (index === selected) element.style.zIndex = '3';
         place(key, element, [option.place.lon, option.place.lat], () => onOption?.(index));
       });

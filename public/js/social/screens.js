@@ -3,13 +3,18 @@
 import * as social from './service.js';
 import { createSocialLayer, CATEGORY_EMOJI } from './map-layer.js';
 import { coarse } from '../core/privacy.js';
+import { t, plural, lang, locale } from '../core/i18n.js';
+import './strings.js';
 
 const EMOJIS = ['🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐸', '🐵', '🦄', '🐙', '🦉', '🐧', '🐳', '🦋', '🌻', '🌵', '🍀', '⚡', '🔥', '🌙', '⭐', '🎧', '🎨', '⚽', '🚲', '☕', '📚', '🏔'];
-const KINDS = [['any', 'Любое'], ['coffee', '☕ Кофе'], ['food', '🍽 Поесть'], ['park', '🌳 Парк'], ['indoor', '🏬 Под крышей']];
-const NOTES = ['☕ Свободен на кофе', '🚶 Гуляю', '🍽 Хочу поесть', '⏳ Занят, позже'];
-const EVENT_CATEGORIES = [['walk', '🚶 Прогулка'], ['sport', '🏃 Спорт'], ['food', '🍽 Еда'], ['culture', '🎭 Культура'], ['study', '📚 Учёба'], ['kids', '🧸 С детьми'], ['other', '✨ Другое']];
-const STATUS = { going: 'идёт', maybe: 'может быть', declined: 'не сможет', on_way: 'в пути', arrived: 'на месте', invited: 'ещё не ответил(а)' };
-const CATEGORY_NAMES = { cafe: 'кафе', restaurant: 'еда', park: 'парк', mall: 'ТРЦ', attraction: 'место', museum: 'музей', culture: 'культура', playground: 'площадка' };
+// Strings are looked up at render time (strings.js), so switching the language re-renders the tab in it.
+const KINDS = ['any', 'coffee', 'food', 'park', 'indoor'];
+const NOTES = ['coffee', 'walk', 'food', 'busy'];
+const EVENT_CATEGORIES = ['walk', 'sport', 'food', 'culture', 'study', 'kids', 'other'];
+const CATEGORY_NAMES = new Set(['cafe', 'restaurant', 'park', 'mall', 'attraction', 'museum', 'culture', 'playground']);
+const known = key => t(key) !== key;
+const statusText = status => (known(`sx.status.${status}`) ? t(`sx.status.${status}`) : status);
+const categoryName = category => t(CATEGORY_NAMES.has(category) ? `sx.place.${category}` : 'sx.place.other');
 
 // ---------- small DOM helpers ----------
 
@@ -54,43 +59,53 @@ function dayLabel(ts) {
   const d = new Date(ts), today = new Date();
   const start = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diff = Math.round((start(d) - start(today)) / 86400000);
-  if (diff === 0) return 'сегодня';
-  if (diff === 1) return 'завтра';
-  if (diff === -1) return 'вчера';
-  return d.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
+  if (diff === 0) return t('sx.today');
+  if (diff === 1) return t('sx.tomorrow');
+  if (diff === -1) return t('sx.yesterday');
+  return d.toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short' });
 }
-const when = ts => `${dayLabel(ts)} в ${clock(ts)}`;
+const when = ts => t('sx.when', { day: dayLabel(ts), time: clock(ts) });
 function ago(ts) {
   const minutes = Math.round((Date.now() - ts) / 60000);
-  if (minutes < 1) return 'только что';
-  if (minutes < 60) return `${minutes} мин назад`;
-  return `${Math.round(minutes / 60)} ч назад`;
+  if (minutes < 1) return t('sx.ago.now');
+  if (minutes < 60) return t('sx.ago.min', { n: minutes });
+  return t('sx.ago.h', { n: Math.round(minutes / 60) });
 }
 function until(ts) {
   const minutes = Math.round((ts - Date.now()) / 60000);
-  if (minutes <= -90) return `было ${when(ts)}`;
-  if (minutes < 0) return `началось ${-minutes} мин назад`;
-  if (minutes === 0) return 'прямо сейчас';
-  if (minutes < 60) return `через ${minutes} мин`;
-  if (minutes < 24 * 60) return `через ${Math.round(minutes / 60)} ч`;
+  if (minutes <= -90) return t('sx.until.past', { when: when(ts) });
+  if (minutes < 0) return t('sx.until.started', { n: -minutes });
+  if (minutes === 0) return t('sx.until.now');
+  if (minutes < 60) return t('sx.until.min', { n: minutes });
+  if (minutes < 24 * 60) return t('sx.until.h', { n: Math.round(minutes / 60) });
   return when(ts);
 }
 function left(ts) {
   const minutes = Math.max(0, Math.round((ts - Date.now()) / 60000));
-  return minutes < 60 ? `ещё ${minutes} мин` : `ещё ${Math.round(minutes / 60)} ч`;
+  return minutes < 60 ? t('sx.left.min', { n: minutes }) : t('sx.left.h', { n: Math.round(minutes / 60) });
 }
-function km(meters) { return meters < 1000 ? `${Math.round(meters / 10) * 10} м` : `${(meters / 1000).toFixed(1).replace('.', ',')} км`; }
+function km(meters) {
+  if (meters < 1000) return t('sx.m', { n: Math.round(meters / 10) * 10 });
+  return t('sx.km', { n: new Intl.NumberFormat(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(meters / 1000) });
+}
 function localInput(ts) { const d = new Date(ts); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 const roundTo5 = ts => Math.ceil(ts / 300000) * 300000;
-function plural(n, one, few, many) {
-  const m10 = n % 10, m100 = n % 100;
-  return m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
+const counted = (n, key) => `${n} ${plural(n, key)}`;
+
+/** The server writes notifications in Russian; in Kazakh and English they are rebuilt from their type. */
+function notificationText(item, state) {
+  const key = `sx.nt.${item.type}`;
+  if (lang() === 'ru' || !known(key)) return item.text;
+  const meetup = state.data?.meetups?.find(entry => entry.id === item.entityId);
+  const event = state.events?.find(entry => entry.id === item.entityId);
+  const title = item.type.startsWith('event') ? event?.title ?? t('sx.nt.event') : meetup?.title ?? t('sx.nt.meetup');
+  return t(key, { name: item.actor?.name ?? t('sx.nt.someone'), title });
 }
 
 function routeLinks(target) {
   return h('div', { class: 'sx-links' },
-    h('a', { class: 'sx-link', href: `https://2gis.kz/astana/geo/${target.lon},${target.lat}`, target: '_blank', rel: 'noopener noreferrer' }, 'Открыть в 2ГИС'),
-    h('a', { class: 'sx-link', href: `https://www.google.com/maps/dir/?api=1&destination=${target.lat},${target.lon}&travelmode=walking`, target: '_blank', rel: 'noopener noreferrer' }, 'Маршрут в Google Maps'));
+    h('a', { class: 'sx-link', href: `https://2gis.kz/astana/geo/${target.lon},${target.lat}`, target: '_blank', rel: 'noopener noreferrer' }, t('sx.open2gis')),
+    h('a', { class: 'sx-link', href: `https://www.google.com/maps/dir/?api=1&destination=${target.lat},${target.lon}&travelmode=walking`, target: '_blank', rel: 'noopener noreferrer' }, t('sx.googleRoute')));
 }
 
 function downloadCalendar({ title, startsAt, endsAt, place, description = '' }) {
@@ -156,7 +171,7 @@ export function mountSocial(root, ctx = {}) {
       if (success) toast(success, 'success');
       return result;
     } catch (error) {
-      toast(error.message || 'Не получилось', 'error');
+      toast(error.message || t('sx.failed'), 'error');
       return null;
     } finally {
       view.busy = false;
@@ -201,14 +216,14 @@ export function mountSocial(root, ctx = {}) {
     const state = data();
     if (!state) return null;
     return h('header', { class: 'sx-header' },
-      h('h2', { class: 'sx-title' }, view.overlay ? backButton() : 'Друзья'),
+      h('h2', { class: 'sx-title' }, view.overlay ? backButton() : t('sx.title')),
       h('div', { class: 'sx-header-actions' },
-        h('button', { type: 'button', class: 'sx-icon-button', 'aria-label': `Уведомления${state.unread ? `: ${state.unread} новых` : ''}`, onclick: () => open({ type: 'notifications' }) },
+        h('button', { type: 'button', class: 'sx-icon-button', 'aria-label': state.unread ? t('sx.notificationsNew', { n: state.unread }) : t('sx.notifications'), onclick: () => open({ type: 'notifications' }) },
           '🔔', state.unread ? h('span', { class: 'sx-badge' }, state.unread > 9 ? '9+' : state.unread) : null),
-        h('button', { type: 'button', class: 'sx-icon-button', 'aria-label': 'Мой профиль', onclick: () => open({ type: 'profile' }) }, avatar(state.me, 'sm'))));
+        h('button', { type: 'button', class: 'sx-icon-button', 'aria-label': t('sx.myProfile'), onclick: () => open({ type: 'profile' }) }, avatar(state.me, 'sm'))));
   }
   function backButton() {
-    return h('button', { type: 'button', class: 'sx-back', onclick: close }, '‹ Назад');
+    return h('button', { type: 'button', class: 'sx-back', onclick: close }, t('sx.back'));
   }
 
   // ---------- onboarding ----------
@@ -216,8 +231,8 @@ export function mountSocial(root, ctx = {}) {
   function onboarding() {
     const invite = view.pendingInvite;
     let emoji = EMOJIS[Math.floor(Math.random() * 12)];
-    const name = h('input', { class: 'sx-input', id: 'sx-name', maxlength: 32, autocomplete: 'nickname', placeholder: 'Как вас зовут друзья', required: true });
-    const picker = h('div', { class: 'sx-emoji-grid', role: 'radiogroup', 'aria-label': 'Значок' },
+    const name = h('input', { class: 'sx-input', id: 'sx-name', maxlength: 32, autocomplete: 'nickname', placeholder: t('sx.ob.namePlaceholder'), required: true });
+    const picker = h('div', { class: 'sx-emoji-grid', role: 'radiogroup', 'aria-label': t('sx.emoji') },
       EMOJIS.map(value => h('button', { type: 'button', class: 'sx-emoji', role: 'radio', 'aria-checked': String(value === emoji), 'aria-label': value,
         onclick: event => { emoji = value; for (const node of picker.children) node.setAttribute('aria-checked', String(node === event.currentTarget)); } }, value)));
     const start = async event => {
@@ -226,32 +241,32 @@ export function mountSocial(root, ctx = {}) {
       if (!me) return;
       root.scrollTop = 0;
       if (invite) await acceptInvite(invite.code);
-      else toast(`Профиль создан, ${me.name}!`, 'success');
+      else toast(t('sx.ob.created', { name: me.name }), 'success');
     };
-    const code = h('input', { class: 'sx-input sx-code-input', inputmode: 'numeric', maxlength: 6, placeholder: '123456', 'aria-label': 'Код с другого устройства' });
+    const code = h('input', { class: 'sx-input sx-code-input', inputmode: 'numeric', maxlength: 6, placeholder: '123456', 'aria-label': t('sx.ob.codeLabel') });
     return h('div', { class: 'sx-onboarding' },
-      invite?.inviter ? h('div', { class: 'sx-invite-card' }, avatar(invite.inviter, 'lg'), h('div', {}, h('strong', {}, `${invite.inviter.name} зовёт вас в друзья`), h('p', {}, 'Создайте профиль за 10 секунд, и вы сразу окажетесь в друзьях.'))) : null,
+      invite?.inviter ? h('div', { class: 'sx-invite-card' }, avatar(invite.inviter, 'lg'), h('div', {}, h('strong', {}, t('sx.ob.invited', { name: invite.inviter.name })), h('p', {}, t('sx.ob.invitedText')))) : null,
       h('div', { class: 'sx-hero' }, h('div', { class: 'sx-hero-faces', 'aria-hidden': 'true' }, '🦊', '🐻', '🐼'),
-        h('h2', {}, 'Гуляйте вместе'),
-        h('p', {}, 'Смотрите, кто из друзей рядом, и встречайтесь там, куда всем идти примерно одинаково.')),
+        h('h2', {}, t('sx.ob.title')),
+        h('p', {}, t('sx.ob.text'))),
       h('ul', { class: 'sx-promises' },
-        h('li', {}, h('span', {}, '🔒'), 'Без почты и телефона: только имя и значок.'),
-        h('li', {}, h('span', {}, '⏱'), 'Ваше место видно друзьям, только когда вы сами включите, и только на 15 минут, час или 8 часов.'),
-        h('li', {}, h('span', {}, '✋'), 'Остановить можно в одно касание. Истории перемещений нет.')),
+        h('li', {}, h('span', {}, '🔒'), t('sx.ob.p1')),
+        h('li', {}, h('span', {}, '⏱'), t('sx.ob.p2')),
+        h('li', {}, h('span', {}, '✋'), t('sx.ob.p3'))),
       h('form', { class: 'sx-form', onsubmit: start },
-        h('label', { class: 'sx-label', for: 'sx-name' }, 'Имя'), name,
-        h('span', { class: 'sx-label' }, 'Значок'), picker,
-        h('button', { type: 'submit', class: 'btn btn-primary sx-btn sx-wide' }, invite?.inviter ? `Начать и добавить: ${invite.inviter.name}` : 'Начать')),
-      h('details', { class: 'sx-details' }, h('summary', {}, 'Уже есть профиль на телефоне? Войти по коду'),
-        h('form', { class: 'sx-inline-form', onsubmit: async event => { event.preventDefault(); const me = await run(() => social.claimDevice(code.value)); if (me) { root.scrollTop = 0; toast(`Вы вошли как ${me.name}`, 'success'); } } },
-          code, button('Войти', null, 'primary', { type: 'submit' })),
-        h('p', { class: 'sx-hint' }, 'Код показывается в профиле на другом устройстве: «Связать часы».')));
+        h('label', { class: 'sx-label', for: 'sx-name' }, t('sx.name')), name,
+        h('span', { class: 'sx-label' }, t('sx.emoji')), picker,
+        h('button', { type: 'submit', class: 'btn btn-primary sx-btn sx-wide' }, invite?.inviter ? t('sx.ob.startWith', { name: invite.inviter.name }) : t('sx.ob.start'))),
+      h('details', { class: 'sx-details' }, h('summary', {}, t('sx.ob.haveProfile')),
+        h('form', { class: 'sx-inline-form', onsubmit: async event => { event.preventDefault(); const me = await run(() => social.claimDevice(code.value)); if (me) { root.scrollTop = 0; toast(t('sx.ob.signedIn', { name: me.name }), 'success'); } } },
+          code, button(t('sx.ob.signIn'), null, 'primary', { type: 'submit' })),
+        h('p', { class: 'sx-hint' }, t('sx.ob.codeHint'))));
   }
 
   async function acceptInvite(code) {
     const result = await run(() => social.act('acceptInvite', { code }));
     view.pendingInvite = null;
-    if (result) toast(result.already ? `${result.friend.name} уже у вас в друзьях` : `${result.friend.name} теперь у вас в друзьях`, 'success');
+    if (result) toast(t(result.already ? 'sx.alreadyFriend' : 'sx.nowFriend', { name: result.friend.name }), 'success');
     render(true);
   }
 
@@ -262,33 +277,34 @@ export function mountSocial(root, ctx = {}) {
     const geo = social.getState().geo;
     if (!share) {
       return h('section', { class: 'sx-share is-off' },
-        h('div', {}, h('strong', {}, 'Вас не видно на карте'), h('p', {}, 'Включите, когда хотите, чтобы друзья нашли вас.')),
-        button('Показать друзьям, где я', () => open({ type: 'share' }), 'gold'));
+        h('div', {}, h('strong', {}, t('sx.share.offTitle')), h('p', {}, t('sx.share.offText'))),
+        button(t('sx.share.cta'), () => open({ type: 'share' }), 'gold'));
     }
-    const audience = share.audience === 'all' ? 'все друзья' : `${share.recipients.length} ${plural(share.recipients.length, 'друг', 'друга', 'друзей')}`;
+    const audience = share.audience === 'all' ? t('sx.share.allFriends') : counted(share.recipients.length, 'sx.w.friend');
     return h('section', { class: 'sx-share is-on', 'aria-live': 'polite' },
       h('span', { class: 'sx-live-dot', 'aria-hidden': 'true' }),
-      h('div', {}, h('strong', {}, 'Вы на карте'),
-        h('p', {}, `${share.mode === 'approximate' ? 'Примерно' : 'Точно'} · ${left(share.expiresAt)} · видят ${audience}`),
+      h('div', {}, h('strong', {}, t('sx.share.onTitle')),
+        h('p', {}, t('sx.share.onText', { mode: t(share.mode === 'approximate' ? 'sx.share.approx' : 'sx.share.precise'), left: left(share.expiresAt), audience })),
         share.note ? h('p', {}, `«${share.note}»`) : null,
-        geo.error ? h('p', { class: 'sx-warning' }, geo.error) : !share.hasPoint ? h('p', { class: 'sx-hint' }, 'Определяем местоположение…') : null),
-      button('Остановить', () => run(() => social.stopShare(), 'Показ места остановлен, точка удалена'), 'ghost', { class: 'btn btn-ghost sx-btn sx-stop' }));
+        geo.error ? h('p', { class: 'sx-warning' }, geo.error) : !share.hasPoint ? h('p', { class: 'sx-hint' }, t('sx.share.locating')) : null),
+      button(t('sx.share.stop'), () => run(() => social.stopShare(), t('sx.share.stopped')), 'ghost', { class: 'btn btn-ghost sx-btn sx-stop' }));
   }
 
   function shareForm() {
     const choice = { minutes: 60, mode: 'approximate', audience: 'all', recipients: new Set(), note: '' };
     const body = h('div', { class: 'sx-form' });
     const consent = h('input', { type: 'checkbox', id: 'sx-consent' });
-    const submit = button('Включить', async () => {
-      if (!consent.checked) { toast('Подтвердите согласие', 'error'); return; }
+    const submit = button(t('sx.share.enable'), async () => {
+      if (!consent.checked) { toast(t('sx.share.confirm'), 'error'); return; }
       const share = await run(() => social.startShare({ minutes: choice.minutes, mode: choice.mode, audience: choice.audience, recipients: [...choice.recipients], note: choice.note }));
-      if (share) { toast('Друзья видят вас на карте', 'success'); close(); }
+      if (share) { toast(t('sx.share.started'), 'success'); close(); }
     }, 'primary', { class: 'btn btn-primary sx-btn sx-wide', disabled: true });
     consent.addEventListener('change', () => { submit.disabled = !consent.checked; });
     const consentText = h('span');
     const updateConsent = () => {
-      const whom = choice.audience === 'all' ? 'все мои друзья' : choice.recipients.size ? 'выбранные друзья' : 'выбранные друзья (выберите хотя бы одного)';
-      consentText.textContent = `Я согласен(на): ${whom} увидят ${choice.mode === 'approximate' ? 'примерное' : 'точное'} место до ${clock(Date.now() + choice.minutes * 60000)}. Остановить можно в любой момент.`;
+      const whom = t(choice.audience === 'all' ? 'sx.share.whomAll' : choice.recipients.size ? 'sx.share.whomSome' : 'sx.share.whomNone');
+      consentText.textContent = t('sx.share.consent', { whom, what: t(choice.mode === 'approximate' ? 'sx.share.consentApprox' : 'sx.share.consentPrecise'),
+        time: clock(Date.now() + choice.minutes * 60000) });
     };
     const group = (label, options, key, after) => {
       const row = h('div', { class: 'sx-chips', role: 'group', 'aria-label': label });
@@ -304,19 +320,19 @@ export function mountSocial(root, ctx = {}) {
         drawPicker(); updateConsent();
       })));
     };
-    const note = h('input', { class: 'sx-input', maxlength: 60, placeholder: 'Свой статус, например «У Байтерека до 18:00»', oninput: () => { choice.note = note.value; drawNotes(); } });
+    const note = h('input', { class: 'sx-input', maxlength: 60, placeholder: t('sx.share.notePlaceholder'), oninput: () => { choice.note = note.value; drawNotes(); } });
     const notes = h('div', { class: 'sx-chips' });
-    const drawNotes = () => notes.replaceChildren(...NOTES.map(text => chip(text, choice.note === text, () => { choice.note = choice.note === text ? '' : text; note.value = choice.note; drawNotes(); })));
+    const drawNotes = () => notes.replaceChildren(...NOTES.map(id => t(`sx.note.${id}`)).map(text => chip(text, choice.note === text, () => { choice.note = choice.note === text ? '' : text; note.value = choice.note; drawNotes(); })));
     drawNotes(); drawPicker(); updateConsent();
     body.append(
-      h('h3', { class: 'sx-section-title' }, 'Показать друзьям, где я'),
-      ...group('На сколько', [[15, '15 мин'], [60, '1 час'], [480, '8 часов']], 'minutes'),
-      ...group('Точность', [['approximate', 'Примерно, ≈150 м'], ['precise', 'Точно']], 'mode'),
-      ...group('Кому', [['all', 'Всем друзьям'], ['selected', 'Выбранным']], 'audience', drawPicker), picker,
-      h('span', { class: 'sx-label' }, 'Статус для друзей'), notes, note,
+      h('h3', { class: 'sx-section-title' }, t('sx.share.cta')),
+      ...group(t('sx.share.howLong'), [[15, t('sx.share.m15')], [60, t('sx.share.h1')], [480, t('sx.share.h8')]], 'minutes'),
+      ...group(t('sx.share.accuracy'), [['approximate', t('sx.share.approxOption')], ['precise', t('sx.share.precise')]], 'mode'),
+      ...group(t('sx.share.whom'), [['all', t('sx.share.toAll')], ['selected', t('sx.share.toSome')]], 'audience', drawPicker), picker,
+      h('span', { class: 'sx-label' }, t('sx.share.status')), notes, note,
       h('label', { class: 'sx-consent', for: 'sx-consent' }, consent, consentText),
       submit,
-      h('p', { class: 'sx-hint' }, 'Храним только последнюю точку, без истории. Когда срок закончится или вы нажмёте «Остановить», точка удаляется. В ИИ координаты не передаются.'));
+      h('p', { class: 'sx-hint' }, t('sx.share.privacy')));
     return body;
   }
 
@@ -324,10 +340,10 @@ export function mountSocial(root, ctx = {}) {
 
   function friendSubtitle(item) {
     const location = item.location;
-    if (!location) return 'не показывает место';
-    if (location.lat === undefined) return 'включил(а) показ, место ещё определяется';
+    if (!location) return t('sx.friend.hidden');
+    if (location.lat === undefined) return t('sx.friend.locating');
     const mine = myPoint();
-    const parts = [mine ? `${km(social.distanceMeters(mine, location))} · ≈${social.walkMinutes(mine, location)} мин пешком` : 'на карте'];
+    const parts = [mine ? t('sx.friend.distance', { d: km(social.distanceMeters(mine, location)), n: social.walkMinutes(mine, location) }) : t('sx.friend.onMap')];
     parts.push(ago(location.updatedAt));
     if (location.note) parts.push(`«${location.note}»`);
     return parts.join(' · ');
@@ -341,60 +357,60 @@ export function mountSocial(root, ctx = {}) {
       shareCard(),
       list.length ? h('button', { type: 'button', class: 'sx-hero-action', onclick: () => open({ type: 'meet' }) },
         h('span', { class: 'sx-hero-action-icon', 'aria-hidden': 'true' }, '🤝'),
-        h('span', {}, h('strong', {}, 'Где встретиться?'), h('span', {}, 'Место, до которого всем идти примерно одинаково'))) : null,
-      nearby.length ? h('p', { class: 'sx-nearby' }, `Рядом с вами: ${nearby.slice(0, 3).map(entry => `${entry.item.name} (${entry.minutes} мин)`).join(', ')}`) : null,
-      h('div', { class: 'sx-list-head' }, h('h3', { class: 'sx-section-title' }, list.length ? `Друзья · ${list.length}` : 'Друзья'), button('+ Добавить', () => open({ type: 'invite' }), 'ghost')),
+        h('span', {}, h('strong', {}, t('sx.meet.title')), h('span', {}, t('sx.meet.sub')))) : null,
+      nearby.length ? h('p', { class: 'sx-nearby' }, t('sx.nearby', { list: nearby.slice(0, 3).map(entry => t('sx.nearbyItem', { name: entry.item.name, n: entry.minutes })).join(', ') })) : null,
+      h('div', { class: 'sx-list-head' }, h('h3', { class: 'sx-section-title' }, list.length ? t('sx.friendsCount', { n: list.length }) : t('sx.title')), button(t('sx.add'), () => open({ type: 'invite' }), 'ghost')),
       list.length ? h('ul', { class: 'sx-list' }, list.map(item => h('li', {},
         h('button', { type: 'button', class: 'sx-row', onclick: () => open({ type: 'friend', id: item.id }) },
           avatar(item, 'md', item.location ? 'is-sharing' : ''),
           h('span', { class: 'sx-row-text' }, h('strong', {}, item.name), h('span', {}, friendSubtitle(item))),
           h('span', { class: 'sx-chevron', 'aria-hidden': 'true' }, '›')))))
-        : h('div', { class: 'sx-empty' }, h('p', {}, 'Пока нет друзей. Отправьте ссылку или покажите QR-код: друг откроет его и сразу окажется у вас в списке.'),
-          button('Пригласить друга', () => open({ type: 'invite' }), 'primary')),
-      h('button', { type: 'button', class: 'sx-link sx-watch-entry', onclick: () => { open({ type: 'profile' }); document.getElementById('sx-watch-link')?.scrollIntoView({ block: 'center' }); } }, '⌚ Связать часы: встречи и друзья на запястье'));
+        : h('div', { class: 'sx-empty' }, h('p', {}, t('sx.friends.empty')),
+          button(t('sx.invite.title'), () => open({ type: 'invite' }), 'primary')),
+      h('button', { type: 'button', class: 'sx-link sx-watch-entry', onclick: () => { open({ type: 'profile' }); document.getElementById('sx-watch-link')?.scrollIntoView({ block: 'center' }); } }, t('sx.watch.entry')));
   }
 
   function friendDetail(id) {
     const item = friend(id);
-    if (!item) return h('p', { class: 'sx-empty' }, 'Этого человека больше нет в друзьях.');
+    if (!item) return h('p', { class: 'sx-empty' }, t('sx.friend.gone'));
     const location = item.location;
     if (view.justOpened && location?.lat !== undefined) layer?.fit([location]);
     return h('div', { class: 'sx-stack' },
       h('div', { class: 'sx-profile-head' }, avatar(item, 'xl', location ? 'is-sharing' : ''), h('h3', {}, item.name), h('p', {}, friendSubtitle(item)),
-        location ? h('p', { class: 'sx-hint' }, `Показывает место ${location.mode === 'approximate' ? 'примерно' : 'точно'}, ${left(location.expiresAt)}`) : null,
-        h('p', { class: 'sx-hint' }, item.iShareWith ? 'Вы показываете ему(ей) своё место' : 'Вы не показываете ему(ей) своё место')),
+        location ? h('p', { class: 'sx-hint' }, t('sx.friend.sharing', { mode: t(location.mode === 'approximate' ? 'sx.friend.approx' : 'sx.friend.precise'), left: left(location.expiresAt) })) : null,
+        h('p', { class: 'sx-hint' }, t(item.iShareWith ? 'sx.friend.iShare' : 'sx.friend.iDontShare'))),
       h('div', { class: 'sx-actions' },
-        location?.lat !== undefined ? button('Показать на карте', () => { layer?.fit([location]); ctx.openSheet?.('peek'); }, 'ghost') : null,
-        button('Позвать встретиться', () => open({ type: 'meet', preselect: [item.id] }), 'primary'),
-        !location ? button('Попросить показать место', () => run(() => social.act('pingFriend', { userId: item.id }), `${item.name} получит просьбу. Решать ему(ей).`), 'ghost') : null),
-      h('details', { class: 'sx-details' }, h('summary', {}, 'Ещё'),
+        location?.lat !== undefined ? button(t('sx.showOnMap'), () => { layer?.fit([location]); ctx.openSheet?.('peek'); }, 'ghost') : null,
+        button(t('sx.friend.meet'), () => open({ type: 'meet', preselect: [item.id] }), 'primary'),
+        !location ? button(t('sx.friend.ask'), () => run(() => social.act('pingFriend', { userId: item.id }), t('sx.friend.asked', { name: item.name })), 'ghost') : null),
+      h('details', { class: 'sx-details' }, h('summary', {}, t('sx.more')),
         h('div', { class: 'sx-actions' },
-          button('Удалить из друзей', async () => { if (confirm(`Удалить ${item.name} из друзей?`)) { if (await run(() => social.act('removeFriend', { userId: item.id }), 'Удалено')) close(); } }, 'ghost'),
-          button('Заблокировать', async () => { if (confirm(`Заблокировать ${item.name}? Он(а) не сможет снова добавить вас и увидеть ваше место.`)) { if (await run(() => social.act('blockUser', { userId: item.id }), 'Заблокировано')) close(); } }, 'ghost', { class: 'btn btn-ghost sx-btn sx-danger' }))));
+          button(t('sx.friend.remove'), async () => { if (confirm(t('sx.friend.removeConfirm', { name: item.name }))) { if (await run(() => social.act('removeFriend', { userId: item.id }), t('sx.friend.removed'))) close(); } }, 'ghost'),
+          button(t('sx.friend.block'), async () => { if (confirm(t('sx.friend.blockConfirm', { name: item.name }))) { if (await run(() => social.act('blockUser', { userId: item.id }), t('sx.friend.blocked'))) close(); } }, 'ghost', { class: 'btn btn-ghost sx-btn sx-danger' }))));
   }
 
   function inviteView() {
-    const box = h('div', { class: 'sx-stack' }, h('h3', { class: 'sx-section-title' }, 'Пригласить друга'), h('p', { class: 'sx-hint' }, 'Создаём ссылку…'));
+    const box = h('div', { class: 'sx-stack' }, h('h3', { class: 'sx-section-title' }, t('sx.invite.title')), h('p', { class: 'sx-hint' }, t('sx.invite.creating')));
     social.act('createInvite').then(({ code, expiresAt }) => {
       const link = `${location.origin}${location.pathname}?friend=${code}`;
-      const qr = h('div', { class: 'sx-qr', role: 'img', 'aria-label': 'QR-код приглашения' });
+      const qr = h('div', { class: 'sx-qr', role: 'img', 'aria-label': t('sx.invite.qr') });
       loadQr().then(factory => {
         const code = factory(0, 'M');
         code.addData(link);
         code.make();
         qr.innerHTML = code.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
       }).catch(() => { qr.hidden = true; });
-      const copy = async () => { try { await navigator.clipboard.writeText(link); toast('Ссылка скопирована', 'success'); } catch { prompt('Скопируйте ссылку', link); } };
-      const share = () => navigator.share({ title: 'Aidem', text: `${data().me.name} зовёт вас в друзья в Aidem: гулять по Астане вместе`, url: link }).catch(() => {});
-      const own = h('input', { class: 'sx-input sx-code-input', maxlength: 8, placeholder: 'Код друга', autocapitalize: 'characters', 'aria-label': 'Код приглашения друга' });
+      const copy = async () => { try { await navigator.clipboard.writeText(link); toast(t('sx.copied'), 'success'); } catch { prompt(t('sx.copyPrompt'), link); } };
+      const share = () => navigator.share({ title: 'Aidem', text: t('sx.invite.shareText', { name: data().me.name }), url: link }).catch(() => {});
+      const own = h('input', { class: 'sx-input sx-code-input', maxlength: 8, placeholder: t('sx.invite.codePlaceholder'), autocapitalize: 'characters', 'aria-label': t('sx.invite.codeLabel') });
       box.replaceChildren(
-        h('h3', { class: 'sx-section-title' }, 'Пригласить друга'),
-        h('p', { class: 'sx-hint' }, 'Друг наводит камеру на код или открывает ссылку — и вы сразу друзья. Ссылка действует до ' + when(expiresAt) + '.'),
+        h('h3', { class: 'sx-section-title' }, t('sx.invite.title')),
+        h('p', { class: 'sx-hint' }, t('sx.invite.hint', { when: when(expiresAt) })),
         qr,
         h('p', { class: 'sx-invite-code' }, code),
-        h('div', { class: 'sx-actions' }, navigator.share ? button('Поделиться ссылкой', share, 'primary') : null, button('Скопировать ссылку', copy, navigator.share ? 'ghost' : 'primary')),
-        h('form', { class: 'sx-inline-form', onsubmit: event => { event.preventDefault(); acceptInvite(own.value.trim()); } }, own, button('Добавить', null, 'ghost', { type: 'submit' })),
-        h('p', { class: 'sx-hint' }, 'Есть код друга? Введите его здесь.'));
+        h('div', { class: 'sx-actions' }, navigator.share ? button(t('sx.invite.share'), share, 'primary') : null, button(t('sx.invite.copy'), copy, navigator.share ? 'ghost' : 'primary')),
+        h('form', { class: 'sx-inline-form', onsubmit: event => { event.preventDefault(); acceptInvite(own.value.trim()); } }, own, button(t('sx.invite.add'), null, 'ghost', { type: 'submit' })),
+        h('p', { class: 'sx-hint' }, t('sx.invite.haveCode')));
     }).catch(error => box.replaceChildren(h('p', { class: 'sx-warning' }, error.message)));
     return box;
   }
@@ -409,20 +425,20 @@ export function mountSocial(root, ctx = {}) {
     const drawChooser = () => {
       const list = friends();
       wrap.replaceChildren(
-        h('h3', { class: 'sx-section-title' }, 'Где встретиться?'),
-        h('p', { class: 'sx-hint' }, 'Подберём место из базы, до которого всем идти примерно одинаково, и проверим часы работы на время прихода.'),
-        h('span', { class: 'sx-label' }, 'С кем'),
-        h('div', { class: 'sx-chips sx-friend-chips' }, list.map(item => chip([avatar(item, 'xs'), item.name, item.location?.lat === undefined ? h('span', { class: 'sx-muted' }, ' · без места') : ''], selected.has(item.id), () => {
+        h('h3', { class: 'sx-section-title' }, t('sx.meet.title')),
+        h('p', { class: 'sx-hint' }, t('sx.meet.hint')),
+        h('span', { class: 'sx-label' }, t('sx.meet.with')),
+        h('div', { class: 'sx-chips sx-friend-chips' }, list.map(item => chip([avatar(item, 'xs'), item.name, item.location?.lat === undefined ? h('span', { class: 'sx-muted' }, t('sx.meet.noPoint')) : ''], selected.has(item.id), () => {
           selected.has(item.id) ? selected.delete(item.id) : selected.add(item.id); drawChooser();
         }))),
-        h('span', { class: 'sx-label' }, 'Что ищем'),
-        h('div', { class: 'sx-chips' }, KINDS.map(([value, label]) => chip(label, kind === value, () => { kind = value; drawChooser(); }))),
-        button('Найти место', find, 'primary', { class: 'btn btn-primary sx-btn sx-wide', disabled: !selected.size }),
+        h('span', { class: 'sx-label' }, t('sx.meet.what')),
+        h('div', { class: 'sx-chips' }, KINDS.map(value => chip(t(`sx.kind.${value}`), kind === value, () => { kind = value; drawChooser(); }))),
+        button(t('sx.meet.find'), find, 'primary', { class: 'btn btn-primary sx-btn sx-wide', disabled: !selected.size }),
         results);
       if (view.meeting) renderMeeting();
     };
     async function find() {
-      results.replaceChildren(h('p', { class: 'sx-hint' }, 'Считаем, кому сколько идти…'));
+      results.replaceChildren(h('p', { class: 'sx-hint' }, t('sx.meet.counting')));
       const here = data().share?.hasPoint ? null : await social.currentPosition();
       const result = await run(() => social.api('meeting-point', { userIds: [...selected], kind, ...(here ? { me: { lat: coarse(here.lat), lon: coarse(here.lon) } } : {}) }));
       if (!result) { results.replaceChildren(); return; }
@@ -448,44 +464,51 @@ export function mountSocial(root, ctx = {}) {
     const name = id => people.find(person => person.id === id);
     const longest = Math.max(1, ...result.options.flatMap(option => option.walks.map(walk => walk.minutes)));
     fill(results,
-      result.missing.length ? h('p', { class: 'sx-warning' }, `Без точки: ${result.missing.map(item => item.name).join(', ')}. Их можно позвать, но расчёт сделан без них.`) : null,
-      result.options.length ? null : h('p', { class: 'sx-empty' }, 'Не нашли подходящего открытого места в пределах 45 минут для всех. Попробуйте «Любое».'),
+      result.missing.length ? h('p', { class: 'sx-warning' }, t('sx.meet.missing', { names: result.missing.map(item => item.name).join(', ') })) : null,
+      result.options.length ? null : h('p', { class: 'sx-empty' }, t('sx.meet.none')),
       ...result.options.map((option, index) => h('article', { class: `sx-option${index === meeting.selected ? ' is-selected' : ''}`, onclick: () => { meeting.selected = index; renderMeeting(); } },
         h('div', { class: 'sx-option-head' }, h('span', { class: 'sx-option-number' }, index + 1),
-          h('div', {}, h('strong', {}, option.place.name), h('span', {}, `${CATEGORY_NAMES[option.place.category] || 'место'} · ${option.why}`))),
+          h('div', {}, h('strong', {}, option.place.name), h('span', {}, `${categoryName(option.place.category)} · ${whyText(option)}`))),
         h('ul', { class: 'sx-walks' }, option.walks.map(walk => {
           const person = name(walk.userId) || {};
-          return h('li', {}, avatar(person, 'xs'), h('span', { class: 'sx-walk-name' }, person.self ? 'Вы' : person.name),
+          return h('li', {}, avatar(person, 'xs'), h('span', { class: 'sx-walk-name' }, person.self ? t('sx.you') : person.name),
             h('span', { class: 'sx-walk-bar' }, h('span', { style: { width: `${Math.round(walk.minutes / longest * 100)}%`, '--avatar': person.color } })),
-            h('span', { class: 'sx-walk-min' }, `${walk.minutes} мин`));
+            h('span', { class: 'sx-walk-min' }, t('sx.min', { n: walk.minutes })));
         })),
-        h('p', { class: `sx-hours${option.hours.status === 'open' ? ' is-open' : ''}` }, option.hours.status === 'open' ? (option.hours.closesAt ? `Открыто до ${option.hours.closesAt} (по данным OSM)` : 'Открыто круглосуточно (по данным OSM)') : 'Часы работы неизвестны, проверьте перед выходом'),
+        h('p', { class: `sx-hours${option.hours.status === 'open' ? ' is-open' : ''}` }, option.hours.status === 'open' ? (option.hours.closesAt ? t('sx.meet.openUntil', { time: option.hours.closesAt }) : t('sx.meet.open24')) : t('sx.meet.hoursUnknown')),
         h('div', { class: 'sx-actions' },
-          button('Позвать сюда', event => { event.stopPropagation(); inviteHere(option); }, index === meeting.selected ? 'gold' : 'ghost'),
-          h('a', { class: 'sx-link', href: option.place.sourceUrl, target: '_blank', rel: 'noopener noreferrer', onclick: event => event.stopPropagation() }, 'Источник: OSM')))),
+          button(t('sx.meet.inviteHere'), event => { event.stopPropagation(); inviteHere(option); }, index === meeting.selected ? 'gold' : 'ghost'),
+          h('a', { class: 'sx-link', href: option.place.sourceUrl, target: '_blank', rel: 'noopener noreferrer', onclick: event => event.stopPropagation() }, t('sx.meet.source'))))),
       result.options.length >= 2 ? h('div', { class: 'sx-vote-cta' },
-        h('p', {}, 'Не можете решить? Отправьте друзьям все варианты: место выберется голосованием.'),
-        button(`Предложить на выбор (${result.options.length})`, () => inviteToVote(), 'primary', { class: 'btn btn-primary sx-btn sx-wide' })) : null,
-      h('p', { class: 'sx-hint' }, result.method.note));
+        h('p', {}, t('sx.vote.cta')),
+        button(t('sx.vote.offer', { n: result.options.length }), () => inviteToVote(), 'primary', { class: 'btn btn-primary sx-btn sx-wide' })) : null,
+      h('p', { class: 'sx-hint' }, lang() === 'ru' ? result.method.note : t('sx.meet.method')));
   }
+
+  function whyText(option) {
+    if (lang() === 'ru') return option.why;
+    const minutes = option.walks.map(walk => walk.minutes);
+    const shortest = Math.min(...minutes), longest = Math.max(...minutes);
+    return shortest === longest ? t('sx.meet.whySame', { n: longest }) : t('sx.meet.whyRange', { from: shortest, to: longest });
+  }
+
+  const meetupTitle = kind => t({ coffee: 'sx.mtitle.coffee', food: 'sx.mtitle.food', park: 'sx.mtitle.park' }[kind] || 'sx.mtitle.meet');
 
   async function inviteToVote() {
     const meeting = view.meeting;
-    if (!meeting.invitees.length) { toast('Выберите хотя бы одного друга', 'error'); return; }
+    if (!meeting.invitees.length) { toast(t('sx.pickFriend'), 'error'); return; }
     const longest = Math.max(...meeting.result.options.map(option => option.maxMinutes));
     const startsAt = roundTo5(Date.now() + (longest + 15) * 60000);
-    const titles = { coffee: 'Кофе', food: 'Поесть вместе', park: 'Прогулка', indoor: 'Встреча', any: 'Встреча' };
     const options = meeting.result.options.map(option => ({ id: option.place.id, name: option.place.name, lat: option.place.lat, lon: option.place.lon }));
-    const created = await run(() => social.act('createMeetup', { title: titles[meeting.result.kind] || 'Встреча', options, startsAt, invitees: meeting.invitees }), 'Друзья выбирают место');
+    const created = await run(() => social.act('createMeetup', { title: meetupTitle(meeting.result.kind), options, startsAt, invitees: meeting.invitees }), t('sx.vote.created'));
     if (created) { layer?.clearMeeting(); view.meeting = null; view.tab = 'meetups'; open({ type: 'meetup', id: created.meetup.id }); }
   }
 
   async function inviteHere(option) {
     const meeting = view.meeting;
-    if (!meeting.invitees.length) { toast('Выберите хотя бы одного друга', 'error'); return; }
+    if (!meeting.invitees.length) { toast(t('sx.pickFriend'), 'error'); return; }
     const startsAt = roundTo5(Date.now() + (option.maxMinutes + 5) * 60000);
-    const titles = { coffee: 'Кофе', food: 'Поесть вместе', park: 'Прогулка', indoor: 'Встреча', any: 'Встреча' };
-    const created = await run(() => social.act('createMeetup', { title: titles[meeting.result.kind] || 'Встреча', place: { id: option.place.id, name: option.place.name, lat: option.place.lat, lon: option.place.lon }, startsAt, invitees: meeting.invitees }), 'Приглашение отправлено');
+    const created = await run(() => social.act('createMeetup', { title: meetupTitle(meeting.result.kind), place: { id: option.place.id, name: option.place.name, lat: option.place.lat, lon: option.place.lon }, startsAt, invitees: meeting.invitees }), t('sx.inviteSent'));
     if (created) { layer?.clearMeeting(); view.meeting = null; view.tab = 'meetups'; open({ type: 'meetup', id: created.meetup.id }); }
   }
 
@@ -493,10 +516,10 @@ export function mountSocial(root, ctx = {}) {
 
   function placePicker(initial, onPick) {
     let chosen = initial || null;
-    const input = h('input', { class: 'sx-input', placeholder: 'Название места, например «Байтерек» или «кофе»', autocomplete: 'off', 'aria-label': 'Поиск места' });
+    const input = h('input', { class: 'sx-input', placeholder: t('sx.pp.placeholder'), autocomplete: 'off', 'aria-label': t('sx.pp.label') });
     const list = h('ul', { class: 'sx-suggestions' });
     const current = h('p', { class: 'sx-picked' });
-    const show = () => { current.textContent = chosen ? `📍 ${chosen.name}` : 'Место не выбрано'; current.classList.toggle('is-empty', !chosen); };
+    const show = () => { current.textContent = chosen ? `📍 ${chosen.name}` : t('sx.pp.none'); current.classList.toggle('is-empty', !chosen); };
     let timer;
     input.addEventListener('input', () => {
       clearTimeout(timer);
@@ -508,20 +531,20 @@ export function mountSocial(root, ctx = {}) {
           const result = await social.api(`places?q=${encodeURIComponent(query)}${center ? `&lat=${center.lat}&lon=${center.lng}` : ''}`);
           list.replaceChildren(...result.places.map(item => h('li', {}, h('button', { type: 'button', class: 'sx-suggestion', onclick: () => {
             chosen = { id: item.id, name: item.name, lat: item.lat, lon: item.lon }; onPick(chosen); show(); list.replaceChildren(); input.value = '';
-          } }, h('strong', {}, item.name), h('span', {}, `${CATEGORY_NAMES[item.category] || 'место'}${item.distanceMeters !== undefined ? ` · ${km(item.distanceMeters)} от центра карты` : ''}`)))));
-          if (!result.places.length) list.replaceChildren(h('li', { class: 'sx-hint' }, 'Ничего не нашли. Можно взять центр карты.'));
+          } }, h('strong', {}, item.name), h('span', {}, `${categoryName(item.category)}${item.distanceMeters !== undefined ? ` · ${t('sx.pp.fromCenter', { d: km(item.distanceMeters) })}` : ''}`)))));
+          if (!result.places.length) list.replaceChildren(h('li', { class: 'sx-hint' }, t('sx.pp.empty')));
         } catch (error) { list.replaceChildren(h('li', { class: 'sx-warning' }, error.message)); }
       }, 250);
     });
-    const mapCenter = ctx.map ? button('Центр карты', () => {
+    const mapCenter = ctx.map ? button(t('sx.pp.center'), () => {
       const center = ctx.map.getCenter();
-      chosen = { id: null, name: 'Точка на карте', lat: Math.round(center.lat * 1e5) / 1e5, lon: Math.round(center.lng * 1e5) / 1e5 };
+      chosen = { id: null, name: t('sx.pp.point'), lat: Math.round(center.lat * 1e5) / 1e5, lon: Math.round(center.lng * 1e5) / 1e5 };
       onPick(chosen); show();
     }, 'ghost') : null;
-    const here = button('Где я сейчас', async () => {
+    const here = button(t('sx.pp.here'), async () => {
       const point = await social.currentPosition();
-      if (!point) { toast('Не удалось определить местоположение', 'error'); return; }
-      chosen = { id: null, name: 'Рядом со мной', lat: Math.round(point.lat * 1e5) / 1e5, lon: Math.round(point.lon * 1e5) / 1e5 };
+      if (!point) { toast(t('sx.pp.noGeo'), 'error'); return; }
+      chosen = { id: null, name: t('sx.pp.nearMe'), lat: Math.round(point.lat * 1e5) / 1e5, lon: Math.round(point.lon * 1e5) / 1e5 };
       onPick(chosen); show();
     }, 'ghost');
     show();
@@ -530,9 +553,10 @@ export function mountSocial(root, ctx = {}) {
 
   function timePicker(initial, onPick) {
     let value = initial;
-    const input = h('input', { type: 'datetime-local', class: 'sx-input', value: localInput(value), 'aria-label': 'Дата и время', onchange: () => { const ts = new Date(input.value).getTime(); if (Number.isFinite(ts)) { value = ts; onPick(ts); draw(); } } });
+    const input = h('input', { type: 'datetime-local', class: 'sx-input', value: localInput(value), 'aria-label': t('sx.tp.label'), onchange: () => { const ts = new Date(input.value).getTime(); if (Number.isFinite(ts)) { value = ts; onPick(ts); draw(); } } });
     const evening = (() => { const d = new Date(); d.setHours(19, 0, 0, 0); if (d.getTime() < Date.now() + 30 * 60000) d.setDate(d.getDate() + 1); return d.getTime(); })();
-    const presets = [['Через 15 мин', roundTo5(Date.now() + 15 * 60000)], ['Через 30 мин', roundTo5(Date.now() + 30 * 60000)], ['Через час', roundTo5(Date.now() + 60 * 60000)], [dayLabel(evening) === 'сегодня' ? 'Вечером в 19:00' : 'Завтра в 19:00', evening]];
+    const tonight = new Date(evening).getDate() === new Date().getDate();
+    const presets = [[t('sx.tp.m15'), roundTo5(Date.now() + 15 * 60000)], [t('sx.tp.m30'), roundTo5(Date.now() + 30 * 60000)], [t('sx.tp.h1'), roundTo5(Date.now() + 60 * 60000)], [t(tonight ? 'sx.tp.tonight' : 'sx.tp.tomorrow'), evening]];
     const row = h('div', { class: 'sx-chips' });
     const draw = () => row.replaceChildren(...presets.map(([label, ts]) => chip(label, Math.abs(ts - value) < 60000, () => { value = ts; input.value = localInput(ts); onPick(ts); draw(); })));
     draw();
@@ -544,10 +568,10 @@ export function mountSocial(root, ctx = {}) {
   function meetupsView() {
     const list = (data().meetups || []).slice().sort((a, b) => (a.status === 'cancelled') - (b.status === 'cancelled') || a.startsAt - b.startsAt);
     return h('div', { class: 'sx-stack' },
-      h('div', { class: 'sx-list-head' }, h('h3', { class: 'sx-section-title' }, 'Встречи'), button('+ Новая', () => open({ type: 'newMeetup' }), 'ghost', { disabled: !friends().length })),
+      h('div', { class: 'sx-list-head' }, h('h3', { class: 'sx-section-title' }, t('sx.meetups')), button(t('sx.mu.new'), () => open({ type: 'newMeetup' }), 'ghost', { disabled: !friends().length })),
       list.length ? h('ul', { class: 'sx-list' }, list.map(item => h('li', {}, meetupRow(item))))
-        : h('div', { class: 'sx-empty' }, h('p', {}, friends().length ? 'Встреч пока нет. Нажмите «Где встретиться?» на вкладке друзей или создайте встречу.' : 'Сначала добавьте друга, потом зовите его встретиться.'),
-          friends().length ? button('Новая встреча', () => open({ type: 'newMeetup' }), 'primary') : button('Пригласить друга', () => open({ type: 'invite' }), 'primary')));
+        : h('div', { class: 'sx-empty' }, h('p', {}, t(friends().length ? 'sx.mu.empty' : 'sx.mu.noFriends')),
+          friends().length ? button(t('sx.mu.newTitle'), () => open({ type: 'newMeetup' }), 'primary') : button(t('sx.invite.title'), () => open({ type: 'invite' }), 'primary')));
   }
 
   function meetupRow(item) {
@@ -555,45 +579,45 @@ export function mountSocial(root, ctx = {}) {
     return h('button', { type: 'button', class: `sx-row sx-meetup-row${item.status === 'cancelled' ? ' is-cancelled' : ''}`, onclick: () => open({ type: 'meetup', id: item.id }) },
       h('span', { class: 'sx-when' }, h('strong', {}, clock(item.startsAt)), h('span', {}, dayLabel(item.startsAt))),
       h('span', { class: 'sx-row-text' }, h('strong', {}, item.title),
-        h('span', {}, item.status === 'cancelled' ? 'отменена' : `${item.place.name} · ${until(item.startsAt)}`),
-        h('span', { class: 'sx-faces' }, going.slice(0, 5).map(member => avatar(member, 'xs')), item.poll?.open ? h('span', { class: 'sx-pill is-gold' }, item.poll.myVote === null ? 'Голосуйте за место' : 'Идёт голосование') : item.myStatus === 'invited' ? h('span', { class: 'sx-pill is-gold' }, 'Ждут ответа') : item.changed ? h('span', { class: 'sx-pill is-amber' }, 'Изменено') : null)),
+        h('span', {}, item.status === 'cancelled' ? t('sx.mu.cancelledLower') : `${item.place.name} · ${until(item.startsAt)}`),
+        h('span', { class: 'sx-faces' }, going.slice(0, 5).map(member => avatar(member, 'xs')), item.poll?.open ? h('span', { class: 'sx-pill is-gold' }, t(item.poll.myVote === null ? 'sx.vote.pill' : 'sx.vote.running')) : item.myStatus === 'invited' ? h('span', { class: 'sx-pill is-gold' }, t('sx.mu.waiting')) : item.changed ? h('span', { class: 'sx-pill is-amber' }, t('sx.mu.changedPill')) : null)),
       h('span', { class: 'sx-chevron', 'aria-hidden': 'true' }, '›'));
   }
 
   function newMeetupView(prefill = {}) {
     const form = { place: prefill.place || null, startsAt: prefill.startsAt || roundTo5(Date.now() + 30 * 60000), invitees: new Set(prefill.invitees || []) };
-    const title = h('input', { class: 'sx-input', maxlength: 60, placeholder: 'Например: кофе после пар', value: prefill.title || '' });
-    const note = h('input', { class: 'sx-input', maxlength: 200, placeholder: 'Комментарий, необязательно' });
+    const title = h('input', { class: 'sx-input', maxlength: 60, placeholder: t('sx.mu.titlePlaceholder'), value: prefill.title || '' });
+    const note = h('input', { class: 'sx-input', maxlength: 200, placeholder: t('sx.mu.notePlaceholder') });
     const people = h('div', { class: 'sx-chips sx-friend-chips' });
     const drawPeople = () => people.replaceChildren(...friends().map(item => chip([avatar(item, 'xs'), item.name], form.invitees.has(item.id), () => { form.invitees.has(item.id) ? form.invitees.delete(item.id) : form.invitees.add(item.id); drawPeople(); })));
     drawPeople();
     return h('form', { class: 'sx-form', onsubmit: async event => {
       event.preventDefault();
-      if (!form.place) { toast('Выберите место', 'error'); return; }
-      if (!form.invitees.size) { toast('Позовите хотя бы одного друга', 'error'); return; }
-      const created = await run(() => social.act('createMeetup', { title: title.value, note: note.value, place: form.place, startsAt: form.startsAt, invitees: [...form.invitees] }), 'Приглашение отправлено');
+      if (!form.place) { toast(t('sx.pickPlace'), 'error'); return; }
+      if (!form.invitees.size) { toast(t('sx.mu.pickFriend'), 'error'); return; }
+      const created = await run(() => social.act('createMeetup', { title: title.value, note: note.value, place: form.place, startsAt: form.startsAt, invitees: [...form.invitees] }), t('sx.inviteSent'));
       if (created) { view.tab = 'meetups'; open({ type: 'meetup', id: created.meetup.id }); }
     } },
-      h('h3', { class: 'sx-section-title' }, 'Новая встреча'),
-      h('span', { class: 'sx-label' }, 'Кого позвать'), people,
-      h('span', { class: 'sx-label' }, 'Где'), placePicker(form.place, value => { form.place = value; }),
-      h('span', { class: 'sx-label' }, 'Когда'), timePicker(form.startsAt, value => { form.startsAt = value; }),
-      h('span', { class: 'sx-label' }, 'Название'), title, note,
-      h('button', { type: 'submit', class: 'btn btn-primary sx-btn sx-wide' }, 'Позвать'));
+      h('h3', { class: 'sx-section-title' }, t('sx.mu.newTitle')),
+      h('span', { class: 'sx-label' }, t('sx.mu.whom')), people,
+      h('span', { class: 'sx-label' }, t('sx.where')), placePicker(form.place, value => { form.place = value; }),
+      h('span', { class: 'sx-label' }, t('sx.mu.when')), timePicker(form.startsAt, value => { form.startsAt = value; }),
+      h('span', { class: 'sx-label' }, t('sx.titleLabel')), title, note,
+      h('button', { type: 'submit', class: 'btn btn-primary sx-btn sx-wide' }, t('sx.invite.send')));
   }
 
   function meetupDetail(id) {
     const item = meetup(id);
-    if (!item) return data() ? h('p', { class: 'sx-empty' }, 'Встреча не найдена или уже прошла.') : h('p', { class: 'sx-hint' }, 'Загружаем встречу…');
+    if (!item) return data() ? h('p', { class: 'sx-empty' }, t('sx.mu.gone')) : h('p', { class: 'sx-hint' }, t('sx.mu.loading'));
     const me = data().me;
     const rsvp = status => run(() => social.act('rsvpMeetup', { id, status }));
     const statusButtons = item.status === 'cancelled' ? null
-      : ['invited', 'maybe', 'declined'].includes(item.myStatus) ? h('div', { class: 'sx-actions' }, button('Иду', () => rsvp('going'), 'primary'), button('Может быть', () => rsvp('maybe'), 'ghost'), button('Не смогу', () => rsvp('declined'), 'ghost'))
+      : ['invited', 'maybe', 'declined'].includes(item.myStatus) ? h('div', { class: 'sx-actions' }, button(t('sx.rsvp.going'), () => rsvp('going'), 'primary'), button(t('sx.rsvp.maybe'), () => rsvp('maybe'), 'ghost'), button(t('sx.rsvp.no'), () => rsvp('declined'), 'ghost'))
         : h('div', { class: 'sx-actions' },
-          item.myStatus !== 'on_way' && item.myStatus !== 'arrived' ? button('🚶 Я в пути', () => rsvp('on_way'), 'gold') : null,
-          item.myStatus !== 'arrived' ? button('📍 Я на месте', () => rsvp('arrived'), item.myStatus === 'on_way' ? 'gold' : 'ghost') : null,
-          button('Не смогу', () => rsvp('declined'), 'ghost'));
-    const message = h('input', { class: 'sx-input', maxlength: 280, placeholder: 'Написать участникам', 'aria-label': 'Сообщение', 'data-keep': `chat-${id}` });
+          item.myStatus !== 'on_way' && item.myStatus !== 'arrived' ? button(t('sx.rsvp.onWay'), () => rsvp('on_way'), 'gold') : null,
+          item.myStatus !== 'arrived' ? button(t('sx.rsvp.arrived'), () => rsvp('arrived'), item.myStatus === 'on_way' ? 'gold' : 'ghost') : null,
+          button(t('sx.rsvp.no'), () => rsvp('declined'), 'ghost'));
+    const message = h('input', { class: 'sx-input', maxlength: 280, placeholder: t('sx.chat.placeholder'), 'aria-label': t('sx.chat.label'), 'data-keep': `chat-${id}` });
     const send = async event => {
       event.preventDefault();
       const text = message.value.trim();
@@ -605,54 +629,54 @@ export function mountSocial(root, ctx = {}) {
     };
     const etaFor = member => {
       const located = friend(member.id)?.location;
-      return member.status === 'on_way' && located?.lat !== undefined ? ` · ≈${social.walkMinutes(located, item.place)} мин до места` : '';
+      return member.status === 'on_way' && located?.lat !== undefined ? t('sx.mu.eta', { n: social.walkMinutes(located, item.place) }) : '';
     };
     if (view.justOpened) layer?.fit([item.place]);
     return h('div', { class: 'sx-stack' },
-      h('div', { class: 'sx-detail-head' }, h('span', { class: 'sx-kicker' }, item.status === 'cancelled' ? 'Отменена' : until(item.startsAt)),
+      h('div', { class: 'sx-detail-head' }, h('span', { class: 'sx-kicker' }, item.status === 'cancelled' ? t('sx.mu.cancelled') : until(item.startsAt)),
         h('h3', {}, item.title), h('p', {}, `${when(item.startsAt)} · ${item.place.name}`),
-        item.changed ? h('p', { class: 'sx-warning' }, 'Организатор изменил время или место. Подтвердите, что придёте.') : null,
+        item.changed ? h('p', { class: 'sx-warning' }, t('sx.mu.changed')) : null,
         item.note ? h('p', { class: 'sx-note' }, item.note) : null),
       pollBlock(item),
       statusButtons,
-      h('h4', { class: 'sx-label' }, 'Кто идёт'),
+      h('h4', { class: 'sx-label' }, t('sx.mu.who')),
       h('ul', { class: 'sx-members' }, item.members.map(member => h('li', { class: `is-${member.status}` }, avatar(member, 'sm'),
-        h('span', {}, h('strong', {}, member.id === me.id ? 'Вы' : member.name), h('span', {}, `${STATUS[member.status] || member.status}${etaFor(member)}${member.id === item.host?.id ? ' · организатор' : ''}`))))),
+        h('span', {}, h('strong', {}, member.id === me.id ? t('sx.you') : member.name), h('span', {}, `${statusText(member.status)}${etaFor(member)}${member.id === item.host?.id ? t('sx.mu.host') : ''}`))))),
       routeLinks(item.place),
-      h('div', { class: 'sx-actions' }, button('В календарь', () => downloadCalendar({ title: item.title, startsAt: item.startsAt, place: item.place, description: item.note }), 'ghost'),
-        item.isHost && item.status !== 'cancelled' ? button('Позвать ещё', () => open({ type: 'addToMeetup', id }), 'ghost') : null),
-      h('h4', { class: 'sx-label' }, 'Сообщения'),
-      h('ul', { class: 'sx-chat' }, item.messages.length ? item.messages.map(entry => h('li', { class: entry.author.id === me.id ? 'is-mine' : '' }, avatar(entry.author, 'xs'), h('span', {}, h('strong', {}, entry.author.id === me.id ? 'Вы' : entry.author.name), ' ', entry.body)))
-        : h('li', { class: 'sx-hint' }, 'Напишите, если опаздываете.')),
+      h('div', { class: 'sx-actions' }, button(t('sx.calendar'), () => downloadCalendar({ title: item.title, startsAt: item.startsAt, place: item.place, description: item.note }), 'ghost'),
+        item.isHost && item.status !== 'cancelled' ? button(t('sx.mu.inviteMore'), () => open({ type: 'addToMeetup', id }), 'ghost') : null),
+      h('h4', { class: 'sx-label' }, t('sx.chat.title')),
+      h('ul', { class: 'sx-chat' }, item.messages.length ? item.messages.map(entry => h('li', { class: entry.author.id === me.id ? 'is-mine' : '' }, avatar(entry.author, 'xs'), h('span', {}, h('strong', {}, entry.author.id === me.id ? t('sx.you') : entry.author.name), ' ', entry.body)))
+        : h('li', { class: 'sx-hint' }, t('sx.chat.empty'))),
       item.status !== 'cancelled' ? h('form', { class: 'sx-inline-form', onsubmit: send },
-        message, button('Отправить', null, 'primary', { type: 'submit' })) : null,
-      item.isHost && item.status !== 'cancelled' ? h('details', { class: 'sx-details', 'data-pause-refresh': '' }, h('summary', {}, 'Управление встречей'),
-        h('div', { class: 'sx-form' }, h('span', { class: 'sx-label' }, 'Перенести'), (() => { let next = item.startsAt; return [timePicker(next, value => { next = value; }), button('Сохранить новое время', () => run(() => social.act('updateMeetup', { id, startsAt: next }), 'Участники получили уведомление'), 'ghost')]; })(),
-          button('Отменить встречу', async () => { if (confirm('Отменить встречу для всех?')) await run(() => social.act('cancelMeetup', { id }), 'Встреча отменена'); }, 'ghost', { class: 'btn btn-ghost sx-btn sx-danger' }))) : null);
+        message, button(t('sx.chat.send'), null, 'primary', { type: 'submit' })) : null,
+      item.isHost && item.status !== 'cancelled' ? h('details', { class: 'sx-details', 'data-pause-refresh': '' }, h('summary', {}, t('sx.mu.manage')),
+        h('div', { class: 'sx-form' }, h('span', { class: 'sx-label' }, t('sx.mu.reschedule')), (() => { let next = item.startsAt; return [timePicker(next, value => { next = value; }), button(t('sx.mu.saveTime'), () => run(() => social.act('updateMeetup', { id, startsAt: next }), t('sx.mu.notified')), 'ghost')]; })(),
+          button(t('sx.mu.cancel'), async () => { if (confirm(t('sx.mu.cancelConfirm'))) await run(() => social.act('cancelMeetup', { id }), t('sx.mu.cancelDone')); }, 'ghost', { class: 'btn btn-ghost sx-btn sx-danger' }))) : null);
   }
 
   function pollBlock(item) {
     const poll = item.poll;
     if (!poll) return null;
-    if (!poll.open) return h('p', { class: 'sx-hint' }, `Место выбрано голосованием: ${item.place.name}.`);
+    if (!poll.open) return h('p', { class: 'sx-hint' }, t('sx.vote.decided', { name: item.place.name }));
     const members = new Map(item.members.map(member => [member.id, member]));
     const mine = myPoint();
     const most = Math.max(1, ...poll.options.map(option => option.voters.length));
-    return h('section', { class: 'sx-poll', 'aria-label': 'Голосование за место' },
-      h('div', { class: 'sx-poll-head' }, h('h4', { class: 'sx-label' }, 'Где встречаемся? Голосуйте'), h('span', { class: 'sx-pill' }, `${poll.voted} из ${poll.eligible}`)),
+    return h('section', { class: 'sx-poll', 'aria-label': t('sx.vote.label') },
+      h('div', { class: 'sx-poll-head' }, h('h4', { class: 'sx-label' }, t('sx.vote.title')), h('span', { class: 'sx-pill' }, t('sx.of', { a: poll.voted, b: poll.eligible }))),
       h('ul', { class: 'sx-poll-options' }, poll.options.map(option => {
         const chosen = poll.myVote === option.index;
-        const walk = mine ? ` · ≈${social.walkMinutes(mine, option.place)} мин от вас` : '';
+        const walk = mine ? t('sx.vote.fromYou', { n: social.walkMinutes(mine, option.place) }) : '';
         return h('li', { class: chosen ? 'is-chosen' : '' },
-          h('button', { type: 'button', class: 'sx-poll-option', 'aria-pressed': String(chosen), onclick: () => run(() => social.act('voteMeetup', { id: item.id, option: option.index }), chosen ? null : 'Голос учтён') },
+          h('button', { type: 'button', class: 'sx-poll-option', 'aria-pressed': String(chosen), onclick: () => run(() => social.act('voteMeetup', { id: item.id, option: option.index }), chosen ? null : t('sx.vote.counted')) },
             h('span', { class: 'sx-option-number' }, option.index + 1),
-            h('span', { class: 'sx-row-text' }, h('strong', {}, option.place.name), h('span', {}, `${option.voters.length ? `${option.voters.length} ${plural(option.voters.length, 'голос', 'голоса', 'голосов')}` : 'пока без голосов'}${walk}`),
+            h('span', { class: 'sx-row-text' }, h('strong', {}, option.place.name), h('span', {}, `${option.voters.length ? counted(option.voters.length, 'sx.w.vote') : t('sx.vote.none')}${walk}`),
               h('span', { class: 'sx-poll-bar' }, h('span', { style: { width: `${Math.round(option.voters.length / most * 100)}%` } })),
               h('span', { class: 'sx-faces' }, option.voters.map(voter => members.get(voter)).filter(Boolean).map(member => avatar(member, 'xs')))),
             h('span', { class: 'sx-poll-check', 'aria-hidden': 'true' }, chosen ? '✓' : '')),
-          item.isHost ? button('Выбрать это место', () => run(() => social.act('decideMeetup', { id: item.id, option: option.index }), 'Место выбрано, участники получили уведомление'), 'ghost', { class: 'btn btn-ghost sx-btn sx-small' }) : null);
+          item.isHost ? button(t('sx.vote.choose'), () => run(() => social.act('decideMeetup', { id: item.id, option: option.index }), t('sx.vote.chosen')), 'ghost', { class: 'btn btn-ghost sx-btn sx-small' }) : null);
       })),
-      h('p', { class: 'sx-hint' }, item.isHost ? 'Место выберется само, когда проголосуют все. Можно выбрать и раньше.' : 'Место выберется само, когда проголосуют все.'));
+      h('p', { class: 'sx-hint' }, t(item.isHost ? 'sx.vote.hintHost' : 'sx.vote.hint')));
   }
 
   function addToMeetupView(id) {
@@ -662,31 +686,31 @@ export function mountSocial(root, ctx = {}) {
     const row = h('div', { class: 'sx-chips sx-friend-chips' });
     const draw = () => row.replaceChildren(...friends().filter(entry => !present.has(entry.id)).map(entry => chip([avatar(entry, 'xs'), entry.name], chosen.has(entry.id), () => { chosen.has(entry.id) ? chosen.delete(entry.id) : chosen.add(entry.id); draw(); })));
     draw();
-    return h('div', { class: 'sx-form' }, h('h3', { class: 'sx-section-title' }, 'Позвать ещё'), row.children.length ? row : h('p', { class: 'sx-hint' }, 'Все друзья уже приглашены.'),
-      button('Позвать', async () => { if (await run(() => social.act('inviteToMeetup', { id, userIds: [...chosen] }), 'Приглашения отправлены')) open({ type: 'meetup', id }); }, 'primary', { class: 'btn btn-primary sx-btn sx-wide' }));
+    return h('div', { class: 'sx-form' }, h('h3', { class: 'sx-section-title' }, t('sx.mu.inviteMore')), row.children.length ? row : h('p', { class: 'sx-hint' }, t('sx.mu.allInvited')),
+      button(t('sx.invite.send'), async () => { if (await run(() => social.act('inviteToMeetup', { id, userIds: [...chosen] }), t('sx.invitesSent'))) open({ type: 'meetup', id }); }, 'primary', { class: 'btn btn-primary sx-btn sx-wide' }));
   }
 
   // ---------- events ----------
 
   function eventsView() {
     const all = social.getState().events;
-    const filters = [['all', 'Все'], ['today', 'Сегодня'], ['friends', 'Друзья идут'], ['mine', 'Мои']];
+    const filters = [['all', t('sx.ev.all')], ['today', t('sx.ev.today')], ['friends', t('sx.ev.friends')], ['mine', t('sx.ev.mine')]];
     const today = new Date(); today.setHours(23, 59, 59, 999);
     const list = all.filter(item => view.eventFilter === 'all' ? true
       : view.eventFilter === 'today' ? item.startsAt <= today.getTime()
         : view.eventFilter === 'friends' ? item.friendsGoing.length > 0
           : item.isHost || item.myStatus);
     return h('div', { class: 'sx-stack' },
-      h('div', { class: 'sx-list-head' }, h('h3', { class: 'sx-section-title' }, 'События в городе'), button('+ Создать', () => open({ type: 'newEvent' }), 'ghost')),
+      h('div', { class: 'sx-list-head' }, h('h3', { class: 'sx-section-title' }, t('sx.ev.title')), button(t('sx.ev.create'), () => open({ type: 'newEvent' }), 'ghost')),
       h('div', { class: 'sx-chips' }, filters.map(([value, label]) => chip(label, view.eventFilter === value, () => { view.eventFilter = value; render(true); }))),
       list.length ? h('ul', { class: 'sx-list' }, list.map(item => h('li', {}, eventRow(item))))
-        : h('div', { class: 'sx-empty' }, h('p', {}, all.length ? 'Под этот фильтр ничего нет.' : 'Пока никто не создал событие. Соберите пробежку, прогулку или настолки — люди рядом увидят его на карте.'),
-          button('Создать событие', () => open({ type: 'newEvent' }), 'primary')));
+        : h('div', { class: 'sx-empty' }, h('p', {}, t(all.length ? 'sx.ev.noMatch' : 'sx.ev.empty')),
+          button(t('sx.ev.createCta'), () => open({ type: 'newEvent' }), 'primary')));
   }
 
   function capacityText(item) {
-    if (item.capacity) return `${item.going} из ${item.capacity}${item.waitlist ? ` · в листе ожидания ${item.waitlist}` : ''}`;
-    return `${item.going} ${plural(item.going, 'идёт', 'идут', 'идут')}`;
+    if (item.capacity) return `${t('sx.of', { a: item.going, b: item.capacity })}${item.waitlist ? t('sx.ev.waitlistCount', { n: item.waitlist }) : ''}`;
+    return counted(item.going, 'sx.w.going');
   }
 
   function eventRow(item) {
@@ -694,8 +718,8 @@ export function mountSocial(root, ctx = {}) {
       h('span', { class: 'sx-event-glyph', 'aria-hidden': 'true' }, CATEGORY_EMOJI[item.category] || '✨'),
       h('span', { class: 'sx-row-text' }, h('strong', {}, item.title),
         h('span', {}, `${when(item.startsAt)} · ${item.place.name}`),
-        h('span', { class: 'sx-faces' }, item.friendsGoing.slice(0, 4).map(person => avatar(person, 'xs')), h('span', {}, item.status === 'cancelled' ? 'отменено' : item.status === 'hidden' ? 'скрыто после жалоб' : capacityText(item)),
-          item.myStatus === 'going' ? h('span', { class: 'sx-pill is-green' }, 'Вы идёте') : item.myStatus === 'waitlist' ? h('span', { class: 'sx-pill is-amber' }, 'Лист ожидания') : null)),
+        h('span', { class: 'sx-faces' }, item.friendsGoing.slice(0, 4).map(person => avatar(person, 'xs')), h('span', {}, item.status === 'cancelled' ? t('sx.ev.cancelledLower') : item.status === 'hidden' ? t('sx.ev.hidden') : capacityText(item)),
+          item.myStatus === 'going' ? h('span', { class: 'sx-pill is-green' }, t('sx.ev.youGo')) : item.myStatus === 'waitlist' ? h('span', { class: 'sx-pill is-amber' }, t('sx.ev.waitlist')) : null)),
       h('span', { class: 'sx-chevron', 'aria-hidden': 'true' }, '›'));
   }
 
@@ -704,31 +728,31 @@ export function mountSocial(root, ctx = {}) {
     if (!item) {
       social.api(`event?id=${encodeURIComponent(id)}`).then(result => { social.getState().events.push(result.event); view.justOpened = true; render(true); view.justOpened = false; })
         .catch(error => { toast(error.message, 'error'); close(); });
-      return h('p', { class: 'sx-hint' }, 'Загружаем событие…');
+      return h('p', { class: 'sx-hint' }, t('sx.ev.loading'));
     }
     if (view.justOpened) layer?.fit([item.place]);
     const signed = social.signedIn();
-    const join = () => signed ? run(() => social.act('joinEvent', { id }), null).then(result => result && toast(result.event.myStatus === 'waitlist' ? 'Мест нет: вы в листе ожидания, сообщим, если освободится' : 'Вы идёте!', 'success')) : toast('Создайте профиль на вкладке «Друзья», чтобы записаться', 'info');
+    const join = () => signed ? run(() => social.act('joinEvent', { id }), null).then(result => result && toast(t(result.event.myStatus === 'waitlist' ? 'sx.ev.waitlisted' : 'sx.ev.joined'), 'success')) : toast(t('sx.ev.needProfile'), 'info');
     const link = `${location.origin}${location.pathname}?event=${item.id}`;
     const share = () => navigator.share ? navigator.share({ title: item.title, text: `${item.title} · ${when(item.startsAt)} · ${item.place.name}`, url: link }).catch(() => {})
-      : navigator.clipboard.writeText(link).then(() => toast('Ссылка скопирована', 'success')).catch(() => prompt('Скопируйте ссылку', link));
+      : navigator.clipboard.writeText(link).then(() => toast(t('sx.copied'), 'success')).catch(() => prompt(t('sx.copyPrompt'), link));
     const full = item.capacity !== null && item.going >= item.capacity;
     return h('div', { class: 'sx-stack' },
-      h('div', { class: 'sx-detail-head' }, h('span', { class: 'sx-kicker' }, `${CATEGORY_EMOJI[item.category] || '✨'} ${item.status === 'cancelled' ? 'Отменено' : until(item.startsAt)}`),
+      h('div', { class: 'sx-detail-head' }, h('span', { class: 'sx-kicker' }, `${CATEGORY_EMOJI[item.category] || '✨'} ${item.status === 'cancelled' ? t('sx.ev.cancelled') : until(item.startsAt)}`),
         h('h3', {}, item.title), h('p', {}, `${when(item.startsAt)}–${clock(item.endsAt)} · ${item.place.name}`),
-        h('p', { class: 'sx-hint' }, `Организатор: ${item.host?.name || '—'} · ${item.visibility === 'friends' ? 'только для друзей организатора' : 'открытое событие'}`),
+        h('p', { class: 'sx-hint' }, t('sx.ev.hostLine', { name: item.host?.name || '—', visibility: t(item.visibility === 'friends' ? 'sx.ev.friendsOnly' : 'sx.ev.public') })),
         item.description ? h('p', { class: 'sx-note' }, item.description) : null),
-      h('p', { class: 'sx-capacity' }, capacityText(item), item.friendsGoing.length ? h('span', { class: 'sx-faces' }, ' · друзья: ', item.friendsGoing.map(person => avatar(person, 'xs')), item.friendsGoing.map(person => person.name).join(', ')) : null),
+      h('p', { class: 'sx-capacity' }, capacityText(item), item.friendsGoing.length ? h('span', { class: 'sx-faces' }, t('sx.ev.friendsGoing'), item.friendsGoing.map(person => avatar(person, 'xs')), item.friendsGoing.map(person => person.name).join(', ')) : null),
       item.status === 'active' ? h('div', { class: 'sx-actions' },
-        !item.myStatus ? button(full ? 'В лист ожидания' : 'Иду', join, 'primary')
-          : item.isHost ? h('span', { class: 'sx-pill is-green' }, 'Вы организатор')
-            : button(item.myStatus === 'waitlist' ? 'Выйти из листа ожидания' : 'Не пойду', () => run(() => social.act('leaveEvent', { id }), 'Готово'), 'ghost'),
-        signed && friends().length ? button('Позвать друзей', () => open({ type: 'inviteEvent', id }), 'ghost') : null,
-        button('Поделиться', share, 'ghost')) : null,
+        !item.myStatus ? button(t(full ? 'sx.ev.joinWaitlist' : 'sx.rsvp.going'), join, 'primary')
+          : item.isHost ? h('span', { class: 'sx-pill is-green' }, t('sx.ev.youHost'))
+            : button(t(item.myStatus === 'waitlist' ? 'sx.ev.leaveWaitlist' : 'sx.ev.leave'), () => run(() => social.act('leaveEvent', { id }), t('sx.done')), 'ghost'),
+        signed && friends().length ? button(t('sx.inviteFriends'), () => open({ type: 'inviteEvent', id }), 'ghost') : null,
+        button(t('sx.share.btn'), share, 'ghost')) : null,
       routeLinks(item.place),
-      h('div', { class: 'sx-actions' }, button('В календарь', () => downloadCalendar({ title: item.title, startsAt: item.startsAt, endsAt: item.endsAt, place: item.place, description: item.description }), 'ghost'),
-        item.isHost && item.status === 'active' ? button('Отменить событие', async () => { if (confirm('Отменить событие для всех участников?')) await run(() => social.act('cancelEvent', { id }), 'Событие отменено'); }, 'ghost', { class: 'btn btn-ghost sx-btn sx-danger' }) : null,
-        signed && !item.isHost ? button('Пожаловаться', async () => { const reason = prompt('Что не так с событием?'); if (reason !== null) await run(() => social.act('reportEvent', { id, reason }), 'Спасибо, жалоба отправлена'); }, 'ghost', { class: 'btn btn-ghost sx-btn sx-quiet' }) : null));
+      h('div', { class: 'sx-actions' }, button(t('sx.calendar'), () => downloadCalendar({ title: item.title, startsAt: item.startsAt, endsAt: item.endsAt, place: item.place, description: item.description }), 'ghost'),
+        item.isHost && item.status === 'active' ? button(t('sx.ev.cancel'), async () => { if (confirm(t('sx.ev.cancelConfirm'))) await run(() => social.act('cancelEvent', { id }), t('sx.ev.cancelDone')); }, 'ghost', { class: 'btn btn-ghost sx-btn sx-danger' }) : null,
+        signed && !item.isHost ? button(t('sx.ev.report'), async () => { const reason = prompt(t('sx.ev.reportPrompt')); if (reason !== null) await run(() => social.act('reportEvent', { id, reason }), t('sx.ev.reported')); }, 'ghost', { class: 'btn btn-ghost sx-btn sx-quiet' }) : null));
   }
 
   function inviteEventView(id) {
@@ -736,15 +760,15 @@ export function mountSocial(root, ctx = {}) {
     const row = h('div', { class: 'sx-chips sx-friend-chips' });
     const draw = () => row.replaceChildren(...friends().map(entry => chip([avatar(entry, 'xs'), entry.name], chosen.has(entry.id), () => { chosen.has(entry.id) ? chosen.delete(entry.id) : chosen.add(entry.id); draw(); })));
     draw();
-    return h('div', { class: 'sx-form' }, h('h3', { class: 'sx-section-title' }, 'Позвать друзей на событие'), row,
-      button('Позвать', async () => { if (chosen.size && await run(() => social.act('inviteToEvent', { id, userIds: [...chosen] }), 'Друзья получили приглашение')) open({ type: 'event', id }); }, 'primary', { class: 'btn btn-primary sx-btn sx-wide' }));
+    return h('div', { class: 'sx-form' }, h('h3', { class: 'sx-section-title' }, t('sx.ev.inviteTitle')), row,
+      button(t('sx.invite.send'), async () => { if (chosen.size && await run(() => social.act('inviteToEvent', { id, userIds: [...chosen] }), t('sx.ev.invited'))) open({ type: 'event', id }); }, 'primary', { class: 'btn btn-primary sx-btn sx-wide' }));
   }
 
   function newEventView(prefill = {}) {
     const form = { category: 'walk', place: prefill.place || null, startsAt: roundTo5(Date.now() + 2 * 3600000), hours: 2, visibility: 'public' };
-    const title = h('input', { class: 'sx-input', maxlength: 80, minlength: 3, required: true, placeholder: 'Например: вечерняя пробежка по набережной' });
-    const description = h('textarea', { class: 'sx-input', maxlength: 600, rows: 3, placeholder: 'Что будет, кому подойдёт, что взять с собой' });
-    const capacity = h('input', { class: 'sx-input', type: 'number', min: 2, max: 500, inputmode: 'numeric', placeholder: 'Без ограничения' });
+    const title = h('input', { class: 'sx-input', maxlength: 80, minlength: 3, required: true, placeholder: t('sx.ev.titlePlaceholder') });
+    const description = h('textarea', { class: 'sx-input', maxlength: 600, rows: 3, placeholder: t('sx.ev.descPlaceholder') });
+    const capacity = h('input', { class: 'sx-input', type: 'number', min: 2, max: 500, inputmode: 'numeric', placeholder: t('sx.ev.noLimit') });
     const group = (options, key) => {
       const row = h('div', { class: 'sx-chips' });
       const draw = () => row.replaceChildren(...options.map(([value, label]) => chip(label, form[key] === value, () => { form[key] = value; draw(); })));
@@ -753,22 +777,22 @@ export function mountSocial(root, ctx = {}) {
     };
     return h('form', { class: 'sx-form', onsubmit: async submitEvent => {
       submitEvent.preventDefault();
-      if (!form.place) { toast('Выберите место', 'error'); return; }
+      if (!form.place) { toast(t('sx.pickPlace'), 'error'); return; }
       const created = await run(() => social.act('createEvent', { title: title.value, description: description.value, category: form.category, place: form.place,
-        startsAt: form.startsAt, endsAt: form.startsAt + form.hours * 3600000, capacity: capacity.value ? Number(capacity.value) : null, visibility: form.visibility }), 'Событие опубликовано');
+        startsAt: form.startsAt, endsAt: form.startsAt + form.hours * 3600000, capacity: capacity.value ? Number(capacity.value) : null, visibility: form.visibility }), t('sx.ev.published'));
       if (created) { view.tab = 'events'; open({ type: 'event', id: created.event.id }); }
     } },
-      h('h3', { class: 'sx-section-title' }, 'Новое событие'),
-      h('span', { class: 'sx-label' }, 'Название'), title,
-      h('span', { class: 'sx-label' }, 'Тип'), group(EVENT_CATEGORIES, 'category'),
-      h('span', { class: 'sx-label' }, 'Где'), placePicker(form.place, value => { form.place = value; }),
-      h('span', { class: 'sx-label' }, 'Начало'), timePicker(form.startsAt, value => { form.startsAt = value; }),
-      h('span', { class: 'sx-label' }, 'Длительность'), group([[1, '1 час'], [2, '2 часа'], [3, '3 часа'], [5, '5 часов']], 'hours'),
-      h('span', { class: 'sx-label' }, 'Мест'), capacity,
-      h('span', { class: 'sx-label' }, 'Кто увидит'), group([['public', 'Все в городе'], ['friends', 'Только мои друзья']], 'visibility'),
-      h('span', { class: 'sx-label' }, 'Описание'), description,
-      h('button', { type: 'submit', class: 'btn btn-primary sx-btn sx-wide' }, 'Опубликовать'),
-      h('p', { class: 'sx-hint' }, 'Не публикуйте личные данные. После трёх жалоб событие скрывается.'));
+      h('h3', { class: 'sx-section-title' }, t('sx.ev.newTitle')),
+      h('span', { class: 'sx-label' }, t('sx.titleLabel')), title,
+      h('span', { class: 'sx-label' }, t('sx.ev.type')), group(EVENT_CATEGORIES.map(id => [id, t(`sx.cat.${id}`)]), 'category'),
+      h('span', { class: 'sx-label' }, t('sx.where')), placePicker(form.place, value => { form.place = value; }),
+      h('span', { class: 'sx-label' }, t('sx.ev.start')), timePicker(form.startsAt, value => { form.startsAt = value; }),
+      h('span', { class: 'sx-label' }, t('sx.ev.duration')), group([1, 2, 3, 5].map(hours => [hours, t(`sx.dur.${hours}`)]), 'hours'),
+      h('span', { class: 'sx-label' }, t('sx.ev.capacity')), capacity,
+      h('span', { class: 'sx-label' }, t('sx.ev.visibility')), group([['public', t('sx.ev.visPublic')], ['friends', t('sx.ev.visFriends')]], 'visibility'),
+      h('span', { class: 'sx-label' }, t('sx.ev.description')), description,
+      h('button', { type: 'submit', class: 'btn btn-primary sx-btn sx-wide' }, t('sx.ev.publish')),
+      h('p', { class: 'sx-hint' }, t('sx.ev.rules')));
   }
 
   // ---------- notifications and profile ----------
@@ -780,42 +804,42 @@ export function mountSocial(root, ctx = {}) {
         : ['friend_added', 'location_shared'].includes(item.type) ? { type: 'friend', id: item.entityId }
           : item.type === 'location_request' ? { type: 'share' } : null;
     const canAsk = 'Notification' in window && Notification.permission === 'default';
-    const ask = canAsk ? h('div', { class: 'sx-note' }, h('p', {}, 'Можно получать уведомления, пока вкладка Aidem открыта в фоне.'),
-      button('Включить уведомления', async () => { await Notification.requestPermission().catch(() => {}); render(true); }, 'ghost')) : null;
-    return h('div', { class: 'sx-stack' }, h('h3', { class: 'sx-section-title' }, 'Уведомления'), ask,
+    const ask = canAsk ? h('div', { class: 'sx-note' }, h('p', {}, t('sx.nt.ask')),
+      button(t('sx.nt.enable'), async () => { await Notification.requestPermission().catch(() => {}); render(true); }, 'ghost')) : null;
+    return h('div', { class: 'sx-stack' }, h('h3', { class: 'sx-section-title' }, t('sx.notifications')), ask,
       list.length ? h('ul', { class: 'sx-list' }, list.map(item => h('li', {}, h('button', { type: 'button', class: `sx-row${item.read ? '' : ' is-unread'}`, onclick: () => { const next = target(item); if (next) open(next); } },
         item.actor ? avatar(item.actor, 'sm') : h('span', { class: 'sx-avatar sx-avatar-sm' }, '🔔'),
-        h('span', { class: 'sx-row-text sx-wrap' }, h('strong', {}, item.text), h('span', {}, ago(item.createdAt)))))))
-        : h('p', { class: 'sx-empty' }, 'Пока тихо. Здесь появятся приглашения и ответы друзей.'));
+        h('span', { class: 'sx-row-text sx-wrap' }, h('strong', {}, notificationText(item, social.getState())), h('span', {}, ago(item.createdAt)))))))
+        : h('p', { class: 'sx-empty' }, t('sx.nt.empty')));
   }
 
   function profileView() {
     const me = data().me;
     let emoji = me.emoji;
-    const name = h('input', { class: 'sx-input', maxlength: 32, value: me.name, 'aria-label': 'Имя' });
-    const picker = h('div', { class: 'sx-emoji-grid', role: 'radiogroup', 'aria-label': 'Значок' },
+    const name = h('input', { class: 'sx-input', maxlength: 32, value: me.name, 'aria-label': t('sx.name') });
+    const picker = h('div', { class: 'sx-emoji-grid', role: 'radiogroup', 'aria-label': t('sx.emoji') },
       EMOJIS.map(value => h('button', { type: 'button', class: 'sx-emoji', role: 'radio', 'aria-checked': String(value === emoji), 'aria-label': value,
         onclick: event => { emoji = value; for (const node of picker.children) node.setAttribute('aria-checked', String(node === event.currentTarget)); } }, value)));
     const linkBox = h('div', { class: 'sx-link-box' });
     const blocked = data().blocked || [];
     return h('div', { class: 'sx-stack' },
       h('div', { class: 'sx-profile-head' }, avatar(me, 'xl'), h('h3', {}, me.name)),
-      h('form', { class: 'sx-form', onsubmit: async event => { event.preventDefault(); await run(() => social.act('updateProfile', { name: name.value, emoji }), 'Сохранено'); } },
-        h('span', { class: 'sx-label' }, 'Имя'), name, h('span', { class: 'sx-label' }, 'Значок'), picker, h('button', { type: 'submit', class: 'btn btn-ghost sx-btn' }, 'Сохранить')),
-      h('section', { class: 'sx-card', id: 'sx-watch-link' }, h('strong', {}, '⌚ Связать часы'),
-        h('p', { class: 'sx-hint' }, 'На часах будут ваши встречи и друзья. Код действует 10 минут и срабатывает один раз. Также можно подключить второй телефон или планшет.'),
-        button('Связать часы', async () => {
+      h('form', { class: 'sx-form', onsubmit: async event => { event.preventDefault(); await run(() => social.act('updateProfile', { name: name.value, emoji }), t('sx.saved')); } },
+        h('span', { class: 'sx-label' }, t('sx.name')), name, h('span', { class: 'sx-label' }, t('sx.emoji')), picker, h('button', { type: 'submit', class: 'btn btn-ghost sx-btn' }, t('sx.save'))),
+      h('section', { class: 'sx-card', id: 'sx-watch-link' }, h('strong', {}, t('sx.watch.title')),
+        h('p', { class: 'sx-hint' }, t('sx.watch.hint')),
+        button(t('sx.watch.link'), async () => {
           const result = await run(() => social.act('linkDevice'));
-          if (result) linkBox.replaceChildren(h('p', { class: 'sx-invite-code sx-watch-code', 'aria-label': `Код ${result.code.split('').join(' ')}` }, result.code.replace(/(\d{3})(\d{3})/, '$1 $2')),
-            h('p', {}, 'Откройте на часах ', h('strong', {}, `${location.host}/watch`), ' → Встречи → Ввести код'),
-            h('p', { class: 'sx-hint' }, `Код действует до ${clock(result.expiresAt)}. На другом телефоне или планшете: «Друзья и встречи» → «Войти по коду».`));
+          if (result) linkBox.replaceChildren(h('p', { class: 'sx-invite-code sx-watch-code', 'aria-label': t('sx.watch.codeLabel', { code: result.code.split('').join(' ') }) }, result.code.replace(/(\d{3})(\d{3})/, '$1 $2')),
+            h('p', {}, t('sx.watch.openBefore'), h('strong', {}, `${location.host}/watch`), t('sx.watch.openAfter')),
+            h('p', { class: 'sx-hint' }, t('sx.watch.until', { time: clock(result.expiresAt) })));
         }, 'primary'), linkBox),
-      blocked.length ? h('section', { class: 'sx-card' }, h('strong', {}, 'Заблокированные'), h('ul', { class: 'sx-list' }, blocked.map(person => h('li', { class: 'sx-row' }, avatar(person, 'sm'), h('span', { class: 'sx-row-text' }, h('strong', {}, person.name)),
-        button('Разблокировать', () => run(() => social.act('unblockUser', { userId: person.id }), 'Разблокировано'), 'ghost'))))) : null,
-      h('section', { class: 'sx-card' }, h('strong', {}, 'Данные и приватность'),
-        h('p', { class: 'sx-hint' }, 'Мы храним имя, значок, список друзей, встречи и события. Место — только пока вы его показываете, одну последнюю точку. Почты, телефона и истории перемещений нет.'),
-        h('div', { class: 'sx-actions' }, button('Выйти на этом устройстве', () => run(() => social.signOut()), 'ghost'),
-          button('Удалить профиль и все данные', async () => { if (confirm('Удалить профиль, друзей, встречи и события навсегда?')) await run(() => social.signOut({ deleteAccount: true }), 'Профиль удалён'); }, 'ghost', { class: 'btn btn-ghost sx-btn sx-danger' }))));
+      blocked.length ? h('section', { class: 'sx-card' }, h('strong', {}, t('sx.blockedTitle')), h('ul', { class: 'sx-list' }, blocked.map(person => h('li', { class: 'sx-row' }, avatar(person, 'sm'), h('span', { class: 'sx-row-text' }, h('strong', {}, person.name)),
+        button(t('sx.unblock'), () => run(() => social.act('unblockUser', { userId: person.id }), t('sx.unblocked')), 'ghost'))))) : null,
+      h('section', { class: 'sx-card' }, h('strong', {}, t('sx.privacy.title')),
+        h('p', { class: 'sx-hint' }, t('sx.privacy.text')),
+        h('div', { class: 'sx-actions' }, button(t('sx.signOut'), () => run(() => social.signOut()), 'ghost'),
+          button(t('sx.deleteProfile'), async () => { if (confirm(t('sx.deleteConfirm'))) await run(() => social.signOut({ deleteAccount: true }), t('sx.deleted')); }, 'ghost', { class: 'btn btn-ghost sx-btn sx-danger' }))));
   }
 
   // ---------- render ----------
@@ -843,7 +867,7 @@ export function mountSocial(root, ctx = {}) {
 
   function tabs() {
     const count = (data()?.meetups || []).filter(item => item.myStatus === 'invited' && item.status === 'active').length;
-    return h('div', { class: 'sx-segments', role: 'tablist' }, [['friends', 'Друзья'], ['meetups', count ? `Встречи · ${count}` : 'Встречи'], ['events', 'События']].map(([id, label]) =>
+    return h('div', { class: 'sx-segments', role: 'tablist' }, [['friends', t('sx.title')], ['meetups', count ? t('sx.meetupsCount', { n: count }) : t('sx.meetups')], ['events', t('sx.events')]].map(([id, label]) =>
       h('button', { type: 'button', role: 'tab', class: 'sx-segment', 'aria-selected': String(view.tab === id), onclick: () => { view.tab = id; if (id === 'events') social.loadEvents(true); render(true); } }, label)));
   }
 
@@ -856,7 +880,7 @@ export function mountSocial(root, ctx = {}) {
     if (!force && body && container.querySelector('details[open][data-pause-refresh]')) { updateMap(); return; }
     let content;
     if (!state.token) content = overlay?.type === 'event' ? overlayView(overlay) : onboarding();
-    else if (!state.data) content = h('p', { class: 'sx-hint' }, state.error || 'Загружаем друзей…');
+    else if (!state.data) content = h('p', { class: 'sx-hint' }, state.error || t('sx.loading'));
     else if (overlay) content = overlayView(overlay);
     else content = h('div', {}, tabs(), view.tab === 'friends' ? friendsView() : view.tab === 'meetups' ? meetupsView() : eventsView());
     const typed = [...container.querySelectorAll('[data-keep]')].map(field => ({ key: field.dataset.keep, value: field.value, focused: field === document.activeElement,
@@ -883,7 +907,7 @@ export function mountSocial(root, ctx = {}) {
     }
     const showEvents = view.tab === 'events' || view.overlay?.type === 'event';
     const badges = {};
-    for (const item of state.data?.meetups || []) for (const member of item.members) if (member.status === 'on_way') badges[member.id] = 'в пути';
+    for (const item of state.data?.meetups || []) for (const member of item.members) if (member.status === 'on_way') badges[member.id] = statusText('on_way');
     const sharedPoint = state.data?.share?.hasPoint ? { lat: state.data.share.lat, lon: state.data.share.lon } : null;
     const me = state.data && sharedPoint ? { ...state.data.me, ...sharedPoint } : null;
     layer.update({ me, friends: state.data?.friends || [], meetups: state.data?.meetups || [], events: showEvents ? state.events : [], badges });
@@ -891,9 +915,9 @@ export function mountSocial(root, ctx = {}) {
 
   const unsubscribe = social.onChange((state, reason) => {
     if (reason?.type === 'notifications') {
-      for (const item of reason.items.slice(0, 2)) toast(item.text, 'info');
+      for (const item of reason.items.slice(0, 2)) toast(notificationText(item, state), 'info');
       if (document.visibilityState === 'hidden' && 'Notification' in window && Notification.permission === 'granted') {
-        for (const item of reason.items.slice(0, 2)) new Notification('Aidem', { body: item.text, icon: '/assets/brand/seruen/icon-192.png' });
+        for (const item of reason.items.slice(0, 2)) new Notification('Aidem', { body: notificationText(item, state), icon: '/assets/brand/seruen/icon-192.png' });
       }
       return;
     }
@@ -908,15 +932,15 @@ export function mountSocial(root, ctx = {}) {
   return {
     unmount() { social.setFocused(false); unsubscribe(); layer?.destroy(); container.remove(); },
     planMeetup(placeInfo) {
-      if (!social.signedIn()) { toast('Создайте профиль, чтобы звать друзей', 'info'); view.overlay = null; render(true); return; }
+      if (!social.signedIn()) { toast(t('sx.needProfile'), 'info'); view.overlay = null; render(true); return; }
       open({ type: 'newMeetup', prefill: { place: { id: placeInfo.id ?? null, name: placeInfo.name, lat: placeInfo.lat, lon: placeInfo.lon }, title: placeInfo.name } });
     },
     async openInvite(code) {
       try {
         const preview = await social.api(`invite?code=${encodeURIComponent(code)}`);
-        if (preview.own) { toast('Это ваша ссылка-приглашение. Отправьте её другу.', 'info'); return; }
+        if (preview.own) { toast(t('sx.ownInvite'), 'info'); return; }
         if (social.signedIn()) {
-          if (preview.alreadyFriends) toast(`${preview.inviter.name} уже у вас в друзьях`, 'info');
+          if (preview.alreadyFriends) toast(t('sx.alreadyFriend', { name: preview.inviter.name }), 'info');
           else await acceptInvite(code);
           return;
         }
