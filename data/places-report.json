@@ -15,11 +15,11 @@
       }
     }
   },
-  "placesSha256": "4f1f6d3b14a81ac8f42cb8dbb6ef37e94c8ff45e966240a60451cd24e0649729",
-  "total": 2275,
+  "placesSha256": "86c5de63d120330a6cfe45adba92018d1ec36350721a20993ed310fc3971cf88",
+  "total": 2255,
   "bySource": {
-    "OpenStreetMap": 1473,
-    "Overture Maps · Meta": 758,
+    "OpenStreetMap": 1454,
+    "Overture Maps · Meta": 757,
     "Overture Maps · Foursquare": 22,
     "Overture Maps · Microsoft": 16,
     "Overture Maps · AllThePlaces": 6
@@ -28,7 +28,7 @@
     "cafe": 506,
     "restaurant": 499,
     "playground": 343,
-    "bar": 180,
+    "bar": 161,
     "fast_food": 137,
     "fountain": 86,
     "mall": 80,
@@ -59,22 +59,22 @@
     "nightclub": 4,
     "beach": 2,
     "theme_park": 1,
-    "exhibition_centre": 1,
-    "zoo": 1
+    "exhibition_centre": 1
   },
   "added": {
-    "osm_import": 930,
+    "osm_import": 911,
     "osm_unnamed_playground": 323,
     "overture_osm_land_use": 33,
     "overture_osm_infrastructure": 175,
     "overture_osm_buildings": 12,
-    "overture_places": 802
+    "overture_places": 801
   },
   "enrichedExisting": {
     "overture_osm_infrastructure": 8,
-    "overture_places": 244
+    "overture_places": 242
   },
   "rejected": {
+    "osm_import:not_a_venue": 19,
     "overture_osm_buildings:already_in_osm_import": 10,
     "overture_osm_buildings:not_selected": 9,
     "overture_osm_buildings:outside_or_private": 1,
@@ -90,19 +90,20 @@
     "overture_places:landmark_mapped_elsewhere": 10,
     "overture_places:low_confidence": 583,
     "overture_places:name_not_a_place": 51,
+    "overture_places:not_a_venue": 3,
     "overture_places:other_city": 6,
     "overture_places:outside_bounds": 9
   },
   "generatedNames": 480,
-  "withOpeningHours": 334,
-  "withPhone": 926,
-  "withWebsite": 685,
-  "withSocials": 1050,
-  "withAddress": 1074,
+  "withOpeningHours": 315,
+  "withPhone": 923,
+  "withWebsite": 665,
+  "withSocials": 1047,
+  "withAddress": 1065,
   "withWikipedia": 9,
   "licenses": {
-    "ODbL-1.0": 1473,
-    "CDLA-Permissive-2.0": 774,
+    "ODbL-1.0": 1454,
+    "CDLA-Permissive-2.0": 773,
     "Apache-2.0": 22,
     "CC0-1.0": 6
   },

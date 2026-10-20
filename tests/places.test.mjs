@@ -27,6 +27,11 @@ test('merged dataset: unique ids, every record valid, sourced and licensed', () 
   assert.deepEqual([...sources].sort(), ['osm', 'overture']);
 });
 
+test('merged dataset holds no betting shops or pet shops posing as bars and zoos', () => {
+  const junk = places.filter(place => /fair\s*play|букмекер|(^|[\s,])бк\s|казино|casino|зоомагазин|zoo\.kz/i.test(place.name));
+  assert.deepEqual(junk.map(place => place.name), []);
+});
+
 test('recommendations over the full dataset stay far below the Workers CPU limit', () => {
   prepareDataset(places);
   const queries = ['', 'кофе', 'погулять', 'с ребёнком', 'дождь', 'поесть', 'мечеть', 'фонтан', 'кино'];
