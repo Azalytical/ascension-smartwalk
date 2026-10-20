@@ -99,6 +99,14 @@ export function confidenceChip(confidence) {
   return CONFIDENCE[confidence?.level] ? h('span', { class: `confidence confidence-${confidence.level}` }, t(CONFIDENCE[confidence.level])) : null;
 }
 
+const NOTABILITY = { high: 'notability.high', medium: 'notability.medium' };
+/** How well open data knows the place (Wikidata, Wikipedia, several sources). Quiet on purpose: it is not a rating. */
+export function notabilityChip(notability) {
+  if (!NOTABILITY[notability?.level]) return null;
+  const label = t(NOTABILITY[notability.level]);
+  return h('span', { class: 'notability', title: t('notability.hint'), 'aria-label': `${label}. ${t('notability.hint')}` }, label);
+}
+
 export function backButton(label, onClick) {
   return h('button', { class: 'btn btn-quiet btn-sm back-btn', type: 'button', onclick: onClick }, icon('back'), label);
 }
