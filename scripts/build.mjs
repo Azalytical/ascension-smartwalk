@@ -38,7 +38,7 @@ const assets=${JSON.stringify(assets)};
 const data=${JSON.stringify(data)};
 prepareDataset(data);
 prepareApi(data);
-const cacheFor=path=>path==='/'||path.endsWith('.html')||path==='/watch'||path==='/friends'||path==='/sw.js'?'no-cache':path.startsWith('/vendor/')||path.startsWith('/assets/')?'public,max-age=86400':'public,max-age=120';
+const cacheFor=path=>path==='/'||path.endsWith('.html')||path==='/watch'||path==='/friends'||path==='/agent'||path==='/sw.js'?'no-cache':path.startsWith('/vendor/')||path.startsWith('/assets/')?'public,max-age=86400':'public,max-age=120';
 // Bodies are decoded once per isolate and reused, which keeps each request well under the CPU limit.
 const decoded=new Map();
 const bytesOf=(path,asset)=>{let bytes=decoded.get(path);if(!bytes){if(asset.encoding==='base64'){const text=atob(asset.body);bytes=new Uint8Array(text.length);for(let i=0;i<text.length;i++)bytes[i]=text.charCodeAt(i);}else bytes=new TextEncoder().encode(asset.body);decoded.set(path,bytes);}return bytes;};
