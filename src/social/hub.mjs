@@ -1,4 +1,5 @@
 import { SocialStore } from './store.mjs';
+import { RatingStore } from '../ratings.mjs';
 
 /** Adapter over the Durable Object SQLite API. */
 function durableDb(sql) {
@@ -10,14 +11,15 @@ function durableDb(sql) {
 }
 
 /**
- * One SQLite-backed Durable Object per city holds friends, location shares, meetups and events.
- * The Worker talks to it with POST /run { op, token, input, meta }.
+ * One SQLite-backed Durable Object per city holds friends, location shares, meetups and events, and users' ratings of places.
+ * The Worker talks to it with POST /run { op, token, input, meta }; ratings operations start with «ratings.» and need no profile.
  */
 export class SocialHub {
   constructor(ctx, env, db = null) {
     this.ctx = ctx;
     this.env = env;
     this.store = new SocialStore(db ?? durableDb(ctx.storage.sql), { schedule: at => { this.wakeAt(at).catch(() => {}); } });
+    this.ratings = new RatingStore(this.store.db, { now: () => this.store.now(), limit: (...args) => this.store.limit(...args) });
   }
 
   async wakeAt(at) {
@@ -28,6 +30,7 @@ export class SocialHub {
   async fetch(request) {
     if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
     const { op, token, input, meta } = await request.json();
+    if (String(op).startsWith('ratings.')) return Response.json(this.ratings.handle(String(op), input, meta));
     const result = await this.store.handle(String(op), token, input, meta);
     return Response.json(result);
   }

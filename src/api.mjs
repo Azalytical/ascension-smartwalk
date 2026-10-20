@@ -3,6 +3,7 @@ import { semanticCategories } from './semantic.mjs';
 import { currentWeather } from './weather.mjs';
 import { handleTelegram } from './telegram.mjs';
 import { handleSocial } from './social/routes.mjs';
+import { handleRatings, placeRatings } from './ratings-api.mjs';
 import { handleWatch, spokenAnswer, spokenLanguage, say } from './watch.mjs';
 import { handleMcp } from './mcp.mjs';
 import { farNote, runAgent } from './agent.mjs';
@@ -448,7 +449,8 @@ export async function handleApi(request, env = {}, dataset = []) {
       generationAvailable: Boolean(activeProvider(env)), generationProvider: activeProvider(env)?.name ?? null,
       source: summary.source, bySource: summary.bySource, licenses: summary.licenses, attribution: summary.attribution, version: '1.2.0',
       social: Boolean(env.SOCIAL || env.SOCIAL_LOCAL),
-      integrations: { mcp: '/mcp', agent: '/api/agent', vision: '/api/vision', speak: '/api/speak', listen: '/api/listen', weather: '/api/weather' } });
+      integrations: { mcp: '/mcp', agent: '/api/agent', vision: '/api/vision', speak: '/api/speak', listen: '/api/listen', weather: '/api/weather' },
+      ratings: Boolean(env.SOCIAL || env.SOCIAL_LOCAL) ? '/api/ratings' : null });
   }
   if (url.pathname === '/api/places' || url.pathname.startsWith('/api/places/')) {
     if (request.method !== 'GET') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'GET' });
@@ -470,6 +472,7 @@ export async function handleApi(request, env = {}, dataset = []) {
     });
   }
   if (url.pathname.startsWith('/api/social/')) return handleSocial(request, env, dataset);
+  if (url.pathname === '/api/ratings') return handleRatings(request, env, dataset);
   if (url.pathname === '/mcp') return handleMcp(request, env, dataset);
   if (url.pathname === '/api/weather') return weather(request, url, env);
   if (['/api/agent', '/api/vision', '/api/speak', '/api/listen'].includes(url.pathname)) return gemini(request, url, env, dataset);
@@ -483,15 +486,16 @@ export async function handleApi(request, env = {}, dataset = []) {
     const body = await limitedJson(request, 8192);
     if (typeof body.query !== 'undefined' && (typeof body.query !== 'string' || body.query.length > 800)) return json({ error: 'Запрос должен быть текстом до 800 символов' }, 400);
     // Weather comes from the server's own lookup; a weather field in the request body is never read.
-    const weatherNow = body.visitDate ? null : await currentWeather(env);
-    let result = recommend(pois, body, { weather: weatherNow });
+    // Users' ratings (a cached table, skipped when the store is slow) nudge the order from 5 ratings a place.
+    const [weatherNow, ratings] = await Promise.all([body.visitDate ? null : currentWeather(env), placeRatings(env)]);
+    let result = recommend(pois, body, { weather: weatherNow, ratings });
     const budget = await rateLimit(request, env);
     if (!budget.allowed) return json({ error: 'Лимит запросов демо исчерпан. Попробуйте позднее.' }, 429, { 'Retry-After': '60' });
     // Words the dictionary did not understand get one Gemini embedding call (query text only). The dictionary answer
     // stands when the call fails, finds no clear meaning, or the meant category has nothing within the time.
     if (budget.generationAllowed && meaningWanted(result)) {
       const semantic = await semanticCategories(body.query, env);
-      const meant = semantic?.categories.length ? recommend(pois, body, { weather: weatherNow, semantic }) : null;
+      const meant = semantic?.categories.length ? recommend(pois, body, { weather: weatherNow, semantic, ratings }) : null;
       if (meant?.recommendations.length) result = meant;
     }
     const generation = budget.generationAllowed
