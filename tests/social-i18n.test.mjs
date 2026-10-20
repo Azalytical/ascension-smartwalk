@@ -22,7 +22,7 @@ test('the friends tab has every Russian string in Kazakh and English, and no Rus
   for (const key of new Set([...screens.matchAll(/t\('(sx\.[^']+)'/g)].map(match => match[1]))) assert.ok(en.has(key) && kk.has(key), key);
   // The watch is Russian only, so the English hint quotes its two buttons as they are.
   assert.deepEqual([...en].filter(([key, value]) => key !== 'sx.watch.openAfter' && /[А-Яа-яЁё]/.test(value)).map(([key]) => key), []);
-  const code = screens.split('\n').filter(line => !line.trim().startsWith('//')).map(line => line.replace(/\s\/\/.*$/, '')).join('\n');
+  const code = screens.split(/\r?\n/).filter(line => !line.trim().startsWith('//')).map(line => line.replace(/\s\/\/.*$/, '')).join('\n');
   assert.doesNotMatch(code, /[А-Яа-яЁё]/);
 });
 

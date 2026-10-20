@@ -480,8 +480,10 @@ test('agent: a typed query takes the page language where its letters cannot tell
 
 test('agent page: every text exists in Russian, Kazakh and English, and steps show no raw JSON', async () => {
   const { default: TEXT } = await import('../public/agent-i18n.js');
-  const html = readFileSync(new URL('../public/agent.html', import.meta.url), 'utf8');
-  const script = readFileSync(new URL('../public/agent.js', import.meta.url), 'utf8');
+  // A Windows checkout (git autocrlf) ends lines with \r\n; the checks below read lines.
+  const text = file => readFileSync(new URL(file, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  const html = text('../public/agent.html');
+  const script = text('../public/agent.js');
   const pageKeys = [...html.matchAll(/data-i18n(?:-label|-placeholder|-q)?="([^"]+)"/g)].map(match => match[1]);
   const scriptKeys = [...script.matchAll(/tr\('([^'$]+)'/g)].map(match => match[1]);
   assert.ok(pageKeys.length > 30 && scriptKeys.length > 30);
