@@ -73,24 +73,26 @@ const sourceOf = place => ({ label: place.source?.label || 'OpenStreetMap', lice
 export function spokenPlan(plan, now = new Date(), lang = 'ru') {
   const [first, ...rest] = plan.places;
   if (!first) return say('nothing', lang);
-  const back = astanaTime(new Date(now.getTime() + first.totalMinutes * 60000));
+  // «Вернётесь к» as in the app: the way there, the visit and the way back; the reserve is spare time on top.
+  const busy = first.totalMinutes - (first.safetyReserveMinutes ?? 5);
+  const back = astanaTime(new Date(now.getTime() + busy * 60000));
   if (lang === 'kk') {
     // Kazakh numerals take no plural: «8 минут».
     let kazakh = `${first.name}, ${KK_LABELS[first.category] || 'орын'}. Жаяу шамамен ${first.walkMinutes} минут, `
-      + `барып-қайтқанда бүкіл серуен шамамен ${first.totalMinutes} минут алады, сағат ${back} шамасында ораласыз.`;
+      + `барып-қайтқанда бүкіл серуен шамамен ${busy} минут алады, сағат ${back} шамасында ораласыз.`;
     if (first.hours?.status === 'open' && first.hours.closesAt) kazakh += ` ${first.source?.label || 'Дереккөз'} деректері бойынша ${first.hours.closesAt} дейін ашық.`;
     if (rest.length) kazakh += ` Тағы: ${rest.map(place => `${place.name}, жаяу ${place.walkMinutes} минут`).join('; ')}.`;
     return kazakh;
   }
   if (lang === 'en') {
     let english = `${first.name}, ${EN_LABELS[first.category] || 'a place'}. About ${enMinutes(first.walkMinutes)} on foot; `
-      + `the whole walk there and back takes about ${enMinutes(first.totalMinutes)}, so you are back by ${back}.`;
+      + `the whole walk there and back takes about ${enMinutes(busy)}, so you are back by ${back}.`;
     if (first.hours?.status === 'open' && first.hours.closesAt) english += ` ${first.source?.label || 'The source'} lists it as open until ${first.hours.closesAt}.`;
     if (rest.length) english += ` Also: ${rest.map(place => `${place.name}, ${enMinutes(place.walkMinutes)} on foot`).join('; ')}.`;
     return english;
   }
   let text = `${first.name}, ${LABELS[first.category] || 'место'}. Идти примерно ${minutes(first.walkMinutes)}, `
-    + `вся прогулка с дорогой обратно займёт примерно ${minutes(first.totalMinutes)}, вернётесь к ${back}.`;
+    + `вся прогулка с дорогой обратно займёт примерно ${minutes(busy)}, вернётесь к ${back}.`;
   if (first.hours?.status === 'open' && first.hours.closesAt) text += ` По данным ${first.source?.label || 'источника'} работает до ${first.hours.closesAt}.`;
   if (rest.length) text += ` Ещё: ${rest.map(place => `${place.name}, ${minutes(place.walkMinutes)} пешком`).join('; ')}.`;
   return text;
