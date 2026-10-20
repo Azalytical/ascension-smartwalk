@@ -6,12 +6,13 @@ const DETOUR = 1.35;
 const METERS_PER_MINUTE = 4200 / 60;
 const STAY_MINUTES = 60;
 const MAX_WALK = 45;
+const CULTURE = ['museum', 'gallery', 'theatre', 'cinema', 'arts_centre', 'library', 'concert_hall', 'exhibition_centre'];
 export const MEETING_KINDS = {
-  any: ['cafe', 'restaurant', 'park', 'mall', 'attraction', 'museum', 'culture'],
-  coffee: ['cafe'],
-  food: ['cafe', 'restaurant'],
-  park: ['park', 'attraction'],
-  indoor: ['mall', 'museum', 'culture', 'cafe', 'restaurant']
+  any: ['cafe', 'bakery', 'dessert', 'restaurant', 'fast_food', 'park', 'garden', 'plaza', 'fountain', 'mall', 'attraction', 'culture', ...CULTURE],
+  coffee: ['cafe', 'bakery', 'dessert'],
+  food: ['cafe', 'restaurant', 'fast_food', 'bakery'],
+  park: ['park', 'garden', 'plaza', 'beach'],
+  indoor: ['mall', 'culture', ...CULTURE, 'cafe', 'bakery', 'dessert', 'restaurant']
 };
 
 const minutesFor = meters => Math.max(1, Math.round(meters * DETOUR / METERS_PER_MINUTE));
