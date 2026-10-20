@@ -185,6 +185,8 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .live-ring.is-over .live-count { color: var(--red); }
 .live-return { display: flex; align-items: center; gap: 6px; font-weight: 650; color: var(--gold-ink); }
 .live-return .icon { width: 18px; height: 18px; }
+.live-spare { margin-top: -6px; padding-left: 24px; font-size: var(--fs-13); color: var(--ink-3); }
+.live-spare:empty { display: none; }
 .live-alert { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: var(--r-md); background: var(--amber-soft); color: var(--ink); font-weight: 650; }
 .live-alert .icon { color: var(--amber); }
 .stepper { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }

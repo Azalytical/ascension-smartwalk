@@ -65,7 +65,7 @@ export default {
   'live.title': 'Серуен жүріп жатыр', 'live.finish': 'Аяқтау', 'live.toReturn': 'оралуға дейін', 'live.over': 'жоспардан артық',
   'live.phase.there': 'Бара жатырсыз', 'live.phase.visit': 'Орындасыз', 'live.phase.back': 'Қайту жолы',
   'live.arrived': 'Келдім', 'live.goBack': 'Кері қайтамын', 'live.done': 'Оралдым',
-  'live.turnaround': 'Қайтатын уақыт болды, сонда сағат {time} шамасында ораласыз', 'live.returnBy': 'Оралу уақыты: {time}',
+  'live.turnaround': 'Қайтатын уақыт болды, сонда сағат {time} шамасында ораласыз', 'live.returnBy': 'Оралу уақыты: {time}', 'live.spareBy': 'Қорымен {time} дейін', 'live.inReserve': 'қор қалды',
   'live.thereLeft': 'Орынға дейін шамамен {n} мин', 'live.visitLeft': 'Орында тағы {n} мин', 'live.backLeft': 'Қайту жолы шамамен {n} мин',
   'live.finished.title': 'Сіз уақытында оралдыңыз', 'live.finished.late': 'Жоспардан {n} мин кеш оралдыңыз',
   'live.finished.text': 'Серуен {n} мин созылды, жоспарда {plan} мин болатын.', 'live.close': 'Дайын', 'live.screenOn': 'Серуен кезінде экран сөнбейді.',

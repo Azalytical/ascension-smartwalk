@@ -12,9 +12,10 @@ import { showStart, showRoutes, upgradeRoute, hideRoutes, hideStart } from '../m
 
 const PHASES = ['there', 'visit', 'back'];
 
-export function startWalk({ place, start, timing }) {
+/** `backAt` is the «вернётесь к» the card and the voice already said (the server's plan.backAt), kept when the walk starts on time. */
+export function startWalk({ place, start, timing, backAt = null }) {
   const walk = {
-    startedAt: Date.now(), phase: 'there', phaseAt: { there: Date.now() }, alerted: false,
+    startedAt: Date.now(), promised: backAt, phase: 'there', phaseAt: { there: Date.now() }, alerted: false,
     place: { id: place.id, name: place.name, category: place.category, lat: place.lat, lon: place.lon },
     start: { name: start.name, lat: start.lat, lon: start.lon, kind: start.kind },
     plan: { there: Math.ceil(timing.walkMinutes), visit: Math.ceil(timing.visitMinutes), back: Math.ceil(timing.returnMinutes), reserve: Math.ceil(timing.safetyReserveMinutes ?? 5), total: Math.ceil(timing.totalMinutes) },
@@ -29,6 +30,15 @@ async function keepAwake() {
 }
 
 const pad = (n) => String(n).padStart(2, '0');
+const minutesOf = (clockText) => { const [hours, minutes] = String(clockText).split(':').map(Number); return hours * 60 + minutes; };
+
+/** «Вернётесь к»: there + on site + back, as on the card and in the voice. The reserve is spare time, shown on its own line. */
+function backAt(walk) {
+  const own = time(walk.startedAt + (walk.plan.there + walk.plan.visit + walk.plan.back) * 60000);
+  if (!/^\d{1,2}:\d{2}$/.test(walk.promised || '')) return own;
+  const gap = Math.abs(minutesOf(own) - minutesOf(walk.promised)) % 1440;
+  return Math.min(gap, 1440 - gap) <= 2 ? walk.promised : own;
+}
 const clock = (seconds) => { const s = Math.abs(Math.round(seconds)); return `${Math.floor(s / 60)}:${pad(s % 60)}`; };
 
 export function mountLive(container, { onFinished }) {
@@ -44,6 +54,7 @@ export function mountLive(container, { onFinished }) {
   const countdown = h('strong', { class: 'live-count num' });
   const countLabel = h('span', { class: 'live-count-label' });
   const returnLine = h('p', { class: 'live-return' });
+  const spareLine = h('p', { class: 'live-spare' });
   const phaseLine = h('p', { class: 'live-phase' });
   const stepper = h('ol', { class: 'stepper' });
   const action = h('button', { class: 'btn btn-gold btn-xl live-action', type: 'button' });
@@ -82,14 +93,18 @@ export function mountLive(container, { onFinished }) {
     if (!walk || finished) return;
     const now = Date.now();
     const elapsed = (now - walk.startedAt) / 1000;
-    const remaining = walk.plan.total * 60 - elapsed;
+    // The countdown is to «вернётесь к»; past it, the reserve that is left; past the whole budget, the time over plan.
+    const toBack = (walk.plan.there + walk.plan.visit + walk.plan.back) * 60 - elapsed;
+    const toEnd = walk.plan.total * 60 - elapsed;
+    const remaining = toBack >= 0 ? toBack : toEnd;
     const progress = elapsed / (walk.plan.total * 60);
     clear(ringHost, timeRing({ there: walk.plan.there, visit: walk.plan.visit, back: walk.plan.back, reserve: walk.plan.reserve, size: 148, stroke: 12, progress, className: 'ring-live' }));
     countdown.textContent = `${remaining < 0 ? '+' : ''}${clock(remaining)}`;
-    countLabel.textContent = remaining < 0 ? t('live.over') : t('live.toReturn');
+    countLabel.textContent = toEnd < 0 ? t('live.over') : toBack < 0 ? t('live.inReserve') : t('live.toReturn');
     ringHost.append(h('div', { class: 'ring-center' }, countdown, countLabel));
-    ringHost.classList.toggle('is-over', remaining < 0);
-    returnLine.replaceChildren(icon('return'), t('live.returnBy', { time: time(walk.startedAt + walk.plan.total * 60000) }));
+    ringHost.classList.toggle('is-over', toEnd < 0);
+    returnLine.replaceChildren(icon('return'), t('live.returnBy', { time: backAt(walk) }));
+    spareLine.textContent = walk.plan.reserve > 0 ? t('live.spareBy', { time: time(walk.startedAt + walk.plan.total * 60000) }) : '';
 
     const sincePhase = (now - (walk.phaseAt[walk.phase] || walk.startedAt)) / 60000;
     const left = walk.phase === 'there' ? walk.plan.there - sincePhase : walk.phase === 'visit' ? walk.plan.visit - sincePhase : walk.plan.back - sincePhase;
@@ -101,12 +116,12 @@ export function mountLive(container, { onFinished }) {
     const turnaroundAt = walk.startedAt + (walk.plan.there + walk.plan.visit) * 60000;
     if (walk.phase !== 'back' && now >= turnaroundAt) {
       alertBox.hidden = false;
-      alertBox.replaceChildren(icon('return'), h('span', { text: t('live.turnaround', { time: time(walk.startedAt + walk.plan.total * 60000) }) }));
+      alertBox.replaceChildren(icon('return'), h('span', { text: t('live.turnaround', { time: backAt(walk) }) }));
       if (!walk.alerted) {
         walk = { ...walk, alerted: true };
         store.set('walk', walk);
         navigator.vibrate?.([220, 120, 220]);
-        announce(t('live.turnaround', { time: time(walk.startedAt + walk.plan.total * 60000) }));
+        announce(t('live.turnaround', { time: backAt(walk) }));
       }
     } else alertBox.hidden = true;
   }
@@ -150,7 +165,7 @@ export function mountLive(container, { onFinished }) {
       h('div', { class: 'view-bar' }, h('h2', { id: 'live-title', class: 'title-3' }, h('span', { class: 'rec-dot', 'aria-hidden': 'true' }), t('live.title')),
         h('button', { class: 'btn btn-quiet btn-sm', type: 'button', onclick: stop }, icon('stop'), t('live.finish'))),
       h('div', { class: 'live-hero' }, ringHost,
-        h('div', { class: 'live-side' }, h('div', { class: 'live-place' }, categoryArt(walk.place.category, 28), h('strong', { text: walk.place.name })), returnLine, phaseLine)),
+        h('div', { class: 'live-side' }, h('div', { class: 'live-place' }, categoryArt(walk.place.category, 28), h('strong', { text: walk.place.name })), returnLine, spareLine, phaseLine)),
       alertBox, action, stepper, navHost,
       watchButton({ place: walk.place, start: walk.start, walk: walk.plan.there, visit: walk.plan.visit, back: walk.plan.back, minutes: walk.plan.total }),
       h('p', { class: 'fine center', text: t('live.screenOn') })));
