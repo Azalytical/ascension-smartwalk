@@ -181,6 +181,22 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
 .stop h3{font-size:46px;letter-spacing:-1.6px;font-weight:650;margin-top:12px;line-height:1.1}
 .stop p{font-size:27px;line-height:1.45;color:var(--muted);margin-top:18px}
 
+/* ============ SLIDE: РИСКИ ============ */
+.s-risks h2{margin-top:36px;max-width:1500px}
+.risk-list{margin-top:70px;display:grid;grid-template-columns:1fr 1fr;gap:0 90px}
+.risk{border-top:1.5px solid var(--line);padding:26px 0 30px}
+.risk h4{font-size:36px;letter-spacing:-1px;font-weight:650}
+.risk p{font-size:26px;line-height:1.45;color:var(--muted);margin-top:10px}
+
+/* ============ SLIDE: БИЗНЕС-МОДЕЛЬ ============ */
+.s-biz h2{margin-top:36px;max-width:1550px}
+.biz{margin-top:80px;display:grid;grid-template-columns:repeat(3,1fr);gap:30px}
+.biz-card{background:#fff;border:1.5px solid var(--line);border-radius:22px;padding:40px}
+.biz-card span{font-size:22px;letter-spacing:2px;text-transform:uppercase;color:var(--teal);font-weight:600}
+.biz-card h3{font-size:42px;letter-spacing:-1.4px;font-weight:650;margin-top:14px;line-height:1.1}
+.biz-card p{font-size:27px;line-height:1.45;color:var(--muted);margin-top:18px}
+.biz-note{margin-top:50px;font-size:26px;color:var(--muted);max-width:1500px}
+
 /* ============ SLIDE: ФИНАЛ ============ */
 .s-end{background:var(--ink);color:#fff}
 .s-end .kicker{color:var(--mint)}
@@ -299,13 +315,13 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
   <div class="kicker reveal d1">06 <b>/ Как это работает</b></div>
   <h2 class="reveal d2">Модель объясняет только то, <em>что нашёл поиск</em>.</h2>
   <div class="pipe">
-    <div class="step reveal d2"><span class="n">01 · ДАННЫЕ</span><h3>Сбор из OSM</h3><p>Скрипт Overpass, дубли проверены, источник сохранён</p><div class="fig">930<small>мест</small></div></div>
+    <div class="step reveal d2"><span class="n">01 · ДАННЫЕ</span><h3>OSM + Overture</h3><p>Сбор скриптами, дубли сведены, источник у каждой записи</p><div class="fig">2275<small>мест</small></div></div>
     <div class="step reveal d3"><span class="n">02 · ПОИСК</span><h3>Отбор кандидатов</h3><p>Категория, текст запроса на RU/KZ/EN, расстояние</p><div class="fig">3<small>языка</small></div></div>
     <div class="step reveal d4"><span class="n">03 · ПРОВЕРКА</span><h3>Время и часы</h3><p>Бюджет прогулки и режим работы на весь визит</p><div class="fig">145/146<small>форматов</small></div></div>
     <div class="step ai reveal d5"><span class="n">04 · GEMINI</span><h3>Объяснение «почему»</h3><p>Видит только найденные записи; ID источников сверяются</p><div class="fig">3.5 Flash-Lite</div></div>
     <div class="step reveal d6"><span class="n">05 · ОТВЕТ</span><h3>Карточки</h3><p>Факты из данных отдельно от сгенерированного текста</p><div class="fig">1–3<small>места</small></div></div>
   </div>
-  <div class="stack reveal d6">Стек: <span>Gemini API</span><span>OpenStreetMap</span><span>Cloudflare Workers</span><span>Dockerfile для Cloud Run</span><span>Telegram-бот</span></div>
+  <div class="stack reveal d6">Стек: <span>Gemini API</span><span>OpenStreetMap</span><span>Cloudflare Workers</span><span>Overture Maps</span><span>Open-Meteo</span></div>
   <aside class="notes">3:35–4:20. Высокоуровневая схема RAG из требований кейса. Если Gemini недоступен, поиск и расчёт продолжают работать, интерфейс честно пишет, что текст без генерации.</aside>
 </section>
 
@@ -317,7 +333,7 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
     <h2 class="reveal d2">Видно, откуда каждый факт.</h2>
     <div class="rules">
       <div class="rule reveal d3"><div class="ic">◎</div><div><h4>Точка старта не уходит в модель</h4><p>Gemini получает запрос и публичные места, без координат пользователя</p></div></div>
-      <div class="rule reveal d4"><div class="ic">∅</div><div><h4>Ничего не храним</h4><p>Нет истории запросов и маршрутов; бот помнит точку 30 минут</p></div></div>
+      <div class="rule reveal d4"><div class="ic">∅</div><div><h4>Ничего не храним</h4><p>Нет истории запросов и маршрутов; друзья видят вас только на время встречи</p></div></div>
       <div class="rule reveal d5"><div class="ic">?</div><div><h4>Неизвестное так и называется</h4><p>Часы, розетки, доступность: «нужно проверить», а не догадка</p></div></div>
       <div class="rule reveal d6"><div class="ic">≤</div><div><h4>Лимиты от злоупотреблений</h4><p>8 запросов в минуту с адреса, 500 в сутки; поиск работает и без ИИ</p></div></div>
     </div>
@@ -331,10 +347,10 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
   <div class="crit"><span>Завершённость</span><span>Этика и приватность</span></div>
   <div>
     <div class="kicker reveal d1">08 <b>/ Проверки</b></div>
-    <div class="score reveal d2">35<small>/35</small></div>
-    <p class="cap reveal d3">автотестов проходят: поиск, API, часы работы, Telegram-бот, приватность и лимиты</p>
+    <div class="score reveal d2">86<small>/86</small></div>
+    <p class="cap reveal d3">автотестов проходят: поиск, часы и погода, друзья и встречи, часы на руке, приватность и лимиты</p>
     <div class="facts">
-      <div class="fact reveal d4"><strong>930</strong><span>мест после проверки дублей</span></div>
+      <div class="fact reveal d4"><strong>2275</strong><span>мест после сведения дублей</span></div>
       <div class="fact reveal d5"><strong>3</strong><span>сценария проверены на опубликованном сайте</span></div>
     </div>
   </div>
@@ -346,24 +362,54 @@ h2 em,h1 em{font-style:normal;color:var(--teal)}
       <li class="reveal d5"><b>Бесплатный ключ Gemini:</b> для реального запуска нужен проект с биллингом</li>
     </ul>
   </div>
-  <aside class="notes">5:00–5:40. Ограничения и риски, как просит кейс. Не заявлять пользователей или выручку.</aside>
+  <aside class="notes">5:00–5:25. Ограничения, как просит кейс. Не заявлять пользователей или выручку.</aside>
 </section>
 
-<!-- ======================= 10. ПЛАН РАЗВИТИЯ ======================= -->
-<section class="slide s-next" data-time="5:40">
+<!-- ======================= 10. РИСКИ ======================= -->
+<section class="slide s-risks" data-time="5:25">
+  <div class="crit"><span>Этика и приватность</span><span>Завершённость</span></div>
+  <div class="kicker reveal d1">09 <b>/ Риски</b></div>
+  <h2 class="reveal d2">Что может пойти не так <em>и что мы делаем</em>.</h2>
+  <div class="risk-list">
+    <div class="risk reveal d3"><h4>Устаревшие часы и данные</h4><p>Метка источника и уверенность на карточке; нет данных, значит «неизвестно», а не «открыто»</p></div>
+    <div class="risk reveal d3"><h4>ИИ ошибается</h4><p>Gemini только объясняет; места, время и часы считает и сверяет сервер. Без ИИ ответ всё равно есть</p></div>
+    <div class="risk reveal d4"><h4>Приватность друзей</h4><p>Только по согласию и на время встречи, «перестать делиться» в одно касание, истории нет</p></div>
+    <div class="risk reveal d4"><h4>Зима до −30</h4><p>Погода в подборе: в мороз, снег и дождь обычный запрос уходит под крышу</p></div>
+    <div class="risk reveal d5"><h4>Бесплатные лимиты</h4><p>Gemini и Cloudflare на бесплатных тарифах; при запуске биллинг, поиск работает и без ИИ</p></div>
+    <div class="risk reveal d5"><h4>Мало данных о доступности</h4><p>Фильтр для коляски берёт теги OSM; где тегов нет, так и пишем</p></div>
+  </div>
+  <aside class="notes">5:25–5:45. Риски отдельным слайдом, как просит кейс: каждый риск и что уже сделано.</aside>
+</section>
+
+<!-- ======================= 11. ПЛАН РАЗВИТИЯ ======================= -->
+<section class="slide s-next" data-time="5:45">
   <div class="crit"><span>Креативность и фишки</span><span>План развития</span></div>
-  <div class="kicker reveal d1">09 <b>/ Что дальше</b></div>
+  <div class="kicker reveal d1">10 <b>/ Что дальше</b></div>
   <h2 class="reveal d2">Из прогулки в инструмент <em>для города</em>.</h2>
   <div class="road">
     <div class="stop reveal d3"><div class="dot"></div><span>Сейчас</span><h3>Точнее время</h3><p>Пешеходные маршруты вместо оценки по прямой, больше проверенных полей о местах</p></div>
-    <div class="stop reveal d4"><div class="dot"></div><span>Следом</span><h3>Мини-маршрут и события</h3><p>Цепочка из трёх мест, афиша города, голосовой запрос на казахском</p></div>
+    <div class="stop reveal d4"><div class="dot"></div><span>Следом</span><h3>Голос и афиша</h3><p>Голосовой запрос на казахском, события города прямо в подборе</p></div>
     <div class="stop reveal d5"><div class="dot"></div><span>Пилот</span><h3>Карта спроса для НИЦ</h3><p>Обезличенные запросы показывают, каких мест городу не хватает. Пилот с кампусами и гостиницами</p></div>
   </div>
-  <aside class="notes">5:40–6:20. Бизнес-идея: сервис для жителей и гостей с коротким окном; для НИЦ Smart City агрегированная карта спроса. Договорённостей с партнёрами не заявлять.</aside>
+  <aside class="notes">5:45–6:10. План развития. Договорённостей с партнёрами не заявлять.</aside>
 </section>
 
-<!-- ======================= 11. ФИНАЛ ======================= -->
-<section class="slide s-end dark" data-time="6:20">
+<!-- ======================= 12. БИЗНЕС-МОДЕЛЬ ======================= -->
+<section class="slide s-biz" data-time="6:10">
+  <div class="crit"><span>Релевантность и полезность</span><span>План развития</span></div>
+  <div class="kicker reveal d1">11 <b>/ Бизнес-модель</b></div>
+  <h2 class="reveal d2">Бесплатно для людей. <em>Платит тот, кому нужны данные и гости.</em></h2>
+  <div class="biz">
+    <div class="biz-card reveal d3"><span>Город</span><h3>НИЦ Smart City, акимат</h3><p>Обезличенная карта спроса: что ищут, где и когда не находят. Подписка на аналитику</p></div>
+    <div class="biz-card reveal d4"><span>Гости</span><h3>Отели, кампусы, конференции</h3><p>Seruen под их брендом: «куда сходить за 45 минут» от входа. Плата за подключение</p></div>
+    <div class="biz-card reveal d5"><span>Места</span><h3>Кафе, музеи, ТРЦ</h3><p>Подтверждённые часы и описание. Платят за проверенную карточку, не за место в выдаче</p></div>
+  </div>
+  <p class="biz-note reveal d6">Аудитория: жители и гости Астаны с коротким окном. В 2025 году город принял 1,6 млн туристов, из них больше 380 тыс. иностранных.</p>
+  <aside class="notes">6:10–6:35. Кто платит. Пилотов и договорённостей не заявлять; это модель, а не выручка.</aside>
+</section>
+
+<!-- ======================= 13. ФИНАЛ ======================= -->
+<section class="slide s-end dark" data-time="6:35">
   <div class="kicker reveal d1">Ascension · Build with AI 2026</div>
   <h1 class="reveal d2">Попробуйте <em>прямо сейчас.</em></h1>
   <div class="links">
@@ -394,7 +440,7 @@ class SlidePresentation{
   /* Полоса внизу: каждый слайд как отрезок бюджета 7 минут */
   buildTalkBars(){
     const toSec=t=>{const[m,s]=t.split(':').map(Number);return m*60+s};
-    const times=this.slides.map(s=>toSec(s.dataset.time||'0:00')); const end=400;
+    const times=this.slides.map(s=>toSec(s.dataset.time||'0:00')); const end=415;
     this.slides.forEach((s,k)=>{
       if(k===0) return;
       const bar=document.createElement('div'); bar.className='talkbar';
