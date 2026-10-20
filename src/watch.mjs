@@ -1,6 +1,7 @@
 import { recommend } from './retrieval.mjs';
 import { validateReminder } from './watch-push.mjs';
 import { placeRatings } from './ratings-api.mjs';
+import { coarse } from './privacy.mjs';
 
 // Compact plans for the watch client and voice assistants. Deterministic only: no language model,
 // so a glance on the wrist answers within one request and does not spend the Gemini quota.
@@ -136,11 +137,13 @@ export async function handleWatch(request, env, pois) {
   if (!env.LOCAL_DEVELOPMENT && !allowed(clientIp(request))) return failure(say('busy', lang), 429, text);
   // Shortcuts on iOS may send a comma as the decimal separator.
   const number = name => Number(String(url.searchParams.get(name) ?? '').replace(',', '.'));
+  // Siri (format=text) sends the phone's exact point; the watch page has already rounded its own.
+  const point = name => (text ? coarse(number(name)) : number(name));
   const mood = url.searchParams.get('mood') || 'any';
   if (!Object.hasOwn(MOODS, mood)) return failure(say('mood', lang), 400, text);
   const query = [MOODS[mood].query, (url.searchParams.get('q') || '').slice(0, 200)].filter(Boolean).join(' ');
   const total = url.searchParams.has('minutes') ? number('minutes') : 45;
-  const input = { lat: number('lat'), lon: number('lon'), minutes: total, query, category: 'any', returnToStart: true,
+  const input = { lat: point('lat'), lon: point('lon'), minutes: total, query, category: 'any', returnToStart: true,
     maxWalkMinutes: Number.isFinite(total) ? Math.min(30, Math.max(5, Math.round(total / 3))) : 15,
     withChild: Boolean(MOODS[mood].withChild) || url.searchParams.get('child') === '1' };
   const ratings = await placeRatings(env);

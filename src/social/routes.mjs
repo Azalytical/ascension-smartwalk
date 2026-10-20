@@ -1,6 +1,7 @@
 import { fairMeetingPoints, MEETING_KINDS } from './meeting.mjs';
 import { OPERATIONS, sha256 } from './store.mjs';
 import { preparedPlaces, haversineMeters } from '../retrieval.mjs';
+import { coarse } from '../privacy.mjs';
 
 const HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
@@ -41,7 +42,8 @@ const searchIndex = new WeakMap();
 function searchPlaces(url, dataset) {
   const query = normalize(url.searchParams.get('q')).slice(0, 60);
   if (query.length < 2) return json({ places: [] });
-  const lat = Number(url.searchParams.get('lat')), lon = Number(url.searchParams.get('lon'));
+  // The point only orders matches by distance, so the rounded cell is enough.
+  const lat = coarse(url.searchParams.get('lat') ?? NaN), lon = coarse(url.searchParams.get('lon') ?? NaN);
   const hasCenter = Number.isFinite(lat) && Number.isFinite(lon);
   const places = preparedPlaces(dataset);
   let index = searchIndex.get(dataset);
@@ -66,8 +68,8 @@ async function meetingPoint(hub, token, body, meta, dataset) {
   const result = await call(hub, 'meetingParticipants', token, { userIds: body.userIds }, meta);
   if (result.status !== 200) return json(result.body, result.status);
   const { me, located, missing } = result.body;
-  // The caller's current position may be sent for this one calculation; it is not stored.
-  const here = body.me && Number.isFinite(Number(body.me.lat)) && Number.isFinite(Number(body.me.lon)) ? { lat: Number(body.me.lat), lon: Number(body.me.lon) } : null;
+  // The caller's current position may be sent for this one calculation, rounded to the same cell as everywhere; it is not stored.
+  const here = body.me && Number.isFinite(Number(body.me.lat)) && Number.isFinite(Number(body.me.lon)) ? { lat: coarse(body.me.lat), lon: coarse(body.me.lon) } : null;
   const people = here ? [{ ...me, ...here, self: true }, ...located.filter(person => !person.self)] : located;
   if (people.length < 2) {
     return json({ error: 'Нужны хотя бы двое с известной точкой: вы и друг, который показывает, где он.', code: 'NOT_ENOUGH_PEOPLE', missing }, 409);

@@ -12,6 +12,7 @@ import { CITY_EVENTS, EVENTS_COLLECTED_AT, EVENT_NOTE, EVENT_SOURCE, cityEventsF
 import { identifyPlace, speak, listen, MediaError } from './media.mjs';
 import { placeLinks } from './links.mjs';
 import { astanaWeather } from './weather.mjs';
+import { coarse } from './privacy.mjs';
 
 const HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
@@ -389,7 +390,8 @@ async function gemini(request, url, env, dataset) {
   const model = budget.generationAllowed ? env : { ...env, GEMINI_API_KEY: undefined };
   try {
     if (url.pathname === '/api/agent') {
-      const lat = Number(body.lat), lon = Number(body.lon), minutes = body.minutes === undefined ? 60 : Number(body.minutes);
+      // Everything the agent hands to Gemini is computed from the rounded cell, also when a caller (Siri) sent the exact point.
+      const lat = coarse(body.lat), lon = coarse(body.lon), minutes = body.minutes === undefined ? 60 : Number(body.minutes);
       if (!(lat >= 51 && lat <= 51.35 && lon >= 71.25 && lon <= 71.65)) return json({ error: 'Aidem подбирает прогулки только в Астане: передайте lat и lon.' }, 400);
       if (!(minutes >= 10 && minutes <= 180)) return json({ error: 'Время прогулки: от 10 до 180 минут.' }, 400);
       if (typeof body.query !== 'string' || !body.query.trim() || body.query.length > 500) return json({ error: 'Запрос должен быть текстом до 500 символов.' }, 400);

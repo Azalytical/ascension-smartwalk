@@ -1,6 +1,7 @@
 // Friends, consent-based location sharing, meetups and city events.
 // All state lives in one SQLite database (a Durable Object in production, node:sqlite locally and in tests).
 // Every operation after authentication is synchronous, so inside a Durable Object it runs atomically.
+import { coarse } from '../privacy.mjs';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -566,8 +567,8 @@ const USER_OPS = {
     if (!share) fail(409, 'SHARE_INACTIVE', 'Показ геопозиции выключен или его срок истёк');
     if (share.updated_at && now - share.updated_at < 4000) return { share: this.shareView(user.id, now), throttled: true };
     const accuracyInput = Number.isFinite(Number(input.accuracy)) ? Math.min(100000, Math.max(0, Number(input.accuracy))) : null;
-    // Approximate mode keeps three decimals (about 110 m north–south, 70 m east–west in Astana).
-    const round = value => share.mode === 'approximate' ? Math.round(value * 1000) / 1000 : Math.round(value * 1e6) / 1e6;
+    // Approximate mode keeps three decimals (about 110 m north–south, 70 m east–west in Astana); the page already sends it rounded.
+    const round = value => share.mode === 'approximate' ? coarse(value) : Math.round(value * 1e6) / 1e6;
     const accuracy = share.mode === 'approximate' ? Math.max(150, accuracyInput ?? 150) : accuracyInput;
     this.db.run('UPDATE shares SET lat = ?, lon = ?, accuracy = ?, updated_at = ? WHERE user_id = ?', round(lat), round(lon), accuracy, now, user.id);
     return { share: this.shareView(user.id, now) };

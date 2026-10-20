@@ -1,4 +1,5 @@
 // Network calls. The app's own API is same-origin; routing and weather are optional public services.
+import { outbound, personal } from './privacy.js';
 let statusPromise = null;
 let placesPromise = null;
 
@@ -52,17 +53,24 @@ export async function recommend(body, signal) {
 }
 
 const routeCache = new Map();
-/** Real walking route from the FOSSGIS OSRM foot server; null when it is unreachable (the app then draws a straight line). */
+/**
+ * Real walking route from the FOSSGIS OSRM foot server; null when it is unreachable (the app then draws a straight line).
+ * The server is a third party, so the person's own point goes rounded, and the drawn line is joined to the exact point here.
+ */
 export async function walkingRoute(from, to) {
-  const key = [from.lon, from.lat, to.lon, to.lat].map((n) => n.toFixed(5)).join(',');
-  if (routeCache.has(key)) return routeCache.get(key);
-  const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${from.lon},${from.lat};${to.lon},${to.lat}?overview=full&geometries=geojson`;
-  const result = await withTimeout(url, {}, 6000).then((r) => (r.ok ? r.json() : null)).then((data) => {
-    const route = data?.routes?.[0];
-    return route?.geometry?.coordinates?.length ? { coordinates: route.geometry.coordinates, meters: route.distance, seconds: route.duration } : null;
-  }).catch(() => null);
-  routeCache.set(key, result);
-  return result;
+  const a = outbound(from), b = outbound(to);
+  const key = [a.lon, a.lat, b.lon, b.lat].map((n) => n.toFixed(5)).join(',');
+  if (!routeCache.has(key)) {
+    const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson`;
+    routeCache.set(key, await withTimeout(url, {}, 6000).then((r) => (r.ok ? r.json() : null)).then((data) => {
+      const route = data?.routes?.[0];
+      return route?.geometry?.coordinates?.length ? { coordinates: route.geometry.coordinates, meters: route.distance, seconds: route.duration } : null;
+    }).catch(() => null));
+  }
+  const result = routeCache.get(key);
+  if (!result) return null;
+  const join = (point) => (personal(point) ? [[point.lon, point.lat]] : []);
+  return { ...result, coordinates: [...join(from), ...result.coordinates, ...join(to)] };
 }
 
 let weatherPromise = null;

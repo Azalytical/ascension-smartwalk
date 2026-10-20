@@ -10,6 +10,9 @@
   "vars": { "MEMORY_BUDGET": "1", "GEMINI_MODEL": "gemini-3.5-flash-lite", "WEATHER": "1" },
   // Run next to Google: from Cloudflare's Astana location the Gemini API is unreachable and every answer falls back.
   "placement": { "region": "gcp:europe-west1" },
+  // Workers Logs keep only what the code writes (errors, without coordinates). Invocation logs are off: they would store
+  // each request URL, and Siri's /api/watch/ask carries the phone's point in its query string.
+  "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": false } },
   // Friends, location sharing, meetups and events: one SQLite-backed Durable Object per city (available on the Workers Free plan).
   // Watch reminders ("time to head back" via Web Push): VAPID keys and pending reminders, woken by an alarm.
   "durable_objects": { "bindings": [{ "name": "SOCIAL", "class_name": "SocialHub" }, { "name": "WATCH_PUSH", "class_name": "WatchPush" }] },

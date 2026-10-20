@@ -16,6 +16,7 @@ import { ratingChip } from '../ui/rating.js';
 import { understand, canListen, startListening } from '../core/voice.js';
 import { speakText, stopSpeaking, unlockAudio } from '../core/media.js';
 import { locateMe } from '../core/where.js';
+import { outbound, personal } from '../core/privacy.js';
 import { mountLive, startWalk } from '../ui/live.js';
 
 const MINUTES = [30, 45, 60, 90, 120];
@@ -113,7 +114,9 @@ function startRowView() {
   const row = h('button', { class: 'row-button', type: 'button', onclick: () => { view = 'start'; render(); } },
     h('span', { class: `row-icon start-icon${here ? ' is-here' : ''}`, 'aria-hidden': 'true' }, icon(here || searching ? 'locate' : 'pin')),
     h('span', { class: 'row-text' }, h('small', { text: t('plan.from') }), h('strong', { text: searching ? t('start.locating') : startName() }),
-      detail && !searching ? h('small', { class: `start-note${(!here && locationNote) || (here && start.accuracy > COARSE_M) ? ' is-warn' : ''}`, text: detail }) : null), icon('chevron', 'row-chevron'));
+      detail && !searching ? h('small', { class: `start-note${(!here && locationNote) || (here && start.accuracy > COARSE_M) ? ' is-warn' : ''}`, text: detail }) : null,
+      // The person's own point goes out rounded (core/privacy.js); the row says so where that point is in use.
+      personal(start) && !searching ? h('small', { class: 'start-note start-private', text: t('start.private') }) : null), icon('chevron', 'row-chevron'));
   // Not starting from a fresh fix: one tap brings the real location back.
   const useMine = !locating && (!here || age >= FRESH_MS)
     ? h('button', { class: 'btn btn-quiet btn-sm start-locate', type: 'button', onclick: () => autoLocate(true) }, icon('locate'), t(here ? 'start.refresh' : 'start.useMine'))
@@ -354,6 +357,7 @@ function renderStart() {
     h('div', { class: 'view-bar' }, backButton(t('common.back'), () => { startPrompt = null; view = 'plan'; render(); })),
     h('h2', { class: 'title-2', text: t('start.title') }),
     h('div', { class: 'list' }, gps, pickRow), message,
+    h('p', { class: 'fine start-private-note', text: t('start.privateLong') }),
     recent.length ? h('h3', { class: 'block-title', text: t('start.recent') }) : null,
     recent.length ? h('div', { class: 'list' }, recent.map((item) => h('button', { class: 'list-row', type: 'button', onclick: () => choose(item) },
       h('span', { class: 'row-icon', 'aria-hidden': 'true' }, icon('history')), h('span', { class: 'row-text' }, h('strong', { text: t('start.picked') }), h('small', { class: 'num', text: `${item.lat.toFixed(4)}, ${item.lon.toFixed(4)}` }))))) : null,
@@ -398,7 +402,7 @@ function renderPick() {
 
 // ---------- request ----------
 function buildRequest() {
-  const body = { lat: start.lat, lon: start.lon, minutes: plan.minutes, maxWalkMinutes: plan.maxWalk, query: plan.query.trim(), withChild: plan.mood === 'kids', category: 'any', returnToStart: true };
+  const body = { ...outbound(start), minutes: plan.minutes, maxWalkMinutes: plan.maxWalk, query: plan.query.trim(), withChild: plan.mood === 'kids', category: 'any', returnToStart: true };
   if (plan.when !== 'now') body.visitDate = isoWithOffset(leaveAt());
   return body;
 }

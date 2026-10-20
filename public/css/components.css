@@ -88,6 +88,7 @@ button, a, [role="button"], .chip, .seg { touch-action: manipulation; -webkit-us
 .start-row { display: grid; gap: var(--s-2); }
 .start-note { color: var(--ink-3); }
 .start-note.is-warn { color: var(--amber); }
+.start-private-note { margin: var(--s-2) 0 0; }
 .start-icon.is-here { background: var(--sky); color: #fff; }
 .start-locate { justify-self: start; }
 .field { display: grid; gap: var(--s-2); margin-top: var(--s-3); }

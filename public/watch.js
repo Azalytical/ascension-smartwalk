@@ -101,6 +101,11 @@
     return point.lat >= ASTANA.minLat && point.lat <= ASTANA.maxLat && point.lon >= ASTANA.minLon && point.lon <= ASTANA.maxLon;
   }
 
+  // The person's own point leaves the watch rounded to three decimals, a cell of about 110 × 70 m (as on the phone, js/core/privacy.js);
+  // the exact one stays here for the walk on the watch. A fixed start from the list is a public place and goes as it is.
+  const coarse = (value) => Math.round(value * 1000) / 1000;
+  const sent = (start) => (start.here ? { lat: coarse(start.lat), lon: coarse(start.lon) } : { lat: start.lat, lon: start.lon });
+
   function currentPosition() {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) { reject(new Error('unsupported')); return; }
@@ -151,7 +156,8 @@
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
     try {
-      const query = new URLSearchParams({ lat: start.lat.toFixed(6), lon: start.lon.toFixed(6), minutes: String(state.minutes), mood });
+      const point = sent(start);
+      const query = new URLSearchParams({ lat: String(point.lat), lon: String(point.lon), minutes: String(state.minutes), mood });
       const response = await fetch(`/api/watch/plan?${query}`, { signal: controller.signal });
       let data;
       try { data = await response.json(); } catch { throw new Error('Aidem ответил неожиданно. Попробуйте ещё раз.'); }
@@ -186,7 +192,8 @@
     show('loading');
     $('loading-text').textContent = `Ищем «${query}»…`;
     const start = await resolveStart();
-    const near = `&lat=${start.lat.toFixed(5)}&lon=${start.lon.toFixed(5)}`;
+    const point = sent(start);
+    const near = `&lat=${point.lat}&lon=${point.lon}`;
     const variants = [...new Set([query, latin(query)])];
     try {
       const answers = await Promise.all(variants.map((variant) => fetch(`/api/social/places?q=${encodeURIComponent(variant)}${near}`)
@@ -455,7 +462,7 @@
     const timer = setTimeout(() => controller.abort(), 45000);
     try {
       const response = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
-        body: JSON.stringify({ query: question, lat: start.lat, lon: start.lon, minutes: state.minutes, lang: 'ru', ...(previous ? { previous } : {}) }) });
+        body: JSON.stringify({ query: question, ...sent(start), minutes: state.minutes, lang: 'ru', ...(previous ? { previous } : {}) }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Помощник сейчас недоступен. Попробуйте ещё раз.');
       const places = (data.places || []).filter((place) => inAstana(place)).slice(0, 3).map((place) => fitPlace(place, start));
@@ -565,7 +572,7 @@
     const { start, minutes } = state.plan;
     try {
       const response = await fetch('/api/recommend', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat: start.lat, lon: start.lon, minutes, maxWalkMinutes: Math.min(30, Math.max(5, Math.round(minutes / 3))),
+        body: JSON.stringify({ ...sent(start), minutes, maxWalkMinutes: Math.min(30, Math.max(5, Math.round(minutes / 3))),
           query: state.plan.query || '', withChild: state.mood === 'child', category: 'any', returnToStart: true }) });
       const data = await response.json();
       if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Gemini сейчас недоступен.');

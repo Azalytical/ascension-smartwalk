@@ -1,6 +1,6 @@
 // Aidem agent: Gemini decides which tools to call (weather, walk plan, place search, details, micro-route) and finishes
 // with a structured answer. Every step is returned so the page can show how the answer was reached.
-// The visitor's point never reaches Gemini: the server fills it into tool calls and strips coordinates from tool results.
+// The visitor's point never reaches Gemini: the server fills the rounded point (src/privacy.mjs) into tool calls and strips coordinates from tool results.
 import { runTool, ToolError, CATEGORIES } from './tools.mjs';
 import { placeLinks, mapLinks } from './links.mjs';
 import { languageNote, languageProblem } from './language.mjs';
@@ -176,7 +176,7 @@ export async function runAgent(input, deps) {
       links: Number.isFinite(place.totalMinutes) ? placeLinks(place, { start: now }) : mapLinks(place) }));
     const route = extra.route && lastRoute && ids.every(id => lastRoute.stops.some(stop => stop.id === id)) ? lastRoute : null;
     return { mode, summary, places, route, ...(lastPlanBeyond ? { beyondWalk: lastPlanBeyond } : {}), steps, modelCalls, toolCalls, elapsedMs: Date.now() - startedAt,
-      privacy: 'Gemini не получал ваши координаты: точку старта подставлял в инструменты сервер, а из ответов инструментов координаты убраны.',
+      privacy: 'Gemini не получал ваши координаты: сервер округлил точку старта примерно до 100 м и сам подставлял её в инструменты, а из ответов инструментов координаты убраны.',
       ...(extra.reason ? { reason: extra.reason } : {}), ...(extra.model ? { provider: 'gemini', model: extra.model } : {}) };
   };
 

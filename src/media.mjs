@@ -1,6 +1,7 @@
 // Gemini beyond text: "what is this building?" from a photo, and answers read aloud (Russian, Kazakh, English).
 import { preparedPlaces, haversineMeters } from './retrieval.mjs';
 import { mapLinks } from './links.mjs';
+import { coarse } from './privacy.mjs';
 
 export const DEFAULT_VISION_MODEL = 'gemini-3.5-flash-lite';
 export const DEFAULT_TTS_MODEL = 'gemini-3.8-flash-lite-tts';
@@ -53,7 +54,8 @@ const VISION_PROMPT = 'Ты помощник Aidem в Астане. На фот�
 
 /** POST /api/vision { image (base64 or data URL), mimeType?, lat, lon, heading?, lang? } */
 export async function identifyPlace(input, { env, dataset, limitedJson }) {
-  const lat = Number(input?.lat), lon = Number(input?.lon);
+  // Distances in the candidate list are from the rounded cell, so the list cannot be turned back into an exact point.
+  const lat = coarse(input?.lat), lon = coarse(input?.lon);
   if (!(lat >= BOUNDS.minLat && lat <= BOUNDS.maxLat && lon >= BOUNDS.minLon && lon <= BOUNDS.maxLon)) throw new MediaError('Aidem узнаёт места только в Астане: передайте lat и lon.');
   let image = typeof input?.image === 'string' ? input.image : '';
   let mimeType = typeof input?.mimeType === 'string' ? input.mimeType : 'image/jpeg';
@@ -63,7 +65,7 @@ export async function identifyPlace(input, { env, dataset, limitedJson }) {
   if (image.length < 200 || image.length > 1400000 || !/^[A-Za-z0-9+/]+=*$/.test(image.slice(-64))) throw new MediaError('Фото не прочиталось или слишком большое: уменьшите до 768 px.');
   const heading = input?.heading === undefined || input?.heading === null || input?.heading === '' ? null : Number(input.heading);
   const candidates = nearbyCandidates(dataset, { lat, lon }, Number.isFinite(heading) ? heading : null);
-  const privacy = 'Фото не сохраняется. В Gemini ушли фото и список мест рядом, без ваших координат. На бесплатном тарифе Google может использовать запросы для улучшения сервисов, поэтому не снимайте людей.';
+  const privacy = 'Фото не сохраняется. В Gemini ушли фото и список мест рядом без ваших координат, расстояния посчитаны от точки, округлённой примерно до 100 м. На бесплатном тарифе Google может использовать запросы для улучшения сервисов, поэтому не снимайте людей.';
   if (!candidates.length) return { place: null, confidence: 'none', seen: null, facts: [], nearby: [], reason: 'no_places_nearby', privacy };
   const nearby = candidates.slice(0, 4).map(({ poi, distance, relative }) => ({ id: String(poi.id), name: poi.name, category: poi.category,
     distanceMeters: distance, relative, lat: poi.lat, lon: poi.lon, sourceUrl: poi.sourceUrl, links: mapLinks(poi) }));
