@@ -52,6 +52,23 @@ export async function recommend(body, signal) {
   return data;
 }
 
+let demoPromise = null;
+/**
+ * A saved answer for one of the key scenarios, for when there is no internet. The service worker keeps
+ * /data/demo-answers.json (written by scripts/demo-answers.mjs); the screen labels it «Демо-ответ, сохранён …».
+ * Picks the scenario by `id`, else the first whose words match the request, else the first one.
+ */
+export async function demoAnswer({ query = '', id = null } = {}) {
+  demoPromise ||= fetch('/data/demo-answers.json').then((r) => { if (!r.ok) throw new Error('demo'); return r.json(); })
+    .catch((error) => { demoPromise = null; throw error; });
+  const data = await demoPromise;
+  const text = String(query || '').toLowerCase();
+  const scenario = data.scenarios.find((item) => item.id === id)
+    || data.scenarios.find((item) => item.match && new RegExp(item.match, 'i').test(text)) || data.scenarios[0];
+  return { ...scenario.result, demo: { id: scenario.id, title: scenario.title, savedAt: data.savedAt, minutes: scenario.minutes, time: scenario.time,
+    start: { kind: 'preset', ...scenario.start }, scenarios: data.scenarios.map((item) => ({ id: item.id, title: item.title })) } };
+}
+
 const routeCache = new Map();
 /**
  * Real walking route from the FOSSGIS OSRM foot server; null when it is unreachable (the app then draws a straight line).

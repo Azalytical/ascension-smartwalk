@@ -9,9 +9,10 @@ import { lang } from '../core/i18n.js';
 import { setOverlay, removeOverlay, setData, onLayerClick, cssVar, fitPoints, flyTo, mapReady } from '../map/map.js';
 import * as layers from '../map/layers.js';
 import { setSnap } from '../ui/sheet.js';
-import { categoryArt, categoryName, hoursStatus, hoursChip, CATEGORY_COLOR, backButton, listenButton } from '../ui/common.js';
+import { categoryArt, categoryName, hoursStatus, hoursChip, CATEGORY_COLOR, backButton, listenButton, backTime } from '../ui/common.js';
 import { placeView } from '../ui/place.js';
 import { startWalk } from '../ui/live.js';
+import { readyView } from '../ui/ready.js';
 import { askPhoto } from '../ui/vision.js';
 import { identify } from '../core/media.js';
 import { outbound } from '../core/privacy.js';
@@ -114,7 +115,8 @@ function openPlace(place) {
   url.searchParams.set('tab', 'explore');
   url.searchParams.set('place', place.id);
   clear(root, placeView({ place: { ...place, retrievedAt: data?.updatedAt }, timing, start, onBack: () => { renderBrowse(); },
-    onStart: () => { startWalk({ place, start, timing }); openTab('walk'); }, shareUrl: url.href }));
+    onStart: () => { clear(root, readyView({ place, timing, backAt: backTime(timing), onGo: () => { startWalk({ place, start, timing }); openTab('walk'); }, onBack: () => openPlace(place) })); root.scrollTop = 0; },
+    shareUrl: url.href }));
   root.scrollTop = 0;
   setSnap('half');
   drawMap(filtered());

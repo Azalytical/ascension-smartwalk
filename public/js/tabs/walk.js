@@ -18,6 +18,8 @@ import { speakText, stopSpeaking, unlockAudio } from '../core/media.js';
 import { locateMe } from '../core/where.js';
 import { outbound, personal } from '../core/privacy.js';
 import { mountLive, startWalk } from '../ui/live.js';
+import { readyView } from '../ui/ready.js';
+import { applyTheme } from '../core/theme.js';
 
 const MINUTES = [30, 45, 60, 90, 120];
 const MAX_WALK = [10, 15, 20, 30];
@@ -62,6 +64,9 @@ function presetStart(id) {
   return { kind: 'preset', id: preset.id, name: pick(preset.name), names: preset.name, lat: preset.lat, lon: preset.lon };
 }
 const startName = () => (start.names ? pick(start.names) : start.kind === 'gps' ? t('start.here') : start.kind === 'map' ? t('start.picked') : start.name);
+// The answer's own start: the person's start, or the saved scenario's start for an offline demo answer.
+const origin = () => result?.demo?.start || start;
+const originName = () => (result?.demo ? pick(result.demo.start.names) : startName());
 function savePlan() { store.set('plan', plan); }
 function setStart(next, manual = true) { start = next; store.set('start', next); store.set('startManual', manual ? Date.now() : 0); store.rememberStart(next); }
 
@@ -149,7 +154,7 @@ function render() {
   if (!root) return;
   if (voice && voice.view !== view) dropVoice();
   if (view !== 'live' && liveCleanup) { liveCleanup(); liveCleanup = null; }
-  const renderers = { plan: renderPlan, start: renderStart, pick: renderPick, loading: renderLoading, results: renderResults, place: renderPlace, live: renderLive };
+  const renderers = { plan: renderPlan, start: renderStart, pick: renderPick, loading: renderLoading, results: renderResults, place: renderPlace, ready: renderReady, live: renderLive };
   (renderers[view] || renderPlan)();
   root.scrollTop = 0;
 }
@@ -195,9 +200,13 @@ function renderPlan() {
   }
 
   const weatherHost = h('div');
+  // Режим «На улице» one tap away from where a walk starts; the same switch is in «Моё».
+  const outdoor = h('button', { class: 'chip outdoor-toggle', type: 'button', 'aria-pressed': String(Boolean(store.get('outdoor'))),
+    onclick: () => { const on = !store.get('outdoor'); store.set('outdoor', on); applyTheme(); outdoor.setAttribute('aria-pressed', String(on)); } },
+  icon('sun', 'icon-xs'), t('outdoor.toggle'));
 
   clear(root, h('section', { class: 'view plan-view', 'aria-labelledby': 'plan-title' },
-    h('div', { class: 'plan-top' }, h('p', { class: 'eyebrowless', text: greeting() }), weatherHost),
+    h('div', { class: 'plan-top' }, h('p', { class: 'eyebrowless', text: greeting() }), h('div', { class: 'plan-top-side' }, outdoor, weatherHost)),
     h('h1', { id: 'plan-title', class: 'title-1', text: t('plan.title') }),
     minutesGroup,
     h('div', { class: 'search-field' }, icon('search', 'search-icon'), query, mic),
@@ -325,7 +334,7 @@ const timingOf = (place) => ({ distanceMeters: place.distanceMeters, walkMinutes
 
 function startPlace(place, spoken) {
   const timing = timingOf(place);
-  startWalk({ place, start, timing, backAt: backOf(place) });
+  startWalk({ place, start: origin(), timing, backAt: backOf(place) });
   view = 'live'; render();
   if (spoken) speakText(t('voice.go', { name: place.name, time: backOf(place) }));
 }
@@ -404,6 +413,8 @@ function renderPick() {
 function buildRequest() {
   const body = { ...outbound(start), minutes: plan.minutes, maxWalkMinutes: plan.maxWalk, query: plan.query.trim(), withChild: plan.mood === 'kids', category: 'any', returnToStart: true };
   if (plan.when !== 'now') body.visitDate = isoWithOffset(leaveAt());
+  const hidden = store.hiddenIds();
+  if (hidden.length) body.excludeIds = hidden;
   return body;
 }
 
@@ -433,13 +444,18 @@ async function submit(options) {
   try {
     const data = await api.recommend(request, controller.signal);
     if (controller.signal.aborted) return;
+    // Places hidden with «Больше не предлагать» stay out even where the server does not know the list.
+    data.recommendations = data.recommendations.filter((place) => !store.isHidden(place.id));
     result = data;
     view = 'results';
     store.addHistory({ key: JSON.stringify([request.lat.toFixed(3), request.lon.toFixed(3), request.minutes, request.query]), kind: 'plan', plan: { ...plan }, start, count: data.recommendations.length });
     announce(`${t('results.title', { min: request.minutes })}: ${data.recommendations.length}`);
   } catch (failure) {
     if (failure.kind === 'aborted' || controller.signal.aborted) return;
-    error = failure;
+    // No internet: the saved answer for the closest key scenario, labelled as a demo on the results screen.
+    const demo = ['offline', 'timeout'].includes(failure.kind) ? await api.demoAnswer({ query: plan.query }).catch(() => null) : null;
+    if (controller.signal.aborted) return;
+    if (demo) result = demo; else error = failure;
     view = 'results';
   } finally { if (inflight === controller) inflight = null; }
   render();
@@ -483,6 +499,8 @@ function renderResults() {
   const leave = leaveAt();
   const notes = notesView(recs);
   const tip = llm ? aiCard(generation) : h('div', { class: 'ai-card is-quiet' }, h('p', { class: 'fine', text: t('results.fallback') }));
+  const demo = result.demo;
+  const minutes = demo?.minutes ?? request.minutes;
 
   const rows = recs.map((place, index) => {
     const status = hoursStatus(place, place.walkMinutes, place.visitMinutes, place.hoursCheck);
@@ -499,9 +517,11 @@ function renderResults() {
 
   clear(root, h('section', { class: 'view results-view', 'aria-labelledby': 'results-title' },
     h('div', { class: 'view-bar' }, back, h('div', { class: 'view-bar-actions' }, voiceButton(),
-      h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: 'Aidem', text: t('results.title', { min: request.minutes }), url: shareLink() }) }, icon('share')))),
-    h('h2', { id: 'results-title', class: 'title-1', text: t('results.title', { min: request.minutes }) }),
-    h('p', { class: 'meta' }, icon('pin', 'icon-xs'), t('results.start', { name: startName() }), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }), t('plan.returnBy', { time: time(leave + request.minutes * 60000) })),
+      demo ? null : h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: 'Aidem', text: t('results.title', { min: request.minutes }), url: shareLink() }) }, icon('share')))),
+    demo ? demoBanner(demo) : null,
+    h('h2', { id: 'results-title', class: 'title-1', text: t('results.title', { min: minutes }) }),
+    h('p', { class: 'meta' }, icon('pin', 'icon-xs'), t('results.start', { name: originName() }), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }),
+      demo ? t('demo.at', { time: demo.time }) : t('plan.returnBy', { time: time(leave + request.minutes * 60000) })),
     tip,
     notes.notices,
     h('div', { class: 'result-list' }, rows),
@@ -516,6 +536,19 @@ function renderResults() {
     if (listen?.play) answer(null, listen.play());
     else answer(t('voice.answer', { n: recs.length, name: recs[0].name, walk: recs[0].walkMinutes, time: backOf(recs[0]) }));
   }
+}
+
+// No internet: a saved answer, never passed off as a live one. The chips switch between the saved scenarios.
+function demoBanner(demo) {
+  // Day and month as digits in Astana time: the same in every language and on every phone.
+  const at = Date.parse(demo.savedAt);
+  const day = Number.isFinite(at) ? new Date(at + 5 * 3600000) : null;
+  const saved = day ? `${String(day.getUTCDate()).padStart(2, '0')}.${String(day.getUTCMonth() + 1).padStart(2, '0')}, ${time(at)}` : '';
+  return h('section', { class: 'demo-banner', role: 'status' },
+    h('p', { class: 'demo-title' }, icon('warning', 'icon-xs'), h('span', { text: t('demo.title', { date: saved }) })),
+    h('p', { class: 'demo-text', text: t('demo.text', { title: pick(demo.title) }) }),
+    h('div', { class: 'chip-row no-drag' }, demo.scenarios.map((item) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(item.id === demo.id),
+      onclick: async () => { const next = await api.demoAnswer({ id: item.id }).catch(() => null); if (next && root) { result = next; selected = 0; view = 'results'; render(); } } }, pick(item.title)))));
 }
 
 // The server's notes. What it cannot confirm from the request (розетки, тишина…) and the notes about this request
@@ -551,7 +584,8 @@ function routeCard(route) {
   const stops = (route?.stops || []).filter((stop) => Number.isFinite(stop.lat) && Number.isFinite(stop.lon));
   if (stops.length < 2) return null;
   const show = () => {
-    const chain = [[start.lon, start.lat], ...stops.map((stop) => [stop.lon, stop.lat]), ...(route.returnToStart ? [[start.lon, start.lat]] : [])];
+    const from = origin();
+    const chain = [[from.lon, from.lat], ...stops.map((stop) => [stop.lon, stop.lat]), ...(route.returnToStart ? [[from.lon, from.lat]] : [])];
     layers.showPins(stops, () => {});
     layers.showRoutes([{ coordinates: chain, selected: true }]);
     fitPoints(chain, { maxZoom: 17 });
@@ -624,8 +658,9 @@ function highlight(index) {
 }
 
 function drawResultsMap(recs) {
+  const start = origin();
   layers.hideReach();
-  layers.showStart(start, startName());
+  layers.showStart(start, originName());
   layers.showPins(recs, (index) => { if (view === 'results') { highlight(index); root.querySelector(`.result-row[data-index="${index}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } else openResult(index); });
   layers.showRoutes(recs.map((place, index) => ({ coordinates: [[start.lon, start.lat], [place.lon, place.lat]], selected: index === selected })));
   layers.selectPin(selected);
@@ -682,9 +717,10 @@ function renderPlace() {
   if (!place) { view = 'results'; render(); return; }
   const timing = timingOf(place);
   const url = new URL(shareLink());
+  const start = origin();
   clear(root, placeView({ place, timing, start, serverHours: place.hoursCheck, why: place.why, activities: place.activities || [], warnings: place.warnings || [],
     backLabel: t('common.back'), onBack: () => { view = 'results'; render(); },
-    onStart: () => { voiceTurns = 0; startPlace(place); }, voice: voiceButton(),
+    onStart: () => { voiceTurns = 0; view = 'ready'; render(); }, voice: voiceButton(), onHide: () => hidePlace(place),
     routeInfo: lastRoute?.id === place.id ? lastRoute.route : null, shareUrl: url.href, backAt: backOf(place) }));
   // Opened by voice («второй»): say why it fits and how long it takes, then wait for «поехали».
   // The server's «why» is written for reading (all the minutes), so only Gemini's idea is said aloud.
@@ -695,6 +731,35 @@ function renderPlace() {
   layers.upgradeRoute(selected, start, place).then((route) => {
     if (route && view === 'place' && result?.recommendations?.[selected]?.id === place.id && lastRoute?.id !== place.id) { lastRoute = { id: place.id, route }; render(); }
   });
+}
+
+// «Больше не предлагать»: the place leaves these results now and goes out as excludeIds from then on.
+function hidePlace(place) {
+  const list = result?.recommendations || [];
+  const index = list.indexOf(place);
+  store.hidePlace(place);
+  result = { ...result, recommendations: list.filter((item) => item !== place) };
+  selected = 0;
+  view = 'results';
+  // Nothing left to choose from: ask again, now without it.
+  if (!result.recommendations.length && !result.demo) submit(); else render();
+  toast(t('toast.hidden', { name: place.name }), { iconName: 'close', action: t('live.undo'), duration: 6000, onAction: () => {
+    store.unhidePlace(place.id);
+    if (result && index >= 0 && !result.recommendations.includes(place)) {
+      const next = [...result.recommendations];
+      next.splice(index, 0, place);
+      result = { ...result, recommendations: next };
+      if (view === 'results') render();
+    }
+  } });
+}
+
+// ---------- before leaving ----------
+function renderReady() {
+  const place = result?.recommendations?.[selected];
+  if (!place) { view = 'results'; render(); return; }
+  clear(root, readyView({ place, timing: timingOf(place), backAt: backOf(place), serverHours: place.hoursCheck,
+    onGo: () => startPlace(place), onBack: () => { view = 'place'; render(); } }));
 }
 
 // ---------- live ----------
