@@ -31,8 +31,8 @@ test('the walk text asks for minimal thinking and reports each attempt without t
   assert.equal(diagnostics.attempts.length, 1);
   assert.deepEqual({ ...diagnostics.attempts[0], ms: 0 }, { provider: 'gemini', model: 'gemini-3.8-flash', thinking: 'minimal', ms: 0, status: 200, finishReason: 'STOP', error: null });
   // The budget counts from the request, so the time before the model call is taken from it.
-  assert.ok(Number.isFinite(diagnostics.totalMs) && diagnostics.budgetMs <= 10000 && diagnostics.budgetMs > 9000);
-  assert.ok(diagnostics.startedAfterMs >= 0 && diagnostics.budgetMs + diagnostics.startedAfterMs === 10000);
+  assert.ok(Number.isFinite(diagnostics.totalMs) && diagnostics.budgetMs <= 12000 && diagnostics.budgetMs > 11000);
+  assert.ok(diagnostics.startedAfterMs >= 0 && diagnostics.budgetMs + diagnostics.startedAfterMs === 12000);
   const shown = JSON.stringify(diagnostics);
   assert.ok(!shown.includes('g-secret-key') && !shown.includes('Прогулка') && !shown.includes('Ты городской'), 'no key, query or prompt in the diagnostics');
 });
@@ -80,7 +80,7 @@ test('a model call that runs out of time is not asked again, and the answer from
   assert.equal(data.recommendations.length, 1);
 });
 
-test('a busy or out-of-quota model hands the walk text to the spare one within the budget, and is skipped for a while', async () => {
+test('a busy or out-of-quota model hands the walk text to the spare one within the budget, and still goes first next time', async () => {
   for (const status of [503, 429]) {
     resetGenerationState();
     const models = [];
@@ -92,10 +92,10 @@ test('a busy or out-of-quota model hands the walk text to the spare one within t
     assert.equal(data.generation.model, 'gemini-3.1-flash-lite');
     assert.deepEqual(models, ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite']);
     assert.deepEqual(data.generation.diagnostics.attempts.map(item => [item.model, item.status]), [['gemini-3.5-flash-lite', status], ['gemini-3.1-flash-lite', 200]]);
-    // The next request goes straight to the spare model.
+    // The next request asks the main model first again: one 503 or 429 does not hand the next answers to the spare.
     models.length = 0;
     data = await withFetch(busyPrimary, async () => (await handleApi(request(valid), live, [poi])).json());
-    assert.deepEqual(models, ['gemini-3.1-flash-lite']);
+    assert.deepEqual(models, ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite']);
   }
   // Both busy: three quick tries, then the answer from the data, well within the budget.
   resetGenerationState();
@@ -126,29 +126,24 @@ test('the main model gets all the time left; a call cut short still shows its th
   assert.ok(attempt.ms >= 1700 && attempt.ms < 2200, `cut at ${attempt.ms} ms`);
 });
 
-test('on the live order 3.1 goes first, a busy 3.1 hands over to 3.5 with its thinking level, and a stand-in that hangs leaves time for 3.1', async () => {
+test('on the live order 3.1 goes first every time, and a busy 3.1 hands over to 3.5 with its thinking level', async () => {
   resetGenerationState();
-  const live = { ...env, GEMINI_MODEL: 'gemini-3.1-flash-lite', STAND_IN_MS: 300 };
+  const live = { ...env, GEMINI_MODEL: 'gemini-3.1-flash-lite' };
   const modelOf = url => String(url).match(/models\/([^:]+)/)[1];
   const calls = [];
   let busy = true;
-  const handler = (url, init) => {
+  const handler = async (url, init) => {
     const model = modelOf(url);
     calls.push([model, JSON.parse(init.body).generationConfig.thinkingConfig?.thinkingLevel ?? 'off']);
-    if (model === 'gemini-3.1-flash-lite') return Promise.resolve(busy ? new Response('{}', { status: 503 }) : geminiReply(ok));
-    if (!busy) return new Promise((resolve, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
-    return Promise.resolve(geminiReply(ok));
+    return model === 'gemini-3.1-flash-lite' && busy ? new Response('{}', { status: 503 }) : geminiReply(ok);
   };
   let data = await withFetch(handler, async () => (await handleApi(request(valid), live, [poi])).json());
   assert.equal(data.generation.model, 'gemini-3.5-flash-lite');
   assert.deepEqual(calls, [['gemini-3.1-flash-lite', 'minimal'], ['gemini-3.5-flash-lite', 'minimal']]);
-  // 3.1 is now marked busy: 3.5 stands in first, gets 300 ms, hangs, and 3.1 (free again) answers with the rest.
   busy = false; calls.length = 0;
   data = await withFetch(handler, async () => (await handleApi(request(valid), live, [poi])).json());
-  assert.equal(data.generation.mode, 'llm');
   assert.equal(data.generation.model, 'gemini-3.1-flash-lite');
-  assert.deepEqual(data.generation.diagnostics.attempts.map(item => [item.model, item.error]), [['gemini-3.5-flash-lite', 'timeout'], ['gemini-3.1-flash-lite', null]]);
-  assert.ok(data.generation.diagnostics.attempts[0].ms < 1000);
+  assert.deepEqual(calls, [['gemini-3.1-flash-lite', 'minimal']]);
 });
 
 test('the embedding call reports what happened next to the model line', async () => {

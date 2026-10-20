@@ -88,7 +88,7 @@ export function activeProvider(env = {}) {
 const THINKING_LEVELS = ['minimal', 'low', null];
 const thinkingIndex = new Map();
 /** Forgets which thinking level each model accepted; for tests. */
-export function resetGenerationState() { thinkingIndex.clear(); busyAt.clear(); }
+export function resetGenerationState() { thinkingIndex.clear(); }
 
 async function callGemini(input, provider, env, signal) {
   for (;;) {
@@ -156,15 +156,9 @@ async function callOpenAI(input, provider, env, signal) {
 }
 
 // The walk answer has one time budget, counted from the request: with the AI text within it, or from the place data at once.
-// Each model call may use all the time that is left (less a margin to send the answer): a call cut at 7 s left 2 s that no
-// second call could use, and gemini-3.1-flash-lite took 6–7 s.
-const GENERATION_MS = 10000, SEND_MARGIN_MS = 250;
-// After a 503 or 429 a model is skipped for this long in this isolate; the other model goes first meanwhile.
-const BUSY_MS = 10 * 60000;
-// That stand-in gets at most this long, so the main model still has time after it (gemini-3.5-flash-lite either answered
-// 503 within a second or hung past 7 s on the live site).
-const STAND_IN_MS = 4500;
-const busyAt = new Map();
+// Each model call may use all the time that is left (less a margin to send the answer): gemini-3.1-flash-lite answers Russian
+// walk texts in 4–8 s on the live site, and the page shows its loading steps meanwhile.
+const GENERATION_MS = 12000, SEND_MARGIN_MS = 250;
 // A rewrite, the spare model and the OpenAI hand-over are asked only while this much of the budget is left.
 const SECOND_CALL_MS = 3500;
 
@@ -225,19 +219,13 @@ async function generate(result, query, env, preferred, requestStartedAt = Date.n
     // The spare is the other of the two fast models (each has its own quota and load), or GEMINI_SPARE_MODEL.
     const spare = provider.name === 'gemini'
       ? { name: 'gemini', model: env.GEMINI_SPARE_MODEL || (provider.model === SPARE_AGENT_MODEL ? DEFAULT_AGENT_MODEL : SPARE_AGENT_MODEL) } : null;
-    // A model that answered 503 or 429 lately is skipped for ten minutes: the spare one starts, as on /agent.
-    const first = spare && spare.model !== provider.model && Date.now() - (busyAt.get(provider.model) || 0) < BUSY_MS ? spare : provider;
-    let reply = await callWithRetry(first, input, env, { deadline, log: attempts, maxAttempts: 1, capMs: first === provider ? Infinity : Number(env.STAND_IN_MS) || STAND_IN_MS });
-    used = first;
-    // Busy, out of quota or unreachable (or a stand-in that ran out of its share): the other Gemini model answers with all
-    // the time that is left (quotas and load are per model).
-    if (reply.error && (RETRYABLE.test(reply.error) || (first !== provider && reply.error === 'provider_timeout')) && spare && left() >= SECOND_CALL_MS) {
-      if (/^provider_(429|5\d\d)$/.test(reply.error)) busyAt.set(first.model, Date.now());
-      const other = first === spare ? provider : spare;
-      if (other.model !== first.model) {
-        const second = await callWithRetry(other, input, env, { deadline, log: attempts, maxAttempts: 1 });
-        if (!second.error) { reply = second; used = other; } else if (/^provider_(429|5\d\d)$/.test(second.error)) busyAt.set(other.model, Date.now());
-      }
+    // The main model always goes first, with all the time there is: skipping it for minutes after one 503 or 429 left the
+    // live answers to the slower spare and cut 3.1 to 5 s.
+    let reply = await callWithRetry(provider, input, env, { deadline, log: attempts, maxAttempts: 1 });
+    // Busy, out of quota or unreachable: the other Gemini model answers with all the time that is left (quotas and load are per model).
+    if (reply.error && RETRYABLE.test(reply.error) && spare && spare.model !== provider.model && left() >= SECOND_CALL_MS) {
+      const second = await callWithRetry(spare, input, env, { deadline, log: attempts, maxAttempts: 1 });
+      if (!second.error) { reply = second; used = spare; }
     }
     // Both busy with an error that may pass: one more try on the primary while time is left.
     if (reply.error && RETRYABLE.test(reply.error) && left() >= SECOND_CALL_MS + 1000) {
@@ -308,11 +296,11 @@ function attemptNote(provider, reply, ms) {
     error: reply.error ? ERROR_TYPES[reply.error] || (/^provider_\d+$/.test(reply.error) ? 'http' : 'other') : null };
 }
 
-async function callWithRetry(provider, input, env, { deadline = Date.now() + GENERATION_MS, maxAttempts = 2, log = [], capMs = Infinity } = {}) {
+async function callWithRetry(provider, input, env, { deadline = Date.now() + GENERATION_MS, maxAttempts = 2, log = [] } = {}) {
   const call = provider.name === 'gemini' ? callGemini : callOpenAI;
   const pause = Number.isFinite(Number(env.RETRY_DELAY_MS)) ? Number(env.RETRY_DELAY_MS) : 600;
-  // ATTEMPT_MS caps a single call (tests); otherwise a call gets everything left in the budget, or capMs.
-  const attemptMs = Math.min(Number(env.ATTEMPT_MS) || Infinity, capMs);
+  // ATTEMPT_MS caps a single call (tests); otherwise a call gets everything left in the budget.
+  const attemptMs = Number(env.ATTEMPT_MS) || Infinity;
   let reply = { error: 'provider_timeout' };
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const left = deadline - Date.now();
