@@ -22,6 +22,11 @@
         <section class="view view-home" id="view-home" aria-labelledby="home-title">
           <p class="clock" aria-hidden="true"><svg class="mark" viewBox="0 0 64 64"><path d="M37.6 16.7A16 16 0 1 0 48 30"/><circle cx="43.5" cy="20.5" r="3.6"/></svg><span id="clock">--:--</span></p>
           <h1 class="title" id="home-title">Куда?</h1>
+          <!-- The mic is a label for the field: on Apple Watch a tap opens watchOS dictation; where the browser can listen, watch.js records instead. -->
+          <form class="search" id="search-form" role="search" action="#">
+            <input class="search-input" id="search-input" type="search" name="q" placeholder="Найти место" enterkeyhint="search" autocomplete="off" aria-label="Найти место по названию" maxlength="60">
+            <label class="voice" id="voice" for="search-input" role="button" tabindex="0" aria-label="Сказать голосом, куда идти">🎤</label>
+          </form>
           <div class="moods">
             <button class="mood" type="button" data-mood="coffee"><img src="/assets/icons/categories/coffee-64.webp" alt="" width="32" height="32"><span>Кофе</span></button>
             <button class="mood" type="button" data-mood="park"><img src="/assets/icons/categories/park-64.webp" alt="" width="32" height="32"><span>Парк</span></button>
