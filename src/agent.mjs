@@ -4,13 +4,17 @@
 import { runTool, ToolError, CATEGORIES } from './tools.mjs';
 import { placeLinks, mapLinks } from './links.mjs';
 
-const MAX_TURNS = 5, MAX_TOOL_CALLS = 6, TOTAL_MS = 30000, ATTEMPT_MS = 12000;
+// Latency budget: an answer within a few seconds, or an honest quick fallback. Usually two model calls: tools, then the answer.
+const MAX_TURNS = 3, MAX_TOOL_CALLS = 5, TOTAL_MS = 14000, ATTEMPT_MS = 7000;
 export const DEFAULT_AGENT_MODEL = 'gemini-3.5-flash-lite';
+// Free-tier quotas are per model. After a 429 the agent starts on the spare model for a few minutes.
+export const SPARE_AGENT_MODEL = 'gemini-3.1-flash-lite';
+let primaryRefusedAt = 0;
 
 const SYSTEM = 'Ты агент Aidem: подбираешь прогулку по Астане ровно под время человека. Точку старта знает только сервер: он сам подставляет её в инструменты, '
   + 'ты координат не видишь и не спрашиваешь. Порядок: если человек пойдёт по улице или упомянул погоду, вызови get_weather; затем plan_walk с его временем и пожеланием '
   + '(при плохой погоде добавь в query «под крышей»); если просят несколько мест подряд, маршрут или «с ... а потом ...», вызови build_route с 2–3 id из результатов; '
-  + 'search_places и place_details — только если без них нельзя ответить. Не больше 4 инструментов, затем обязательно give_answer. '
+  + 'search_places и place_details — только если без них нельзя ответить. Нужные инструменты вызывай одновременно в одном ходе (обычно get_weather и plan_walk вместе), затем сразу give_answer. '
   + 'В give_answer: summary на языке answerLanguage (ru — русский, kk — казахский, en — английский), 2–3 коротких предложения до 450 символов; '
   + 'только факты из результатов инструментов: названия, категории, минуты, статус часов, погода; все минуты как оценку; «открыто» только если hours.status = open; '
   + 'не описывай меню, кухню, цены, атмосферу, услуги, популярность, безопасность и розетки; сервер отклоняет слова «расположен», «предлагает», «находится внутри», «работает до», «гарантирует». place_ids — 1–3 id из результатов инструментов в порядке совета; '
@@ -63,7 +67,20 @@ function describe(name, args, result) {
   }
 }
 
+// Gemini 3 thinks by default; low thinking keeps each call short. If a model rejects the setting, it is dropped for this isolate.
+let thinkingAccepted = true;
+const THINKING = { thinkingLevel: 'low' };
+
 async function callGemini(body, model, env, signal, limitedJson) {
+  if (thinkingAccepted) {
+    const reply = await post({ ...body, generationConfig: { ...body.generationConfig, thinkingConfig: THINKING } }, model, env, signal, limitedJson);
+    if (reply.error !== 'provider_400') return reply;
+    thinkingAccepted = false;
+  }
+  return post(body, model, env, signal, limitedJson);
+}
+
+async function post(body, model, env, signal, limitedJson) {
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST', signal, headers: { 'x-goog-api-key': env.GEMINI_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
   });
@@ -71,18 +88,19 @@ async function callGemini(body, model, env, signal, limitedJson) {
   return { body: await limitedJson(response, 262144) };
 }
 
-async function callWithRetry(body, model, env, deadline, limitedJson) {
+async function callWithRetry(body, model, env, deadline, limitedJson, attemptMs = ATTEMPT_MS) {
   let reply = { error: 'provider_unavailable' };
   for (let attempt = 1; attempt <= 2; attempt++) {
     const left = deadline - Date.now();
     if (left < 2500) return { error: 'provider_timeout' };
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Math.min(ATTEMPT_MS, left));
+    const timer = setTimeout(() => controller.abort(), Math.min(attemptMs, left));
+    // A timed-out call is not retried: waiting a second time is what made answers take 20+ seconds.
     try { reply = await callGemini(body, model, env, controller.signal, limitedJson); }
-    catch { reply = { error: 'provider_unavailable' }; }
+    catch { reply = { error: controller.signal.aborted ? 'provider_timeout' : 'provider_unavailable' }; }
     finally { clearTimeout(timer); }
-    if (!reply.error || !/^provider_(429|500|502|503|504|unavailable)$/.test(reply.error)) return reply;
-    await new Promise(resolve => setTimeout(resolve, 700));
+    if (!reply.error || !/^provider_(500|502|503|504|unavailable)$/.test(reply.error) || deadline - Date.now() < 4000) return reply;
+    await new Promise(resolve => setTimeout(resolve, 400));
   }
   return reply;
 }
@@ -95,11 +113,14 @@ function astanaNow(now) {
 
 /**
  * Run the agent. input: { query, lat, lon, minutes?, withChild?, lang?, previous?: { query, summary } } (previous = the last turn of a spoken conversation).
- * deps: { env, dataset, limitedJson, answerLanguage, unsupported (RegExp), now?, fetchImpl? (weather only) }.
+ * deps: { env, dataset, limitedJson, answerLanguage, unsupported (RegExp), now?, fetchImpl? (weather only), attemptMs?, totalMs? }.
  */
+export function resetAgentState() { primaryRefusedAt = 0; thinkingAccepted = true; }
+
 export async function runAgent(input, deps) {
   const { env, dataset, limitedJson, answerLanguage, unsupported } = deps;
   const now = deps.now || new Date();
+  const startedAt = Date.now();
   const start = { lat: input.lat, lon: input.lon };
   const steps = [];
   const seen = new Map();
@@ -134,7 +155,7 @@ export async function runAgent(input, deps) {
     const places = ids.map(id => seen.get(id)).filter(Boolean).map(place => ({ ...place,
       links: Number.isFinite(place.totalMinutes) ? placeLinks(place, { start: now }) : mapLinks(place) }));
     const route = extra.route && lastRoute && ids.every(id => lastRoute.stops.some(stop => stop.id === id)) ? lastRoute : null;
-    return { mode, summary, places, route, steps, modelCalls, toolCalls,
+    return { mode, summary, places, route, steps, modelCalls, toolCalls, elapsedMs: Date.now() - startedAt,
       privacy: 'Gemini не получал ваши координаты: точку старта подставлял в инструменты сервер, а из ответов инструментов координаты убраны.',
       ...(extra.reason ? { reason: extra.reason } : {}), ...(extra.model ? { provider: 'gemini', model: extra.model } : {}) };
   };
@@ -152,22 +173,34 @@ export async function runAgent(input, deps) {
     await execute('get_weather');
     return fallback('no_gemini_key');
   }
-  const model = env.GEMINI_AGENT_MODEL || env.GEMINI_MODEL || DEFAULT_AGENT_MODEL;
+  // The agent always runs on a fast model: GEMINI_MODEL may name a slower one for the walk summary.
+  const primary = env.GEMINI_AGENT_MODEL || DEFAULT_AGENT_MODEL;
+  let model = Date.now() - primaryRefusedAt < 5 * 60000 ? SPARE_AGENT_MODEL : primary;
   const language = ['ru', 'kk', 'en'].includes(input.lang) ? input.lang : answerLanguage(input.query);
   const previousTurn = input.previous ? { query: input.previous.query, answer: input.previous.summary } : undefined;
   const contents = [{ role: 'user', parts: [{ text: JSON.stringify({ answerLanguage: language, query: String(input.query || '').slice(0, 500),
     minutes: input.minutes, withChild: Boolean(input.withChild), now: astanaNow(now), start: 'точка человека известна серверу', ...(previousTurn ? { previousTurn } : {}) }) }] }];
-  const deadline = Date.now() + TOTAL_MS;
+  const attemptMs = deps.attemptMs || ATTEMPT_MS;
+  const deadline = Date.now() + (deps.totalMs || TOTAL_MS);
 
   // One rejected answer gets a second chance: the server says what failed and Gemini rewrites it.
   let rejected = false;
   for (let turn = 1; turn <= MAX_TURNS || (rejected && turn === MAX_TURNS + 1); turn++) {
-    const last = turn >= MAX_TURNS || toolCalls >= MAX_TOOL_CALLS || rejected;
+    // Turn 1: any tools. Turn 2: a micro-route, a place card or the answer. Then only the answer; also when time runs short.
+    const last = turn >= MAX_TURNS || toolCalls >= MAX_TOOL_CALLS || rejected || deadline - Date.now() < attemptMs;
+    const allowed = last ? ['give_answer'] : turn === 2 ? ['build_route', 'place_details', 'give_answer'] : null;
     const body = { systemInstruction: { parts: [{ text: SYSTEM }] }, contents, tools: [{ functionDeclarations: DECLARATIONS }],
-      toolConfig: { functionCallingConfig: { mode: 'ANY', ...(last ? { allowedFunctionNames: ['give_answer'] } : {}) } },
+      toolConfig: { functionCallingConfig: { mode: 'ANY', ...(allowed ? { allowedFunctionNames: allowed } : {}) } },
       generationConfig: { temperature: 0.2, maxOutputTokens: 1024 } };
-    const reply = await callWithRetry(body, model, env, deadline, limitedJson);
+    let reply = await callWithRetry(body, model, env, deadline, limitedJson, attemptMs);
     modelCalls++;
+    // Out of quota before any model turn: the spare model takes the whole run (thought signatures don't cross models).
+    if (reply.error === 'provider_429' && turn === 1 && model === primary) {
+      primaryRefusedAt = Date.now();
+      model = SPARE_AGENT_MODEL;
+      reply = await callWithRetry(body, model, env, deadline, limitedJson, attemptMs);
+      modelCalls++;
+    }
     if (reply.error) return fallback(reply.error, model);
     const content = reply.body.candidates?.[0]?.content;
     const calls = (content?.parts || []).filter(part => part.functionCall?.name);
@@ -182,7 +215,7 @@ export async function runAgent(input, deps) {
       const problem = !summary || summary.length > 700 ? 'summary пустой или длиннее 700 символов'
         : !ids.length || ids.some(id => !seen.has(id)) ? `place_ids — только 1–3 id из результатов инструментов: ${[...seen.keys()].slice(0, 12).join(', ')}`
           : claim ? `в summary есть то, чего нет в данных («${claim}»): убери это слово и утверждение, оставь названия, минуты, часы и погоду` : null;
-      if (problem && (rejected || Date.now() > deadline - 4000)) return fallback(claim && ids.length ? 'unsupported_claim' : 'validation', model);
+      if (problem && (rejected || Date.now() > deadline - 3500)) return fallback(claim && ids.length ? 'unsupported_claim' : 'validation', model);
       if (problem) {
         rejected = true;
         steps.push({ tool: 'check', args: {}, label: 'Сервер вернул ответ на доработку', summary: claim ? `Нет в данных: «${claim}»` : 'Места только из найденных', ms: 0 });

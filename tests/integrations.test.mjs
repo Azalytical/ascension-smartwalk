@@ -5,7 +5,8 @@ import { handleApi } from '../src/api.mjs';
 import { mapLinks, calendarLink } from '../src/links.mjs';
 import { runTool } from '../src/tools.mjs';
 import { astanaWeather, weatherAdvice } from '../src/weather.mjs';
-import { modelView } from '../src/agent.mjs';
+import { modelView, runAgent, resetAgentState, SPARE_AGENT_MODEL } from '../src/agent.mjs';
+import { limitedJson, answerLanguage, UNSUPPORTED } from '../src/api.mjs';
 
 const pois = [
   { id: 'node/1', name: 'Кофейня у Байтерека', lat: 51.1290, lon: 71.4310, category: 'cafe', tags: { amenity: 'cafe', internet_access: 'wlan', 'addr:street': 'Нуржол', 'addr:housenumber': '14' }, sourceUrl: 'https://www.openstreetmap.org/node/1', retrievedAt: '2026-10-19T10:00:00Z', openingHours: '24/7' },
@@ -371,4 +372,74 @@ test('agent: a spoken follow-up carries the previous turn and the spoken languag
   const plain = await handleApi(new Request('https://demo.example/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query: 'кофе', ...START, previous: 'not an object' }) }), env, pois);
   assert.equal(plain.status, 200);
+}));
+
+const agentDeps = (extra = {}) => ({ env: { GEMINI_API_KEY: 'test' }, dataset: pois, limitedJson, answerLanguage, unsupported: UNSUPPORTED,
+  fetchImpl: async () => jsonResponse(weatherBody), ...extra });
+const modelOf = url => String(url).match(/models\/([^:]+)/)[1];
+const toolsTurn = { candidates: [{ content: { role: 'model', parts: [
+  { functionCall: { name: 'get_weather', args: {} }, thoughtSignature: 'a' }, { functionCall: { name: 'plan_walk', args: { query: 'кофе' } } }] } }] };
+const answerTurn = { candidates: [{ content: { role: 'model', parts: [{ functionCall: { name: 'give_answer', args: { summary: 'Кофейня у Байтерека: около 2 минут пешком.', place_ids: ['node/1'] } } }] } }] };
+
+test('agent latency: low thinking, tools in one turn, then only route, card or answer; elapsed time reported', withFetch(async (url, init) => {
+  if (String(url).includes('open-meteo')) return jsonResponse(weatherBody);
+  const body = JSON.parse(init.body);
+  globalThis.__requests.push(body);
+  return jsonResponse(body.contents.some(content => content.role === 'model') ? answerTurn : toolsTurn);
+}, async () => {
+  resetAgentState(); globalThis.__requests = [];
+  const data = await runAgent({ query: 'кофе', ...START, minutes: 60 }, agentDeps());
+  assert.equal(data.mode, 'agent');
+  assert.equal(data.modelCalls, 2);
+  assert.ok(Number.isFinite(data.elapsedMs));
+  assert.deepEqual(globalThis.__requests[0].generationConfig.thinkingConfig, { thinkingLevel: 'low' });
+  assert.equal(globalThis.__requests[0].toolConfig.functionCallingConfig.allowedFunctionNames, undefined);
+  assert.deepEqual(globalThis.__requests[1].toolConfig.functionCallingConfig.allowedFunctionNames, ['build_route', 'place_details', 'give_answer']);
+}));
+
+test('agent latency: a model that rejects the thinking setting is asked again without it', withFetch(async (url, init) => {
+  if (String(url).includes('open-meteo')) return jsonResponse(weatherBody);
+  const body = JSON.parse(init.body);
+  if (body.generationConfig.thinkingConfig) return new Response('{"error":{"code":400}}', { status: 400 });
+  return jsonResponse(body.contents.some(content => content.role === 'model') ? answerTurn : toolsTurn);
+}, async () => {
+  resetAgentState();
+  const data = await runAgent({ query: 'кофе', ...START, minutes: 60 }, agentDeps());
+  assert.equal(data.mode, 'agent');
+}));
+
+test('agent latency: a timed-out call is not retried and the tools already run still answer', withFetch(async (url, init) => {
+  if (String(url).includes('open-meteo')) return jsonResponse(weatherBody);
+  globalThis.__calls++;
+  const body = JSON.parse(init.body);
+  if (!body.contents.some(content => content.role === 'model')) return jsonResponse(toolsTurn);
+  return new Promise((resolve, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
+}, async () => {
+  resetAgentState(); globalThis.__calls = 0;
+  const began = Date.now();
+  const data = await runAgent({ query: 'кофе', ...START, minutes: 60 }, agentDeps({ attemptMs: 300, totalMs: 6000 }));
+  assert.equal(data.mode, 'fallback');
+  assert.equal(data.reason, 'provider_timeout');
+  assert.equal(globalThis.__calls, 2, 'one tools call and one timed-out call, no retry');
+  assert.ok(data.places.length >= 1);
+  assert.ok(Date.now() - began < 2000);
+}));
+
+test('agent latency: out of quota on the first call, the spare model answers', withFetch(async (url, init) => {
+  if (String(url).includes('open-meteo')) return jsonResponse(weatherBody);
+  globalThis.__models.push(modelOf(url));
+  if (modelOf(url) !== SPARE_AGENT_MODEL) return new Response('{"error":{"code":429}}', { status: 429 });
+  return jsonResponse(JSON.parse(init.body).contents.some(content => content.role === 'model') ? answerTurn : toolsTurn);
+}, async () => {
+  resetAgentState(); globalThis.__models = [];
+  const data = await runAgent({ query: 'кофе', ...START, minutes: 60 }, agentDeps({ totalMs: 20000 }));
+  assert.equal(data.mode, 'agent');
+  assert.equal(data.model, SPARE_AGENT_MODEL);
+  assert.equal(globalThis.__models.filter(model => model === SPARE_AGENT_MODEL).length, 2);
+  assert.equal(globalThis.__models.filter(model => model !== SPARE_AGENT_MODEL).length, 1, 'a 429 is not retried on the same model');
+  // The next run starts on the spare model at once.
+  globalThis.__models = [];
+  await runAgent({ query: 'кофе', ...START, minutes: 60 }, agentDeps());
+  assert.equal(globalThis.__models[0], SPARE_AGENT_MODEL);
+  resetAgentState();
 }));

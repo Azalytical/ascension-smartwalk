@@ -125,7 +125,7 @@ async function ask(query, extra = {}) {
     steps.replaceChildren();
     for (const step of data.steps) { steps.append(stepNode(step, step.tool === 'give_answer')); await wait(extra.lang ? 200 : 380); }
     $('who').textContent = data.mode === 'agent'
-      ? `Gemini · ${data.model} · ${data.modelCalls} обращ. к модели, ${data.toolCalls} инструм.`
+      ? `Gemini · ${data.model} · ${data.modelCalls} обращ. к модели, ${data.toolCalls} инструм.${Number.isFinite(data.elapsedMs) ? ` · ${(data.elapsedMs / 1000).toFixed(1).replace('.', ',')} с` : ''}`
       : 'Подбор по данным без ИИ: Gemini сейчас недоступен';
     lastSummary = data.summary;
     $('you').textContent = extra.lang ? `Вы сказали: «${query}»` : '';
