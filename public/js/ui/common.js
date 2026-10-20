@@ -64,7 +64,7 @@ export function watchUrl({ place, start, walk, visit, back, minutes }) {
 }
 
 export function watchButton(options) {
-  return h('button', { class: 'btn btn-quiet btn-sm watch-btn', type: 'button', onclick: () => share({ title: 'Seruen', text: t('place.watchText', { name: options.place.name }), url: watchUrl(options) }) }, icon('watch'), t('place.watch'));
+  return h('button', { class: 'btn btn-quiet btn-sm watch-btn', type: 'button', onclick: () => share({ title: 'Ulger', text: t('place.watchText', { name: options.place.name }), url: watchUrl(options) }) }, icon('watch'), t('place.watch'));
 }
 
 /** «Слушать»: Gemini reads the text aloud; a second tap stops it. */
