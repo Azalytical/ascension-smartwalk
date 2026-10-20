@@ -172,7 +172,12 @@
     ю: 'yu', я: 'ya', ә: 'a', ғ: 'g', қ: 'k', ң: 'n', ө: 'o', ұ: 'u', ү: 'u', һ: 'h', і: 'i' };
   const latin = (text) => [...text].map((letter) => LATIN[letter] ?? letter).join('');
 
+  // «Мега» is a name to find; «где выпить кофе рядом?» is a question for the assistant.
+  const QUESTION = /\?|^(где|куда|что|чем|как|какой|какая|какое|какие|когда|сколько|можно|посоветуй|подскажи|хочу|хотим|найди|покажи|отведи|давай|пойд|пошли|идём|айда|мне|нам|а )/i;
+  const isQuestion = (text) => QUESTION.test(text.trim()) || text.trim().split(/\s+/).length >= 4;
+
   async function searchPlaces(raw) {
+    if (isQuestion(raw)) { askAssistant(raw); return; }
     const query = raw.trim().replace(/[.!?…]+$/, '').toLowerCase().slice(0, 60);
     // Dictation can end with both a change and a submit.
     if (query.length < 2 || (state.lastSearch?.query === query && Date.now() - state.lastSearch.at < 1500)) return;
@@ -196,6 +201,7 @@
           const visitMinutes = Math.max(10, state.minutes - 2 * walkMinutes - RESERVE_MINUTES);
           return { ...place, walkMinutes, visitMinutes, returnMinutes: walkMinutes, totalMinutes: 2 * walkMinutes + visitMinutes + RESERVE_MINUTES, hours: { status: 'no_data' } };
         });
+      if (!found.length && query.includes(' ')) { state.lastSearch = null; askAssistant(raw); return; }
       state.plan = { places: found, query: '', start, minutes: state.minutes, at: Date.now(), search: query };
       renderResults();
       $('ask-gemini').hidden = true;
@@ -210,20 +216,28 @@
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const canRecord = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
 
+  // Each field has its own mic: the home search and the question to the assistant.
+  const MICS = { voice: { input: 'search-input', placeholder: 'Найти место', send: (text) => searchPlaces(text) },
+    'ask-voice': { input: 'ask-input', placeholder: 'Ваш вопрос', send: (text) => askAssistant(text) } };
+
   function setListening(on) {
-    $('voice').classList.toggle('rec', on);
-    $('search-input').placeholder = on ? 'Говорите…' : 'Найти место';
+    const mic = state.mic || MICS.voice;
+    $(mic === MICS.voice ? 'voice' : 'ask-voice').classList.toggle('rec', on);
+    $(mic.input).placeholder = on ? 'Говорите…' : mic.placeholder;
     buzz(on ? 30 : 15);
   }
 
   function heard(text) {
-    $('search-input').value = text;
-    searchPlaces(text);
+    const mic = state.mic || MICS.voice;
+    $(mic.input).value = text;
+    mic.send(text);
   }
 
   function voice(event) {
     if (!Recognition && !canRecord) return;
     event.preventDefault();
+    unlockVoice();
+    if (!state.recording) state.mic = MICS[event.currentTarget.id] || MICS.voice;
     if (state.recording) { state.recording.stop(); return; }
     if (Recognition) recognize(); else record();
   }
@@ -265,8 +279,8 @@
       show('loading');
       $('loading-text').textContent = 'Распознаём…';
       try {
-        const audio = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); });
-        const response = await fetch('/api/listen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio, mimeType: blob.type, lang: 'ru' }) });
+        const recording = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); });
+        const response = await fetch('/api/listen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: recording, mimeType: blob.type, lang: 'ru' }) });
         const data = await response.json();
         if (!response.ok || !data.text) throw new Error(typeof data.error === 'string' ? data.error : 'Не расслышали. Попробуйте ещё раз.');
         heard(data.text);
@@ -291,7 +305,13 @@
     $('gemini-tip').hidden = true;
     $('ask-gemini').hidden = false;
     $('ask-gemini').disabled = false;
-    const { places, start } = state.plan;
+    const { places, start, answer } = state.plan;
+    $('ask-more').hidden = !answer;
+    if (answer) {
+      $('ask-gemini').hidden = true;
+      list.append(answerCard(answer));
+      if (!places.length) return;
+    }
     if (!places.length && state.plan.search) {
       const card = element('article', 'card');
       card.append(element('p', 'card-name', `Не нашли «${state.plan.search}»`), element('p', 'card-hours', 'Попробуйте сказать название иначе или выберите настроение.'));
@@ -349,6 +369,158 @@
     }
     line.append(place.source?.label || 'OpenStreetMap');
     return line;
+  }
+
+  // The assistant: a question by voice or text goes to the same Gemini agent as /agent on the phone (/api/agent),
+  // with the real start point; the answer comes back as text, read aloud where the watch can play sound, and as cards with «Идём».
+  const EXAMPLES = ['Кофе рядом на полчаса', 'Куда с ребёнком на час?', 'Что посмотреть до заката?'];
+  const FOLLOW_UPS = ['А поближе?', 'А под крышей?', 'А на полчаса?'];
+  const CONFIDENCE = { high: 'Высокая уверенность', medium: 'Средняя уверенность', low: 'Низкая уверенность' };
+
+  function openAsk() {
+    const chat = state.chat;
+    $('ask-context').hidden = !chat;
+    if (chat) $('ask-context').textContent = `Продолжаем: «${chat.question}»`;
+    $('ask-reset').hidden = !chat;
+    $('ask-input').value = '';
+    $('ask-examples').replaceChildren(...(chat ? FOLLOW_UPS : EXAMPLES).map((text) => {
+      const button = element('button', 'example', text);
+      button.type = 'button';
+      button.addEventListener('click', () => askAssistant(text));
+      return button;
+    }));
+    show('ask');
+  }
+
+  // Times from the agent were counted from the start sent with the question; a place found only by name gets them here.
+  function fitPlace(place, start) {
+    const timed = Number.isFinite(place.totalMinutes);
+    const walkMinutes = timed ? place.walkMinutes : Math.max(1, Math.ceil(haversine(start, place) / METERS_PER_MINUTE));
+    const visitMinutes = timed ? place.visitMinutes : Math.max(10, state.minutes - 2 * walkMinutes - RESERVE_MINUTES);
+    const level = place.confidence?.level;
+    return { id: place.id, name: place.name, category: place.category, lat: place.lat, lon: place.lon,
+      distanceMeters: Number.isFinite(place.distanceMeters) ? place.distanceMeters : Math.round(haversine(start, place)),
+      walkMinutes, visitMinutes, returnMinutes: timed ? place.returnMinutes : walkMinutes,
+      totalMinutes: timed ? place.totalMinutes : 2 * walkMinutes + visitMinutes + RESERVE_MINUTES,
+      hours: place.hours || { status: 'no_data' }, source: { label: place.dataSource || 'OpenStreetMap' },
+      confidence: CONFIDENCE[level] ? { level, label: CONFIDENCE[level] } : null };
+  }
+
+  async function askAssistant(raw) {
+    const question = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+    // Dictation can end with both a change and a submit.
+    if (question.length < 2 || (state.lastAsk?.question === question && Date.now() - state.lastAsk.at < 1500)) return;
+    state.lastAsk = { question, at: Date.now() };
+    unlockVoice();
+    stopVoice();
+    state.mood = null;
+    show('loading');
+    $('loading-text').textContent = '✦ Aidem думает…';
+    const start = await resolveStart();
+    const previous = state.chat ? { query: state.chat.question, summary: state.chat.summary } : undefined;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 45000);
+    try {
+      const response = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
+        body: JSON.stringify({ query: question, lat: start.lat, lon: start.lon, minutes: state.minutes, lang: 'ru', ...(previous ? { previous } : {}) }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Помощник сейчас недоступен. Попробуйте ещё раз.');
+      const places = (data.places || []).filter((place) => inAstana(place)).slice(0, 3).map((place) => fitPlace(place, start));
+      // Without Gemini the agent's summary is a generic line; the watch says what it found instead, and says Gemini was not there.
+      const first = places[0];
+      const summary = data.mode === 'agent' ? String(data.summary || '').trim()
+        : first ? `Gemini сейчас не ответил. Ближе всего «${first.name}»: ${first.walkMinutes} мин пешком, обратно к ${time(Date.now() + first.totalMinutes * 60000)}.`
+          : 'Gemini сейчас не ответил, а рядом под ваш вопрос ничего не нашлось. Попробуйте спросить иначе.';
+      state.chat = { question, summary };
+      state.plan = { places, query: '', start, minutes: state.minutes, at: Date.now(),
+        answer: { question, summary, ai: data.mode === 'agent', steps: (data.steps || []).map((step) => step.label).filter(Boolean).slice(0, 4) } };
+      renderResults();
+      show('results');
+      buzz([20, 60, 20]);
+      speak(summary);
+    } catch (error) {
+      const message = error?.name === 'AbortError' ? 'Помощник отвечает слишком долго. Попробуйте ещё раз.'
+        : error instanceof TypeError ? 'Нет связи с Aidem. Проверьте интернет на часах или телефоне.' : error.message;
+      showError(message, () => { state.lastAsk = null; askAssistant(question); });
+    } finally { clearTimeout(timer); }
+  }
+
+  function answerCard(answer) {
+    const card = element('article', 'card answer-card');
+    card.setAttribute('aria-label', 'Ответ Aidem');
+    card.append(element('p', 'answer-head', answer.ai ? '✦ Aidem · Gemini' : '✦ Aidem · без модели'),
+      element('p', 'answer-q', `«${answer.question}»`), element('p', 'answer-text', answer.summary));
+    if (canSpeak && answer.summary) {
+      const play = element('button', 'action ghost answer-play', '🔊 Прослушать');
+      play.type = 'button';
+      play.addEventListener('click', () => { unlockVoice(); speak(answer.summary); });
+      card.append(play);
+    }
+    if (answer.steps.length) card.append(element('p', 'answer-steps', answer.steps.join(' → ')));
+    if (state.plan.places.length) card.append(element('p', 'answer-more', 'Ниже места ↓'));
+    return card;
+  }
+
+  // The answer read aloud: Gemini's voice through /api/speak, else the browser's own voice.
+  // Apple Watch pages have neither, so there the answer stays text on the screen.
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  const canSpeak = Boolean(AudioContextClass || 'speechSynthesis' in window);
+  let audio = null, speech = 0, playing = null;
+
+  /** Inside a tap: wakes the audio context so the answer can play when it arrives (iOS and Safari need this). */
+  function unlockVoice() {
+    if (AudioContextClass) {
+      try {
+        if (!audio || audio.state === 'closed') audio = new AudioContextClass();
+        audio.resume?.().catch(() => {});
+        const source = audio.createBufferSource();
+        source.buffer = audio.createBuffer(1, 1, 22050);
+        source.connect(audio.destination);
+        source.start();
+      } catch { /* no sound on this device */ }
+    }
+    if ('speechSynthesis' in window && !unlockVoice.done) { unlockVoice.done = true; speechSynthesis.speak(new SpeechSynthesisUtterance('')); }
+  }
+
+  function stopVoice() {
+    speech++;
+    playing?.stop();
+    playing = null;
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+  }
+
+  async function speak(text) {
+    if (!canSpeak || !text) return;
+    stopVoice();
+    const id = speech;
+    // /api/speak takes up to 400 characters: whole sentences that fit.
+    const clean = text.length <= 400 ? text : (text.slice(0, 400).match(/^.*[.!?…](?=\s|$)/s)?.[0] || text.slice(0, 400));
+    try {
+      if (!audio) throw new Error('no audio');
+      const response = await fetch('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: clean, lang: 'ru' }) });
+      const data = await response.json();
+      if (!response.ok || !data.data || id !== speech) throw new Error('no voice');
+      const bytes = Uint8Array.from(atob(data.data), (char) => char.charCodeAt(0));
+      // A WAV answer starts with a RIFF header; the samples after it are the same 16-bit PCM.
+      const offset = bytes.length > 44 && String.fromCharCode(...bytes.subarray(0, 4)) === 'RIFF' ? 44 : 0;
+      const samples = new Int16Array(bytes.buffer, offset, Math.floor((bytes.length - offset) / 2));
+      const buffer = audio.createBuffer(1, samples.length, data.sampleRate || 24000);
+      const channel = buffer.getChannelData(0);
+      for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768;
+      await audio.resume?.();
+      if (audio.state !== 'running') throw new Error('audio locked');
+      if (id !== speech) return;
+      const source = audio.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audio.destination);
+      source.start();
+      playing = { stop: () => { try { source.stop(); } catch { /* already stopped */ } } };
+    } catch {
+      if (id !== speech || !('speechSynthesis' in window)) return;
+      const utterance = new SpeechSynthesisUtterance(clean);
+      utterance.lang = 'ru-RU';
+      speechSynthesis.speak(utterance);
+    }
   }
 
   async function askGemini() {
@@ -453,6 +625,7 @@
   }
 
   function startWalk(place) {
+    stopVoice();
     // A place found by name may need more time than the chip says.
     state.plan.minutes = Math.max(state.plan.minutes, place.totalMinutes);
     const walk = newWalk({ kind: 'place', place, start: state.plan.start });
@@ -1052,12 +1225,21 @@
       save(); renderHome();
     });
     $('ask-gemini').addEventListener('click', askGemini);
+    $('ai-chip').addEventListener('click', () => { unlockVoice(); openAsk(); });
+    $('ask-more').addEventListener('click', () => { stopVoice(); openAsk(); });
+    $('ask-form').addEventListener('submit', (event) => { event.preventDefault(); $('ask-input').blur(); askAssistant($('ask-input').value); });
+    $('ask-voice').addEventListener('click', voice);
+    $('ask-voice').addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); $('ask-voice').click(); } });
+    $('ask-input').addEventListener('change', () => { if ($('view-ask').hidden === false) askAssistant($('ask-input').value); });
+    // Home starts a new conversation; «Спросить ещё» continues the current one.
+    $('ask-home').addEventListener('click', () => { state.chat = null; renderHome(); show('home'); });
+    $('ask-reset').addEventListener('click', () => { state.chat = null; openAsk(); });
     $('search-form').addEventListener('submit', (event) => { event.preventDefault(); $('search-input').blur(); searchPlaces($('search-input').value); });
     $('voice').addEventListener('click', voice);
     $('voice').addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); $('voice').click(); } });
     // Apple Watch returns dictation as a change, without a submit.
     $('search-input').addEventListener('change', () => { if ($('view-home').hidden === false) searchPlaces($('search-input').value); });
-    $('back-home').addEventListener('click', () => { history.replaceState(null, '', location.pathname + location.search); renderHome(); show('home'); });
+    $('back-home').addEventListener('click', () => { stopVoice(); state.chat = null; history.replaceState(null, '', location.pathname + location.search); renderHome(); show('home'); });
     $('go-next').addEventListener('click', next);
     $('go-stop').addEventListener('click', () => {
       const walk = state.walk;
