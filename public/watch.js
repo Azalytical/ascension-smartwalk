@@ -330,10 +330,25 @@
       const go = element('button', 'action', 'Идём');
       go.type = 'button';
       go.addEventListener('click', () => startWalk(place));
-      card.append(top, element('p', 'card-name', place.name), walk, back, element('p', 'card-hours', facts.join(' · ')), go);
+      card.append(top, element('p', 'card-name', place.name), walk, back, element('p', 'card-hours', facts.join(' · ')), trust(place), go);
       if (index === 0 && start.note) card.prepend(startNote(start));
       list.append(card);
     });
+  }
+
+  // How complete the data is and where it came from, as on the place card in the main app.
+  function trust(place) {
+    const line = element('p', 'card-trust');
+    const level = place.confidence?.level;
+    if (level) {
+      // Round screens drop the second word to keep «Идём» on screen: «● Высокая · OpenStreetMap».
+      const [word, ...rest] = (place.confidence.label || 'Уверенность').split(' ');
+      const badge = element('span', `conf conf-${level}`, word);
+      if (rest.length) badge.append(element('span', 'conf-word', ` ${rest.join(' ')}`));
+      line.append(badge, ' · ');
+    }
+    line.append(place.source?.label || 'OpenStreetMap');
+    return line;
   }
 
   async function askGemini() {
@@ -349,8 +364,8 @@
           query: state.plan.query || '', withChild: state.mood === 'child', category: 'any', returnToStart: true }) });
       const data = await response.json();
       if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Gemini сейчас недоступен.');
-      tip.replaceChildren(data.generation?.mode === 'llm' ? data.generation.summary : 'Gemini сейчас не ответил. Варианты подобраны по данным OpenStreetMap.',
-        element('small', '', data.generation?.mode === 'llm' ? 'Gemini · факты из OpenStreetMap' : 'Подбор без модели'));
+      tip.replaceChildren(data.generation?.mode === 'llm' ? data.generation.summary : 'Gemini сейчас не ответил. Варианты подобраны по данным OpenStreetMap и Overture Maps.',
+        element('small', '', data.generation?.mode === 'llm' ? 'Gemini · факты из OpenStreetMap и Overture Maps' : 'Подбор без модели'));
       button.hidden = true;
     } catch (error) {
       tip.textContent = error instanceof TypeError ? 'Нет связи. Попробуйте ещё раз.' : error.message;

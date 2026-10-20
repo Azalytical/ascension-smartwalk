@@ -40,13 +40,19 @@ function astanaTime(date) {
   return `${String(local.getUTCHours()).padStart(2, '0')}:${String(local.getUTCMinutes()).padStart(2, '0')}`;
 }
 
+export const ATTRIBUTION = '© OpenStreetMap contributors, Overture Maps Foundation';
+
+// Each place cites its own dataset: about a third of them come from Overture, not OpenStreetMap.
+const sourceOf = place => ({ label: place.source?.label || 'OpenStreetMap', license: place.source?.license || 'ODbL-1.0',
+  attribution: place.source?.attribution || '© OpenStreetMap contributors' });
+
 export function spokenPlan(plan, now = new Date()) {
   const [first, ...rest] = plan.places;
   if (!first) return 'Рядом не нашлось мест, на которые хватит времени. Попробуйте дать прогулке больше времени.';
   const back = astanaTime(new Date(now.getTime() + first.totalMinutes * 60000));
   let text = `${first.name}, ${LABELS[first.category] || 'место'}. Идти примерно ${minutes(first.walkMinutes)}, `
     + `вся прогулка с дорогой обратно займёт примерно ${minutes(first.totalMinutes)}, вернётесь к ${back}.`;
-  if (first.hours?.status === 'open' && first.hours.closesAt) text += ` По данным OpenStreetMap работает до ${first.hours.closesAt}.`;
+  if (first.hours?.status === 'open' && first.hours.closesAt) text += ` По данным ${first.source?.label || 'источника'} работает до ${first.hours.closesAt}.`;
   if (rest.length) text += ` Ещё: ${rest.map(place => `${place.name}, ${minutes(place.walkMinutes)} пешком`).join('; ')}.`;
   return text;
 }
@@ -120,9 +126,10 @@ export function handleWatch(request, env, pois) {
       distanceMeters: place.distanceMeters, walkMinutes: place.walkMinutes, visitMinutes: place.visitMinutes,
       returnMinutes: place.returnMinutes, totalMinutes: place.totalMinutes,
       hours: { status: place.hoursCheck?.status || 'no_data', closesAt: place.hoursCheck?.closesAt || null },
-      sourceUrl: place.sourceUrl
+      sourceUrl: place.sourceUrl, source: sourceOf(place),
+      confidence: place.confidence ? { level: place.confidence.level, label: place.confidence.label } : null
     })),
-    source: 'OpenStreetMap', license: 'ODbL-1.0', estimate: 'Время пешком — оценка по прямой ×1,35 при 4,2 км/ч, с резервом 5 минут.'
+    attribution: ATTRIBUTION, estimate: 'Время пешком — оценка по прямой ×1,35 при 4,2 км/ч, с резервом 5 минут.'
   };
   if (text) return new Response(spokenPlan(plan), { headers: { ...HEADERS, 'Content-Type': 'text/plain; charset=utf-8' } });
   return new Response(JSON.stringify(plan), { headers: { ...HEADERS, 'Content-Type': 'application/json; charset=utf-8' } });
