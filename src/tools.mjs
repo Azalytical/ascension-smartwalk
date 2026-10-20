@@ -5,6 +5,7 @@ import { checkVisit } from './hours.mjs';
 import { placeLinks, mapLinks } from './links.mjs';
 import { astanaWeather } from './weather.mjs';
 import { CITY_EVENTS, cityEventsFor } from './events.mjs';
+import { cityEventsState } from './events-live.mjs';
 import { placeRatings } from './ratings-api.mjs';
 
 export const CATEGORIES = Object.keys(VISIT);
@@ -76,7 +77,7 @@ function brief(poi, extra = {}) {
     openingHours: poi.openingHours || null, dataSource: sourceOf(poi), sourceUrl: poi.sourceUrl, links: mapLinks(poi) };
 }
 
-function planWalk(args, { dataset, now, ratings = null }) {
+function planWalk(args, { dataset, now, ratings = null, cityEvents = null }) {
   const start = location(args, true);
   const minutes = number(args, 'minutes', { min: 10, max: 180, fallback: 60 });
   const at = visitTime(args);
@@ -91,7 +92,7 @@ function planWalk(args, { dataset, now, ratings = null }) {
     throw error;
   }
   const begin = at || now;
-  const events = cityEventsFor(CITY_EVENTS, { ...start, minutes, maxWalkMinutes: result.constraints.maxWalkMinutes, withChild: result.constraints.withChild, now: begin, limit: 2 });
+  const events = cityEventsFor(cityEvents?.events ?? CITY_EVENTS, { ...start, minutes, maxWalkMinutes: result.constraints.maxWalkMinutes, withChild: result.constraints.withChild, now: begin, limit: 2 });
   return {
     start, minutes, query,
     places: result.recommendations.map(p => ({ id: String(p.id), name: p.name, category: p.category, lat: p.lat, lon: p.lon,
@@ -254,6 +255,8 @@ export async function runTool(name, args, context) {
   if (!tool) throw new ToolError(`Неизвестный инструмент ${name}.`);
   if (args !== undefined && (typeof args !== 'object' || args === null || Array.isArray(args))) throw new ToolError('Аргументы должны быть объектом.');
   // plan_walk ranks with users' ratings like the site does (from 5 ratings a place, a small nudge).
-  const ratings = tool.run === planWalk && context?.env && !context.ratings ? await placeRatings(context.env) : null;
-  return tool.run(args ?? {}, { now: new Date(), ...context, ...(ratings ? { ratings } : {}) });
+  // and with the city listing the Worker collected today (or the saved snapshot).
+  const [ratings, cityEvents] = tool.run === planWalk && context?.env
+    ? await Promise.all([context.ratings ? null : placeRatings(context.env), context.cityEvents ? null : cityEventsState(context.env)]) : [null, null];
+  return tool.run(args ?? {}, { now: new Date(), ...context, ...(ratings ? { ratings } : {}), ...(cityEvents ? { cityEvents } : {}) });
 }

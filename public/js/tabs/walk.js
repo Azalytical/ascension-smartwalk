@@ -575,12 +575,23 @@ function eventsCard(events) {
   if (!items.length) return null;
   return h('section', { class: 'route-card events-card', 'aria-labelledby': 'events-title' },
     h('div', { class: 'route-head' }, h('span', { class: 'route-icon', 'aria-hidden': 'true' }, icon('calendar')),
-      h('div', {}, h('strong', { id: 'events-title', text: t('events.title') }), h('small', { text: t('events.note') }))),
+      h('div', {}, h('strong', { id: 'events-title', text: t('events.title') }), h('small', { text: t('events.note') }),
+        h('small', { class: 'events-source', text: eventsSource(events) }))),
     h('ul', { class: 'event-list' }, items.map((event) => h('li', {},
       h('a', { class: 'event-row', href: safeUrl(event.url), target: '_blank', rel: 'noopener noreferrer', 'aria-label': `${event.title}. ${t('events.open')}` },
         h('span', { class: 'row-text' }, h('strong', { text: event.title }),
           h('small', { text: [eventWhen(event), event.venue, t('explore.walk', { n: event.walkMinutes }), event.price].filter(Boolean).join(' · ') })),
         icon('external', 'icon-xs'))))));
+}
+// Where the listing comes from and when it was read: collected by the server this morning, or the saved copy.
+function eventsSource(events) {
+  const locale = lang() === 'kk' ? 'kk-KZ' : lang() === 'en' ? 'en-GB' : 'ru-RU';
+  // Astana time is UTC+5 all year; shifting by hand does not depend on the phone's time zone data.
+  const astana = (iso, withTime) => new Date(Date.parse(iso) + 5 * 3600000).toLocaleString(locale,
+    { timeZone: 'UTC', day: 'numeric', month: 'long', ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {}) });
+  if (events?.fetchedAt && Number.isFinite(Date.parse(events.fetchedAt))) return t('events.updated', { date: astana(events.fetchedAt, true) });
+  if (events?.collectedAt) return t('events.collected', { date: astana(`${events.collectedAt}T07:00:00Z`, false) });
+  return t('events.source');
 }
 function eventWhen(event) {
   if (event.when?.time) return t('events.at', { time: event.when.time });

@@ -8,7 +8,8 @@ import { handleWatch, spokenAnswer, spokenLanguage, say } from './watch.mjs';
 import { handleMcp } from './mcp.mjs';
 import { farNote, runAgent } from './agent.mjs';
 import { languageNote, languageProblem } from './language.mjs';
-import { CITY_EVENTS, EVENTS_COLLECTED_AT, EVENT_NOTE, EVENT_SOURCE, cityEventsFor, upcomingEvents } from './events.mjs';
+import { EVENT_NOTE, EVENT_SOURCE, cityEventsFor, upcomingEvents } from './events.mjs';
+import { cityEventsState } from './events-live.mjs';
 import { identifyPlace, speak, listen, MediaError } from './media.mjs';
 import { placeLinks } from './links.mjs';
 import { astanaWeather } from './weather.mjs';
@@ -417,12 +418,17 @@ async function gemini(request, url, env, dataset) {
   }
 }
 
+// Where the events come from, for the label under «Сегодня в городе»: collected by the Worker today ('live') or the snapshot.
+const eventsOrigin = state => ({ source: EVENT_SOURCE, note: EVENT_NOTE, mode: state.mode, collectedAt: state.collectedAt, fetchedAt: state.fetchedAt });
+
 // City events for the map: the next days from the sxodim.com listing, venues placed on the map from our own place base.
-function cityEventsResponse(request, url) {
+// `collection` says how the last collection went, so anyone can check that it runs.
+async function cityEventsResponse(request, url, env) {
   if (request.method !== 'GET') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'GET' });
   const days = Math.min(14, Math.max(1, Math.round(Number(url.searchParams.get('days')) || 7)));
-  return json({ source: EVENT_SOURCE, note: EVENT_NOTE, collectedAt: EVENTS_COLLECTED_AT, days, events: upcomingEvents(CITY_EVENTS, { days }) },
-    200, { 'Cache-Control': 'public, max-age=300' });
+  const state = await cityEventsState(env);
+  return json({ ...eventsOrigin(state), collection: { schedule: 'ежедневно в 05:50 по Астане', stats: state.stats, lastAttempt: state.lastAttempt },
+    days, events: upcomingEvents(state.events, { days }) }, 200, { 'Cache-Control': 'public, max-age=300' });
 }
 
 // Siri's «Куда сходить» with a free question: the same agent and budget as /api/agent, answered as text Siri reads aloud.
@@ -488,7 +494,7 @@ export async function handleApi(request, env = {}, dataset = []) {
   if (url.pathname === '/api/ratings') return handleRatings(request, env, dataset);
   if (url.pathname === '/mcp') return handleMcp(request, env, dataset);
   if (url.pathname === '/api/weather') return weather(request, url, env);
-  if (url.pathname === '/api/events') return cityEventsResponse(request, url);
+  if (url.pathname === '/api/events') return cityEventsResponse(request, url, env);
   if (['/api/agent', '/api/vision', '/api/speak', '/api/listen'].includes(url.pathname)) return gemini(request, url, env, dataset);
   if (url.pathname !== '/api/recommend') return null;
   if (request.method !== 'POST') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'POST' });
@@ -514,8 +520,9 @@ export async function handleApi(request, env = {}, dataset = []) {
     }
     // Today's events from the city listing within walking reach, shown as their own block with the listing as source.
     const visitAt = body.visitDate && String(body.visitDate).includes('T') ? new Date(body.visitDate) : new Date();
-    result = { ...result, cityEvents: { label: 'Сегодня в городе', source: EVENT_SOURCE, note: EVENT_NOTE, collectedAt: EVENTS_COLLECTED_AT,
-      items: cityEventsFor(CITY_EVENTS, { lat: result.constraints.lat, lon: result.constraints.lon, minutes: result.constraints.minutes,
+    const events = await cityEventsState(env);
+    result = { ...result, cityEvents: { label: 'Сегодня в городе', ...eventsOrigin(events),
+      items: cityEventsFor(events.events, { lat: result.constraints.lat, lon: result.constraints.lon, minutes: result.constraints.minutes,
         maxWalkMinutes: result.constraints.maxWalkMinutes, withChild: result.constraints.withChild, now: visitAt }) } };
     const generation = budget.generationAllowed
       ? await generate(result, body.query, env)

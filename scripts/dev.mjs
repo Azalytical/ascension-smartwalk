@@ -4,6 +4,7 @@ import { resolve, extname } from 'node:path';
 import { handleApi } from '../src/api.mjs';
 import { localSocialHub } from '../src/social/local.mjs';
 import { localWatchPush } from '../src/watch-push.mjs';
+import { localCityEvents, prepareCityEvents } from '../src/events-live.mjs';
 import { preparePublic } from './prepare-public.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -15,11 +16,14 @@ const env = { GEMINI_API_KEY: process.env.GEMINI_API_KEY, GEMINI_MODEL: process.
   // Friends and meetups: SQLite file in SOCIAL_DB (or in memory), the same store the Durable Object uses.
   SOCIAL_LOCAL: localSocialHub(process.env.SOCIAL_DB || ':memory:'),
   // Watch reminders: the same Durable Object class with storage in memory.
-  WATCH_PUSH_LOCAL: localWatchPush() };
+  WATCH_PUSH_LOCAL: localWatchPush(),
+  // City events: the same collection as the Worker's, kept in memory (EVENTS_LISTING_BASE=http://127.0.0.1:…/astana/ reads a local copy).
+  CITY_EVENTS_LOCAL: localCityEvents({ env: { EVENTS_LISTING_BASE: process.env.EVENTS_LISTING_BASE } }) };
 const port = Number(process.env.PORT || 8789);
 const host = process.env.HOST || '127.0.0.1';
 await preparePublic();
 const dataset = JSON.parse(await readFile(resolve(root, 'data/places.json'), 'utf8'));
+prepareCityEvents(dataset);
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.ico': 'image/x-icon', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg' };
 createServer(async (req, res) => {
   try {
