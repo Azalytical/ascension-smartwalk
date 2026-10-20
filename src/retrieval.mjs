@@ -243,6 +243,11 @@ export function prepareDataset(dataset) {
   prepare(poisOf(dataset));
 }
 
+/** Validated, deduplicated places with normalized categories, shared with features other than walk recommendations. */
+export function preparedPlaces(dataset) {
+  return prepare(poisOf(dataset)).unique.map(entry => entry.poi);
+}
+
 /**
  * Return up to three independent alternatives backed by existing POI records.
  * Accepts an array, or a dataset wrapper { pois: [...] }. Does not mutate inputs.
