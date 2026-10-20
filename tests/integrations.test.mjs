@@ -381,7 +381,7 @@ const toolsTurn = { candidates: [{ content: { role: 'model', parts: [
   { functionCall: { name: 'get_weather', args: {} }, thoughtSignature: 'a' }, { functionCall: { name: 'plan_walk', args: { query: 'кофе' } } }] } }] };
 const answerTurn = { candidates: [{ content: { role: 'model', parts: [{ functionCall: { name: 'give_answer', args: { summary: 'Кофейня у Байтерека: около 2 минут пешком.', place_ids: ['node/1'] } } }] } }] };
 
-test('agent latency: low thinking, tools in one turn, then only route, card or answer; elapsed time reported', withFetch(async (url, init) => {
+test('agent latency: minimal thinking, tools in one turn, then only route, card or answer; elapsed time reported', withFetch(async (url, init) => {
   if (String(url).includes('open-meteo')) return jsonResponse(weatherBody);
   const body = JSON.parse(init.body);
   globalThis.__requests.push(body);
@@ -392,7 +392,7 @@ test('agent latency: low thinking, tools in one turn, then only route, card or a
   assert.equal(data.mode, 'agent');
   assert.equal(data.modelCalls, 2);
   assert.ok(Number.isFinite(data.elapsedMs));
-  assert.deepEqual(globalThis.__requests[0].generationConfig.thinkingConfig, { thinkingLevel: 'low' });
+  assert.deepEqual(globalThis.__requests[0].generationConfig.thinkingConfig, { thinkingLevel: 'minimal' });
   assert.equal(globalThis.__requests[0].toolConfig.functionCallingConfig.allowedFunctionNames, undefined);
   assert.deepEqual(globalThis.__requests[1].toolConfig.functionCallingConfig.allowedFunctionNames, ['build_route', 'place_details', 'give_answer']);
 }));
@@ -439,10 +439,11 @@ test('agent latency: out of quota or busy on the first call, the spare model ans
     assert.equal(data.model, SPARE_AGENT_MODEL);
     assert.equal(globalThis.__models.filter(model => model === SPARE_AGENT_MODEL).length, 2);
     assert.equal(globalThis.__models.filter(model => model !== SPARE_AGENT_MODEL).length, primaryCalls);
-    // The next run starts on the spare model at once.
+    assert.equal(data.diagnostics.attempts[0].error, `provider_${status}`);
+    // The next run asks the main model first again: one refusal does not hand the next runs to the spare.
     globalThis.__models = [];
     await runAgent({ query: 'кофе', ...START, minutes: 60 }, agentDeps());
-    assert.equal(globalThis.__models[0], SPARE_AGENT_MODEL);
+    assert.notEqual(globalThis.__models[0], SPARE_AGENT_MODEL);
   }
   resetAgentState();
 }));

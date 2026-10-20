@@ -5,12 +5,13 @@ import { runTool, ToolError, CATEGORIES } from './tools.mjs';
 import { placeLinks, mapLinks } from './links.mjs';
 import { languageNote, languageProblem } from './language.mjs';
 
-// Latency budget: an answer within a few seconds, or an honest quick fallback. Usually two model calls: tools, then the answer.
-const MAX_TURNS = 3, MAX_TOOL_CALLS = 5, TOTAL_MS = 14000, ATTEMPT_MS = 7000;
-export const DEFAULT_AGENT_MODEL = 'gemini-3.5-flash-lite';
-// Free-tier quotas and load are per model. After a 429 or 5xx the agent starts on the spare model for a few minutes.
-export const SPARE_AGENT_MODEL = 'gemini-3.1-flash-lite';
-let primaryRefusedAt = 0;
+// Latency budget, counted from the request: an answer within it, or an honest quick fallback. Usually two model calls: tools,
+// then the answer. The first call leaves ANSWER_MS for the answer; with less than that left only the answer may be called.
+const MAX_TURNS = 3, MAX_TOOL_CALLS = 5, TOTAL_MS = 16000, ANSWER_MS = 5000;
+// gemini-3.5-flash-lite answered 503 or hung past 7 s on the live site; 3.1 answers, so it goes first on every run.
+export const DEFAULT_AGENT_MODEL = 'gemini-3.1-flash-lite';
+// Free-tier quotas and load are per model. After a 429 or 5xx on the first call the spare model takes the run.
+export const SPARE_AGENT_MODEL = 'gemini-3.5-flash-lite';
 
 const SYSTEM = 'Ты агент Aidem: подбираешь прогулку по Астане ровно под время человека. Точку старта знает только сервер: он сам подставляет её в инструменты, '
   + 'ты координат не видишь и не спрашиваешь. Порядок: если человек пойдёт по улице или упомянул погоду, вызови get_weather; затем plan_walk с его временем и пожеланием '
@@ -104,9 +105,9 @@ function describe(name, args, result) {
   }
 }
 
-// Gemini 3 thinks by default; low thinking keeps each call short. If a model rejects the setting, it is dropped for this isolate.
+// Gemini 3 thinks by default; minimal thinking keeps each call short. If a model rejects the setting, it is dropped for this isolate.
 let thinkingAccepted = true;
-const THINKING = { thinkingLevel: 'low' };
+const THINKING = { thinkingLevel: 'minimal' };
 
 async function callGemini(body, model, env, signal, limitedJson) {
   if (thinkingAccepted) {
@@ -125,17 +126,20 @@ async function post(body, model, env, signal, limitedJson) {
   return { body: await limitedJson(response, 262144) };
 }
 
-async function callWithRetry(body, model, env, deadline, limitedJson, attemptMs = ATTEMPT_MS) {
+async function callWithRetry(body, model, env, deadline, limitedJson, attemptMs = Infinity, log = []) {
   let reply = { error: 'provider_unavailable' };
   for (let attempt = 1; attempt <= 2; attempt++) {
     const left = deadline - Date.now();
     if (left < 2500) return { error: 'provider_timeout' };
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Math.min(attemptMs, left));
+    const began = Date.now();
+    const timer = setTimeout(() => controller.abort(), Math.min(attemptMs, left - 250));
     // A timed-out call is not retried: waiting a second time is what made answers take 20+ seconds.
     try { reply = await callGemini(body, model, env, controller.signal, limitedJson); }
     catch { reply = { error: controller.signal.aborted ? 'provider_timeout' : 'provider_unavailable' }; }
     finally { clearTimeout(timer); }
+    // What happened, safe to show: model, thinking, time and error type; never the key, prompt or text.
+    log.push({ model, thinking: thinkingAccepted ? THINKING.thinkingLevel : 'off', ms: Date.now() - began, error: reply.error || null });
     if (!reply.error || !/^provider_(500|502|503|504|unavailable)$/.test(reply.error) || deadline - Date.now() < 4000) return reply;
     await new Promise(resolve => setTimeout(resolve, 400));
   }
@@ -154,12 +158,14 @@ function astanaNow(now) {
  * cannot tell; previous = the last turn of a spoken conversation; reserveMinutes and the hidden places are the visitor's settings, filled in by the server).
  * deps: { env, dataset, limitedJson, answerLanguage, unsupported (RegExp), now?, fetchImpl? (weather only), attemptMs?, totalMs? }.
  */
-export function resetAgentState() { primaryRefusedAt = 0; thinkingAccepted = true; }
+export function resetAgentState() { thinkingAccepted = true; }
 
 export async function runAgent(input, deps) {
   const { env, dataset, limitedJson, answerLanguage, unsupported } = deps;
   const now = deps.now || new Date();
   const startedAt = Date.now();
+  const requestStartedAt = deps.startedAt ?? startedAt;
+  const attempts = [];
   const start = { lat: input.lat, lon: input.lon };
   const steps = [];
   const seen = new Map();
@@ -202,7 +208,8 @@ export async function runAgent(input, deps) {
     const route = extra.route && lastRoute && ids.every(id => lastRoute.stops.some(stop => stop.id === id)) ? lastRoute : null;
     return { mode, summary, places, route, ...(lastPlanBeyond ? { beyondWalk: lastPlanBeyond } : {}), steps, modelCalls, toolCalls, elapsedMs: Date.now() - startedAt,
       privacy: 'Gemini не получал ваши координаты: сервер округлил точку старта примерно до 100 м и сам подставлял её в инструменты, а из ответов инструментов координаты убраны.',
-      ...(extra.reason ? { reason: extra.reason } : {}), ...(extra.model ? { provider: 'gemini', model: extra.model } : {}) };
+      ...(extra.reason ? { reason: extra.reason } : {}), ...(extra.model ? { provider: 'gemini', model: extra.model } : {}),
+      diagnostics: { totalMs: Date.now() - requestStartedAt, startedAfterMs: startedAt - requestStartedAt, attempts } };
   };
 
   // Without Gemini the same tools still answer, in a fixed order.
@@ -224,30 +231,32 @@ export async function runAgent(input, deps) {
   }
   // The agent always runs on a fast model: GEMINI_MODEL may name a slower one for the walk summary.
   const primary = env.GEMINI_AGENT_MODEL || DEFAULT_AGENT_MODEL;
-  let model = Date.now() - primaryRefusedAt < 5 * 60000 ? SPARE_AGENT_MODEL : primary;
+  let model = primary;
   const language = ['ru', 'kk', 'en'].includes(input.lang) ? input.lang : answerLanguage(input.query, input.uiLang);
   const previousTurn = input.previous ? { query: input.previous.query, answer: input.previous.summary } : undefined;
   const contents = [{ role: 'user', parts: [{ text: JSON.stringify({ answerLanguage: language, query: String(input.query || '').slice(0, 500),
     minutes: input.minutes, reserveMinutes: reserve, withChild: Boolean(input.withChild), now: astanaNow(now), start: 'точка человека известна серверу', ...(previousTurn ? { previousTurn } : {}) }) }] }];
-  const attemptMs = deps.attemptMs || ATTEMPT_MS;
-  const deadline = Date.now() + (deps.totalMs || TOTAL_MS);
+  const attemptMs = deps.attemptMs || Infinity;
+  const deadline = requestStartedAt + (deps.totalMs || TOTAL_MS);
 
   // One rejected answer gets a second chance: the server says what failed and Gemini rewrites it.
   let rejected = false;
+  try {
   for (let turn = 1; turn <= MAX_TURNS || (rejected && turn === MAX_TURNS + 1); turn++) {
     // Turn 1: any tools. Turn 2: a micro-route, a place card or the answer. Then only the answer; also when time runs short.
-    const last = turn >= MAX_TURNS || toolCalls >= MAX_TOOL_CALLS || rejected || deadline - Date.now() < attemptMs;
+    const last = turn >= MAX_TURNS || toolCalls >= MAX_TOOL_CALLS || rejected || deadline - Date.now() < ANSWER_MS;
+    // A call that is not the answer leaves time for the answer after it.
+    const cap = last ? attemptMs : Math.min(attemptMs, deadline - Date.now() - ANSWER_MS);
     const allowed = last ? ['give_answer'] : turn === 2 ? ['build_route', 'place_details', 'give_answer'] : null;
     const body = { systemInstruction: { parts: [{ text: SYSTEM }] }, contents, tools: [{ functionDeclarations: DECLARATIONS }],
       toolConfig: { functionCallingConfig: { mode: 'ANY', ...(allowed ? { allowedFunctionNames: allowed } : {}) } },
       generationConfig: { temperature: 0.2, maxOutputTokens: 1024 } };
-    let reply = await callWithRetry(body, model, env, deadline, limitedJson, attemptMs);
+    let reply = await callWithRetry(body, model, env, deadline, limitedJson, cap, attempts);
     modelCalls++;
     // Out of quota or busy before any model turn: the spare model takes the whole run (thought signatures don't cross models).
     if (/^provider_(429|5\d\d)$/.test(reply.error || '') && turn === 1 && model === primary && primary !== SPARE_AGENT_MODEL) {
-      primaryRefusedAt = Date.now();
       model = SPARE_AGENT_MODEL;
-      reply = await callWithRetry(body, model, env, deadline, limitedJson, attemptMs);
+      reply = await callWithRetry(body, model, env, deadline, limitedJson, Math.min(attemptMs, deadline - Date.now() - ANSWER_MS), attempts);
       modelCalls++;
     }
     if (reply.error) return fallback(reply.error, model);
@@ -290,6 +299,11 @@ export async function runAgent(input, deps) {
       responses.push({ functionResponse: { name, ...(id ? { id } : {}), response: result.error ? { error: result.error } : { result: modelView(result) } } });
     }
     contents.push({ role: 'user', parts: responses });
+  }
+  } catch (error) {
+    // Anything unexpected on the way still ends in the answer from the tools, not in a server error.
+    console.error(JSON.stringify({ event: 'agent_error', name: error?.name, message: String(error?.message || 'Unknown').slice(0, 200) }));
+    return fallback('agent_error', model);
   }
   return fallback('no_answer', model);
 }

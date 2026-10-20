@@ -483,6 +483,7 @@ async function gemini(request, url, env, dataset) {
   const budget = await rateLimit(request, env);
   if (!budget.allowed) return json({ error: 'Лимит запросов демо исчерпан. Попробуйте позднее.' }, 429, { 'Retry-After': '60' });
   const model = budget.generationAllowed ? env : { ...env, GEMINI_API_KEY: undefined };
+  const requestStartedAt = Date.now();
   try {
     if (url.pathname === '/api/agent') {
       // Everything the agent hands to Gemini is computed from the rounded cell, also when a caller (Siri) sent the exact point.
@@ -506,7 +507,7 @@ async function gemini(request, url, env, dataset) {
       const previous = body.previous && typeof body.previous === 'object' && text(body.previous.query, 300)
         ? { query: text(body.previous.query, 300), summary: text(body.previous.summary, 500) } : undefined;
       return json(await runAgent({ query: body.query.trim(), lat, lon, minutes, withChild: body.withChild === true, lang: body.lang, uiLang: body.uiLang, reserveMinutes, excludeIds, previous },
-        { env: agentEnv, dataset, limitedJson, answerLanguage, unsupported: UNSUPPORTED }));
+        { env: agentEnv, dataset, limitedJson, answerLanguage, unsupported: UNSUPPORTED, startedAt: requestStartedAt }));
     }
     if (url.pathname === '/api/vision') return json(await identifyPlace(body, { env: model, dataset, limitedJson }));
     if (url.pathname === '/api/listen') return json(await listen(body, { env: model, limitedJson }));
