@@ -1,4 +1,5 @@
 import { recommend, placeCategory } from './retrieval.mjs';
+import { currentWeather } from './weather.mjs';
 import { handleTelegram } from './telegram.mjs';
 import { handleSocial } from './social/routes.mjs';
 import { handleWatch } from './watch.mjs';
@@ -97,16 +98,18 @@ async function callOpenAI(input, provider, env, signal) {
 }
 
 async function generate(result, query, env) {
-  const fallback = { mode: 'fallback', summary: safeSummary(result), references: [] };
+  const fallback = { mode: 'fallback', summary: safeSummary(result), references: [], origin: 'template', label: 'Текст без модели, по данным POI' };
   const provider = activeProvider(env);
   if (!result.recommendations.length || !provider) return fallback;
   // Coordinates and visitor identity are deliberately excluded from model context.
   const context = result.recommendations.map(p => ({
     id: p.id, name: p.name, category: p.category,
     walkMinutes: p.walkMinutes, totalMinutes: p.totalMinutes, visitMinutes: p.visitMinutes,
-    why: p.why, warnings: p.warnings, sourceUrl: p.sourceUrl
+    why: p.why, warnings: p.warnings, confidence: p.confidence?.label, sourceUrl: p.sourceUrl
   }));
-  const input = JSON.stringify({ answerLanguage: answerLanguage(query), query: String(query || '').slice(0, 800), alternatives: context });
+  // What the retrieval understood (child, night, group…) so the summary addresses it; no coordinates in these labels.
+  const understood = (result.understood || []).filter(item => item.key !== 'location').map(item => item.label);
+  const input = JSON.stringify({ answerLanguage: answerLanguage(query), query: String(query || '').slice(0, 800), understood, alternatives: context });
   try {
     const reply = await callWithRetry(provider, input, env);
     if (reply.error) return { ...fallback, reason: reply.error };
@@ -115,7 +118,8 @@ async function generate(result, query, env) {
     if (typeof answer.summary !== 'string' || answer.summary.length > 700 || !answer.summary.trim()
       || !Array.isArray(answer.references) || !answer.references.length || answer.references.some(id => !ids.has(id))) return { ...fallback, reason: 'validation' };
     if (UNSUPPORTED.test(answer.summary)) return { ...fallback, reason: 'unsupported_claim' };
-    return { mode: 'llm', provider: provider.name, model: provider.model, summary: answer.summary.trim(), references: answer.references };
+    return { mode: 'llm', provider: provider.name, model: provider.model, summary: answer.summary.trim(), references: answer.references,
+      origin: 'generated', label: `Сгенерировано ${provider.name === 'gemini' ? 'Gemini' : 'OpenAI'} только по найденным местам` };
   } catch { return { ...fallback, reason: 'provider_unavailable' }; }
 }
 
@@ -297,7 +301,8 @@ export async function handleApi(request, env = {}, dataset = []) {
   try {
     const body = await limitedJson(request, 8192);
     if (typeof body.query !== 'undefined' && (typeof body.query !== 'string' || body.query.length > 800)) return json({ error: 'Запрос должен быть текстом до 800 символов' }, 400);
-    const result = recommend(pois, body);
+    // Weather comes from the server's own lookup; a weather field in the request body is never read.
+    const result = recommend(pois, body, { weather: body.visitDate ? null : await currentWeather(env) });
     const budget = await rateLimit(request, env);
     if (!budget.allowed) return json({ error: 'Лимит запросов демо исчерпан. Попробуйте позднее.' }, 429, { 'Retry-After': '60' });
     const generation = budget.generationAllowed

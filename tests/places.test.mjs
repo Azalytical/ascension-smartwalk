@@ -60,7 +60,8 @@ test('new kinds map to app categories; family places count as child-friendly', (
   assert.equal(placeCategory(record({ category: 'bakery' })), 'cafe');
   assert.equal(placeCategory(record({ category: 'amusement_park' })), 'family');
   assert.equal(placeCategory(record({ category: 'toilets' })), 'service');
-  assert.equal(placeCategory(record({ category: 'bar' })), 'other');
+  assert.equal(placeCategory(record({ category: 'bar' })), 'nightlife');
+  assert.equal(placeCategory(record({ category: 'bench' })), 'other');
   const zoo = record({ category: 'zoo', name: 'Зоопарк' });
   const child = recommend([zoo], { lat: 51.12, lon: 71.42, minutes: 120, maxWalkMinutes: 20, withChild: true });
   assert.equal(child.recommendations[0].category, 'family');

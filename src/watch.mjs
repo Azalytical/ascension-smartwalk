@@ -13,7 +13,7 @@ const MOODS = {
   any: { query: '' }
 };
 const LABELS = { park: 'парк', cafe: 'кафе', museum: 'музей', playground: 'детская площадка', attraction: 'достопримечательность',
-  restaurant: 'где поесть', mall: 'торговый центр', culture: 'культурное место', family: 'место для семейного отдыха' };
+  restaurant: 'где поесть', mall: 'торговый центр', culture: 'культурное место', family: 'место для семейного отдыха', nightlife: 'бар или паб' };
 const HEADERS = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin' };
 
 const buckets = new Map();
