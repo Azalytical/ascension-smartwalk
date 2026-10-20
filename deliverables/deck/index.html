@@ -189,12 +189,12 @@ h1 em,h2 em{font-style:normal;color:var(--gold)}
 
 /* ============ 08 ДОВЕРИЕ ============ */
 .s-trust .left{position:relative;z-index:3;width:960px}
-.s-trust h2{margin-top:30px;font-size:84px}
+.s-trust h2{margin-top:30px;font-size:70px;white-space:nowrap}
 .rules{margin-top:38px}
-.rule{display:grid;grid-template-columns:72px 1fr;gap:22px;padding:19px 0;border-top:1px solid var(--line-2)}
+.rule{display:grid;grid-template-columns:72px 1fr;gap:22px;padding:16px 0;border-top:1px solid var(--line-2)}
 .rule .ic{width:56px;height:56px;border-radius:16px;background:rgba(255,194,26,.10);border:1px solid rgba(255,194,26,.35);display:grid;place-items:center;font-size:28px;color:var(--gold);font-weight:700}
 .rule h4{font-size:30px;font-weight:700;letter-spacing:-.015em}
-.rule p{font-size:23px;color:var(--muted);margin-top:4px;line-height:1.35}
+.rule p{font-size:22px;color:var(--muted);margin-top:4px;line-height:1.35}
 .s-trust .sheet{position:absolute;right:var(--pad);top:250px;width:700px;height:553px;border-radius:26px;overflow:hidden;z-index:3;box-shadow:0 60px 120px -40px rgba(0,0,0,.9),0 0 0 1px var(--line-2)}
 .s-trust .sheet img{width:100%;height:100%;object-fit:cover;display:block}
 .s-trust .sheet-tag{position:absolute;right:calc(var(--pad) + 30px);top:186px;z-index:4;font-size:20px;font-weight:650;padding:10px 18px;border-radius:999px;background:var(--gold);color:#0E1621}
@@ -441,10 +441,11 @@ h1 em,h2 em{font-style:normal;color:var(--gold)}
     <div class="kicker" data-a="up">08 <b>/ Чему можно верить</b></div>
     <h2 data-a="words">Видно, откуда каждый факт.</h2>
     <div class="rules">
-      <div class="rule" data-a="up"><div class="ic">◎</div><div><h4>Точка старта не уходит в модель</h4><p>Gemini получает запрос и публичные места, без координат пользователя</p></div></div>
+      <div class="rule" data-a="up"><div class="ic">◎</div><div><h4>Точное место не покидает телефон</h4><p>На сервер уходит только клетка около 110 × 70 м</p></div></div>
       <div class="rule" data-a="up"><div class="ic">∅</div><div><h4>Ничего не храним</h4><p>Нет истории запросов и маршрутов; друзья видят вас только на время встречи</p></div></div>
       <div class="rule" data-a="up"><div class="ic">?</div><div><h4>Неизвестное так и называется</h4><p>Часы, розетки, доступность: «нужно проверить», а не догадка</p></div></div>
       <div class="rule" data-a="up"><div class="ic">≤</div><div><h4>Лимиты от злоупотреблений</h4><p>8 запросов в минуту с адреса, 500 в сутки; поиск работает и без ИИ</p></div></div>
+      <div class="rule" data-a="up"><div class="ic">★</div><div><h4>Оценки людей отдельно от данных</h4><p>1–5 звёзд с устройства; среднее от 3 оценок, на порядок влияет слабо</p></div></div>
     </div>
   </div>
   <div class="sheet" data-a="phone" data-t="0.35"><img src="assets/privacy.jpg" alt="Окно о данных и приватности"></div>
@@ -730,7 +731,7 @@ function show(n,opts={}){
   } else if(G){ G.set(next,{autoAlpha:1}); }
   if(!PDF) next.querySelectorAll('video').forEach(v=>{v.currentTime=0;v.play().catch(()=>{})});
   document.getElementById('counter').textContent=(n+1)+' / '+slides.length;
-  if(!PDF) history.replaceState(null,'',location.pathname+location.search+'#'+(n+1));
+  if(!PDF) try{history.replaceState(null,'',location.pathname+location.search+'#'+(n+1))}catch(e){}
   presenterUpdate();
 }
 
