@@ -691,7 +691,14 @@ export function recommend(dataset, input, context = {}) {
   const nameOf = c => c.name;
   // Two records of one kind within 80 m that share a long word («Әнші субұрқақтар» and «Ән салатын субұрқақтар»), or where one has no name,
   // are usually one place mapped twice; different cafes in one mall share neither.
-  const words = c => new Set(normalize(c.poi.name).split(/[^\p{L}\p{N}]+/u).filter(word => word.length >= 5));
+  // Name words are computed once per candidate, and each candidate's adjusted score once per pick round:
+  // recomputing both inside every comparison made this loop the hottest part of a request over ~2000 places.
+  const wordCache = new Map();
+  const words = c => {
+    let set = wordCache.get(c);
+    if (!set) wordCache.set(c, set = new Set(normalize(c.poi.name).split(/[^\p{L}\p{N}]+/u).filter(word => word.length >= 5)));
+    return set;
+  };
   const sameSpot = (a, b) => a.poi.category === b.poi.category && haversineMeters(a.poi.lat, a.poi.lon, b.poi.lat, b.poi.lon) < 80
     && (a.poi.nameIsGenerated || b.poi.nameIsGenerated || [...words(a)].some(word => words(b).has(word)));
   // A nameless place is shown with its nearest named place. Two cards reading «Детская площадка у «Wall Street»» look like
@@ -704,10 +711,18 @@ export function recommend(dataset, input, context = {}) {
     return landmark ? `${c.poi.name} у «${landmark.name}»` : c.poi.name;
   };
   while (picks.length < 3 && taken.size < candidates.length) {
-    const adjusted = c => c.score - (picks.some(pick => pick.poi.category === c.poi.category) ? 8 : 0)
-      - (picks.some(pick => nameOf(pick) === nameOf(c)) ? 15 : 0)
-      - (picks.some(pick => sameSpot(pick, c)) ? 30 : 0)
-      + (named.includes(c.poi.category) && !picks.some(pick => pick.poi.category === c.poi.category) ? 6 : 0);
+    const roundScores = new Map();
+    const adjusted = c => {
+      let value = roundScores.get(c);
+      if (value === undefined) {
+        value = c.score - (picks.some(pick => pick.poi.category === c.poi.category) ? 8 : 0)
+          - (picks.some(pick => nameOf(pick) === nameOf(c)) ? 15 : 0)
+          - (picks.some(pick => sameSpot(pick, c)) ? 30 : 0)
+          + (named.includes(c.poi.category) && !picks.some(pick => pick.poi.category === c.poi.category) ? 6 : 0);
+        roundScores.set(c, value);
+      }
+      return value;
+    };
     let best = null;
     for (const candidate of candidates) {
       if (taken.has(candidate)) continue;

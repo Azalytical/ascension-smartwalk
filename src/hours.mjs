@@ -78,8 +78,19 @@ function clock(minutes) {
  * Returns { status: 'open' | 'closed' | 'closes_early' | 'unknown', closesAt?, opensAt? }.
  * 'open' means the whole window from arrival to departure falls inside a recorded span.
  */
+// The dataset has a few hundred distinct hours strings and every request checks many of them; parse each once.
+const parsedHours = new Map();
+function cachedWeek(openingHours) {
+  if (typeof openingHours !== 'string') return null;
+  if (!parsedHours.has(openingHours)) {
+    if (parsedHours.size > 5000) parsedHours.clear();
+    parsedHours.set(openingHours, parseOpeningHours(openingHours));
+  }
+  return parsedHours.get(openingHours);
+}
+
 export function checkVisit(openingHours, arrival, stayMinutes) {
-  const week = parseOpeningHours(openingHours);
+  const week = cachedWeek(openingHours);
   if (!week) return { status: 'unknown' };
   const { day, minute } = localParts(arrival);
   // A span from the previous day may continue past midnight.

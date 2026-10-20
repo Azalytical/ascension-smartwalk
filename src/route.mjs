@@ -18,24 +18,23 @@ const MAX_HOURS_CHECKS = 60;
  */
 export function microRoute(candidates, constraints, reference, walk) {
   if (constraints.minutes < 45 || candidates.length < 3) return null;
-  // Top places by score with distinct names, picked without sorting every candidate.
+  // Top places by score with distinct names. Every filter below only gets stricter as the pool grows, so one pass
+  // in score order (ties: nearer first, then input order) picks the same pool as rescanning all candidates per slot.
   const pool = [];
   const names = new Set();
-  const used = new Set();
-  while (pool.length < POOL) {
-    let best = null;
-    for (const candidate of candidates) {
-      // A stop needs a name to walk to, and a second record of the same kind a few steps away is usually the same place.
-      if (used.has(candidate) || candidate.poi.nameIsGenerated || names.has(candidate.name)
-        || pool.some(other => other.poi.category === candidate.poi.category && walk(other.poi, candidate.poi) <= 2)
-        // Cafes score high for most requests; capping them leaves room in the pool for a park or a sight to walk to.
-        || (!constraints.foodFocus && FOOD.includes(candidate.poi.category) && pool.filter(other => FOOD.includes(other.poi.category)).length >= 3)) continue;
-      if (!best || candidate.score > best.score || (candidate.score === best.score && candidate.walkMinutes < best.walkMinutes)) best = candidate;
-    }
-    if (!best) break;
-    used.add(best);
-    names.add(best.name);
-    pool.push(best);
+  let food = 0;
+  const ranked = candidates.map((candidate, index) => ({ candidate, index }))
+    .sort((a, b) => b.candidate.score - a.candidate.score || a.candidate.walkMinutes - b.candidate.walkMinutes || a.index - b.index);
+  for (const { candidate } of ranked) {
+    if (pool.length >= POOL) break;
+    // A stop needs a name to walk to, and a second record of the same kind a few steps away is usually the same place.
+    if (candidate.poi.nameIsGenerated || names.has(candidate.name)
+      || pool.some(other => other.poi.category === candidate.poi.category && walk(other.poi, candidate.poi) <= 2)
+      // Cafes score high for most requests; capping them leaves room in the pool for a park or a sight to walk to.
+      || (!constraints.foodFocus && FOOD.includes(candidate.poi.category) && food >= 3)) continue;
+    names.add(candidate.name);
+    if (FOOD.includes(candidate.poi.category)) food++;
+    pool.push(candidate);
   }
   if (pool.length < 3) return null;
   const start = { lat: constraints.lat, lon: constraints.lon };
