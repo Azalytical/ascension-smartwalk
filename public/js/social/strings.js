@@ -72,8 +72,8 @@ const ru = {
   'sx.meet.missing': 'Без точки: {names}. Их можно позвать, но расчёт сделан без них.',
   'sx.meet.none': 'Не нашли подходящего открытого места в пределах 45 минут для всех. Попробуйте «Любое».',
   'sx.meet.whySame': 'Всем идти примерно {n} мин', 'sx.meet.whyRange': 'Всем идти от {from} до {to} мин',
-  'sx.meet.openUntil': 'Открыто до {time} (по данным OSM)', 'sx.meet.open24': 'Открыто круглосуточно (по данным OSM)', 'sx.meet.hoursUnknown': 'Часы работы неизвестны, проверьте перед выходом',
-  'sx.meet.inviteHere': 'Позвать сюда', 'sx.meet.source': 'Источник: OSM',
+  'sx.meet.openUntil': 'Открыто до {time} (по данным {source})', 'sx.meet.open24': 'Открыто круглосуточно (по данным {source})', 'sx.meet.hoursUnknown': 'Часы работы неизвестны, проверьте перед выходом',
+  'sx.meet.inviteHere': 'Позвать сюда', 'sx.meet.source': 'Источник: {source}',
   'sx.meet.method': 'Время в пути оценено по прямой с коэффициентом обхода, без пешеходного маршрута.',
   'sx.mtitle.coffee': 'Кофе', 'sx.mtitle.food': 'Поесть вместе', 'sx.mtitle.park': 'Прогулка', 'sx.mtitle.meet': 'Встреча',
 
@@ -198,8 +198,8 @@ const kk = {
   'sx.meet.missing': 'Нүктесі жоқ: {names}. Оларды шақыруға болады, бірақ есеп оларсыз жасалды.',
   'sx.meet.none': 'Барлығына 45 минут ішінде жететін ашық орын табылмады. «Кез келген» нұсқасын көріңіз.',
   'sx.meet.whySame': 'Бәріне шамамен {n} мин жүру керек', 'sx.meet.whyRange': 'Бәріне {from}–{to} мин жүру керек',
-  'sx.meet.openUntil': '{time} дейін ашық (OSM деректері бойынша)', 'sx.meet.open24': 'Тәулік бойы ашық (OSM деректері бойынша)', 'sx.meet.hoursUnknown': 'Жұмыс уақыты белгісіз, шығар алдында тексеріңіз',
-  'sx.meet.inviteHere': 'Осында шақыру', 'sx.meet.source': 'Дереккөз: OSM',
+  'sx.meet.openUntil': '{time} дейін ашық ({source} деректері бойынша)', 'sx.meet.open24': 'Тәулік бойы ашық ({source} деректері бойынша)', 'sx.meet.hoursUnknown': 'Жұмыс уақыты белгісіз, шығар алдында тексеріңіз',
+  'sx.meet.inviteHere': 'Осында шақыру', 'sx.meet.source': 'Дереккөз: {source}',
   'sx.meet.method': 'Жол уақыты түзу сызық пен айналма жол коэффициенті бойынша бағаланған, жаяу маршрут құрылмаған.',
   'sx.mtitle.coffee': 'Кофе', 'sx.mtitle.food': 'Бірге тамақтану', 'sx.mtitle.park': 'Серуен', 'sx.mtitle.meet': 'Кездесу',
 
@@ -340,8 +340,8 @@ const en = {
   'sx.meet.missing': 'No location: {names}. You can invite them, but the calculation leaves them out.',
   'sx.meet.none': 'No open place within 45 minutes for everyone. Try “Any”.',
   'sx.meet.whySame': 'About {n} min walk for everyone', 'sx.meet.whyRange': '{from} to {to} min walk for everyone',
-  'sx.meet.openUntil': 'Open until {time} (OSM data)', 'sx.meet.open24': 'Open 24 hours (OSM data)', 'sx.meet.hoursUnknown': 'Opening hours unknown, check before you go',
-  'sx.meet.inviteHere': 'Invite here', 'sx.meet.source': 'Source: OSM',
+  'sx.meet.openUntil': 'Open until {time} ({source} data)', 'sx.meet.open24': 'Open 24 hours ({source} data)', 'sx.meet.hoursUnknown': 'Opening hours unknown, check before you go',
+  'sx.meet.inviteHere': 'Invite here', 'sx.meet.source': 'Source: {source}',
   'sx.meet.method': 'Walking times are straight-line estimates with a detour factor, not a walking route.',
   'sx.mtitle.coffee': 'Coffee', 'sx.mtitle.food': 'Eat together', 'sx.mtitle.park': 'Walk', 'sx.mtitle.meet': 'Meetup',
 

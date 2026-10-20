@@ -117,3 +117,33 @@ test('every element the watch script looks up exists on the page', () => {
   // The pairing keypad: ten digits, erase and back.
   assert.equal([...html.matchAll(/data-key="([^"]+)"/g)].map(match => match[1]).sort().join(','), '0,1,2,3,4,5,6,7,8,9,back,del');
 });
+
+test('the park mood offers parks, not monuments', async () => {
+  const monument = { id: 'node/3', name: 'Монумент у Байтерека', lat: 51.1285, lon: 71.4306, category: 'attraction', tags: { historic: 'monument' }, sourceUrl: 'https://www.openstreetmap.org/node/3', retrievedAt: '2026-10-19T10:00:00Z', openingHours: null };
+  const response = await handleApi(new Request('https://demo.example/api/watch/plan?lat=51.1283&lon=71.4304&minutes=45&mood=park'), {}, [...pois, monument]);
+  const data = await response.json();
+  assert.ok(data.places.length);
+  assert.deepEqual([...new Set(data.places.map(place => place.category))], ['park']);
+});
+
+test('the watch page has every text in Russian, Kazakh and English', () => {
+  const sandbox = {};
+  new Function('window', readFileSync(new URL('../public/watch-text.js', import.meta.url), 'utf8'))(sandbox);
+  const text = sandbox.AidemWatchText;
+  const keys = Object.keys(text.ru);
+  for (const lang of ['kk', 'en']) {
+    assert.deepEqual(Object.keys(text[lang]).sort(), [...keys].sort(), lang);
+    for (const key of keys) {
+      assert.equal(typeof text[lang][key], typeof text.ru[key], `${lang} ${key}`);
+      if (Array.isArray(text.ru[key])) assert.equal(text[lang][key].length, text.ru[key].length, `${lang} ${key}`);
+      // Only values the page fills in (Kazakh needs no plural word, so it may use fewer).
+      const names = (value) => [...String(value).matchAll(/\{(\w+)\}/g)].map(match => match[1]);
+      assert.deepEqual(names(text[lang][key]).filter(name => !names(text.ru[key]).includes(name)), [], `${lang} ${key}`);
+    }
+  }
+  const html = readFileSync(new URL('../public/watch.html', import.meta.url), 'utf8');
+  const script = readFileSync(new URL('../public/watch.js', import.meta.url), 'utf8');
+  const used = [...html.matchAll(/data-t(?:-placeholder|-aria|-content)?="([^"]+)"/g), ...script.matchAll(/\bt\('([^']+)'/g)].map(match => match[1]);
+  assert.ok(used.length > 100);
+  assert.deepEqual([...new Set(used)].filter(key => !(key in text.ru)), []);
+});

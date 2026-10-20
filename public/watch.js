@@ -2,19 +2,33 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
+  // Language: ?lang=, else the one chosen in Aidem on this device, else the device's own, as in the main app.
+  const LANG = (() => {
+    let chosen = null;
+    try { chosen = JSON.parse(localStorage.getItem('seruen:v1') || '{}').lang; } catch { /* private mode */ }
+    const device = (navigator.language || 'ru').slice(0, 2).toLowerCase();
+    return [new URLSearchParams(location.search).get('lang'), chosen, device].find((value) => ['ru', 'kk', 'en'].includes(value)) || 'ru';
+  })();
+  const TEXT = window.AidemWatchText || {};
+  const t = (key, vars = {}) => {
+    const value = TEXT[LANG]?.[key] ?? TEXT.ru?.[key] ?? key;
+    return typeof value === 'string' ? value.replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? '')) : value;
+  };
+  const SPEECH = { ru: 'ru-RU', kk: 'kk-KZ', en: 'en-US' }[LANG];
   const STARTS = [
-    { key: 'here', label: 'моего места' },
-    { key: 'baiterek', label: 'Байтерека', name: 'Байтерек', lat: 51.1283, lon: 71.4304 },
-    { key: 'mega', label: 'Mega Silk Way', name: 'Mega Silk Way', lat: 51.0880152, lon: 71.4097489 },
-    { key: 'embankment', label: 'набережной', name: 'Набережная Есиля', lat: 51.161, lon: 71.423 }
+    { key: 'here', label: t('start.here') },
+    { key: 'baiterek', label: t('start.baiterek'), name: LANG === 'en' ? 'Baiterek' : 'Бәйтерек', lat: 51.1283, lon: 71.4304 },
+    { key: 'mega', label: t('start.mega'), name: 'Mega Silk Way', lat: 51.0880152, lon: 71.4097489 },
+    { key: 'embankment', label: t('start.embankment'), name: { ru: 'Набережная Есиля', kk: 'Есіл жағалауы', en: 'Yesil embankment' }[LANG], lat: 51.161, lon: 71.423 }
   ];
   const TIMES = [30, 45, 60, 90, 120];
-  const CATEGORIES = { cafe: ['coffee', 'Кафе'], restaurant: ['food', 'Поесть'], park: ['park', 'Парк'], playground: ['family', 'Площадка'],
-    museum: ['museum', 'Музей'], attraction: ['landmark', 'Интересное'], mall: ['indoor', 'Под крышей'], culture: ['museum', 'Культура'],
-    family: ['family', 'Для семьи'] };
+  const CATEGORIES = { cafe: 'coffee', restaurant: 'food', park: 'park', playground: 'family', museum: 'museum', attraction: 'landmark', mall: 'indoor',
+    culture: 'museum', family: 'family' };
   // Same estimate as the server: straight line × 1.35 at 4.2 km/h, plus a 5-minute reserve.
   const METERS_PER_MINUTE = 4200 / 60 / 1.35;
   const RESERVE_MINUTES = 5;
+  // A place found by name is offered only if at least this long is left there after the way there and back.
+  const MIN_VISIT_MINUTES = 5;
   // «Обратно к» as on the phone: the way there, the visit and the way back; the reserve is spare time on top.
   const backIn = (place) => place.walkMinutes + place.visitMinutes + place.returnMinutes;
   const ASTANA = { minLat: 51, maxLat: 51.35, minLon: 71.25, maxLon: 71.65 };
@@ -40,8 +54,21 @@
     return node;
   }
 
-  const time = (ms) => new Date(ms).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-  const distanceText = (meters) => meters < 950 ? `${Math.max(10, Math.round(meters / 10) * 10)} м` : `${(meters / 1000).toFixed(1).replace('.', ',')} км`;
+  // Clock times are Astana time (UTC+5 all year) whatever zone the watch is set to; shifting by hand avoids outdated time zone data.
+  const ASTANA_OFFSET = 5 * 3600000;
+  const astana = (ms) => new Date(ms + ASTANA_OFFSET);
+  const time = (ms) => { const at = astana(ms); return `${String(at.getUTCHours()).padStart(2, '0')}:${String(at.getUTCMinutes()).padStart(2, '0')}`; };
+  const decimal = (value) => (LANG === 'en' ? value : value.replace('.', ','));
+  const distanceText = (meters) => meters < 950 ? t('m', { n: Math.max(10, Math.round(meters / 10) * 10) }) : t('km', { n: decimal((meters / 1000).toFixed(1)) });
+
+  // The page's own texts are marked in watch.html: data-t for the text, data-t-placeholder, data-t-aria and data-t-content.
+  function translatePage() {
+    document.documentElement.lang = LANG;
+    for (const node of document.querySelectorAll('[data-t]')) node.textContent = t(node.dataset.t);
+    for (const node of document.querySelectorAll('[data-t-placeholder]')) node.placeholder = t(node.dataset.tPlaceholder);
+    for (const node of document.querySelectorAll('[data-t-aria]')) node.setAttribute('aria-label', t(node.dataset.tAria));
+    for (const node of document.querySelectorAll('[data-t-content]')) node.setAttribute('content', t(node.dataset.tContent));
+  }
 
   function haversine(a, b) {
     const rad = Math.PI / 180;
@@ -116,7 +143,7 @@
     });
   }
 
-  const ago = (ms) => { const minutes = Math.round((Date.now() - ms) / 60000); return minutes < 1 ? 'только что' : `${minutes} мин назад`; };
+  const ago = (ms) => { const minutes = Math.round((Date.now() - ms) / 60000); return minutes < 1 ? t('ago.now') : t('ago.min', { n: minutes }); };
 
   // The paired phone's own point, when Friends → «показывать, где я» is on there and the point is fresh.
   async function phonePosition() {
@@ -136,40 +163,39 @@
     if (!fallback && option.key !== 'here') return { lat: option.lat, lon: option.lon, name: option.name, here: false };
     const base = fallback || { lat: STARTS[1].lat, lon: STARTS[1].lon, name: STARTS[1].name, label: STARTS[1].label };
     const from = base.label || base.name;
-    if (state.demo) return { ...base, here: false, note: `Демо: старт от ${from}` };
+    if (state.demo) return { ...base, here: false, note: t('note.demo', { from }) };
     let outside = false;
     try {
       const point = await currentPosition();
-      if (inAstana(point)) return { ...point, name: 'Старт', here: true, source: 'watch', note: '📍 По геопозиции часов' };
+      if (inAstana(point)) return { ...point, name: t('handoff.start'), here: true, source: 'watch', note: t('note.watch') };
       outside = true;
     } catch { /* no GPS in this browser, denied or timed out */ }
     const phone = await phonePosition();
-    if (phone) return { ...phone, name: 'Старт', here: true, source: 'phone', note: `📍 Место с телефона, ${ago(phone.updatedAt)}` };
+    if (phone) return { ...phone, name: t('handoff.start'), here: true, source: 'phone', note: t('note.phone', { ago: ago(phone.updatedAt) }) };
     return { ...base, here: false, warn: true,
-      note: outside ? `Вы не в Астане: считаю от ${from}` : `⚠ Часы не дали геопозицию: считаю от ${from}` };
+      note: t(outside ? 'note.outside' : 'note.noGps', { from }) };
   }
 
   async function findPlaces(mood) {
     state.mood = mood;
     show('loading');
-    $('loading-text').textContent = STARTS[state.startIndex].key === 'here' && !state.demo ? 'Где вы?…' : 'Ищем рядом…';
+    $('loading-text').textContent = t(STARTS[state.startIndex].key === 'here' && !state.demo ? 'loading.where' : 'loading.near');
     const start = await resolveStart();
-    $('loading-text').textContent = 'Ищем рядом…';
+    $('loading-text').textContent = t('loading.near');
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
     try {
       const point = sent(start);
-      const query = new URLSearchParams({ lat: String(point.lat), lon: String(point.lon), minutes: String(state.minutes), mood });
+      const query = new URLSearchParams({ lat: String(point.lat), lon: String(point.lon), minutes: String(state.minutes), mood, lang: LANG });
       const response = await fetch(`/api/watch/plan?${query}`, { signal: controller.signal });
       let data;
-      try { data = await response.json(); } catch { throw new Error('Aidem ответил неожиданно. Попробуйте ещё раз.'); }
-      if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Не получилось подобрать места.');
+      try { data = await response.json(); } catch { throw new Error(t('error.odd')); }
+      if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : t('error.plan'));
       state.plan = { places: data.places, query: data.query, start, minutes: state.minutes, at: Date.now() };
       renderResults();
       show('results');
     } catch (error) {
-      showError(error.name === 'AbortError' ? 'Сеть отвечает слишком долго. Попробуйте ещё раз.'
-        : error instanceof TypeError ? 'Нет связи с Aidem. Проверьте интернет на часах или телефоне.' : error.message);
+      showError(error.name === 'AbortError' ? t('error.slow') : error instanceof TypeError ? t('error.offline') : error.message);
     } finally { clearTimeout(timer); }
   }
 
@@ -181,7 +207,7 @@
   const latin = (text) => [...text].map((letter) => LATIN[letter] ?? letter).join('');
 
   // «Мега» is a name to find; «где выпить кофе рядом?» is a question for the assistant.
-  const QUESTION = /\?|^(где|куда|что|чем|как|какой|какая|какое|какие|когда|сколько|можно|посоветуй|подскажи|хочу|хотим|найди|покажи|отведи|давай|пойд|пошли|идём|айда|мне|нам|а )/i;
+  const QUESTION = /\?|^(где|куда|что|чем|как|какой|какая|какое|какие|когда|сколько|можно|посоветуй|подскажи|хочу|хотим|найди|покажи|отведи|давай|пойд|пошли|идём|айда|мне|нам|а |қайда|қалай|қандай|қашан|неше|маған|бізге|көрсет|тап|апар|where|what|how|which|when|can |could|find|show|take me|i want|let's|is there)/i;
   const isQuestion = (text) => QUESTION.test(text.trim()) || text.trim().split(/\s+/).length >= 4;
 
   async function searchPlaces(raw) {
@@ -192,7 +218,7 @@
     state.lastSearch = { query, at: Date.now() };
     state.mood = null;
     show('loading');
-    $('loading-text').textContent = `Ищем «${query}»…`;
+    $('loading-text').textContent = t('loading.search', { q: query });
     const start = await resolveStart();
     const point = sent(start);
     const near = `&lat=${point.lat}&lon=${point.lon}`;
@@ -204,19 +230,24 @@
       // Names that start with the query first ("Mega Silk Way" before "Taksim Fastfood Mega Silkway"), then the nearest.
       const found = answers.flatMap((answer) => answer.places || []).filter((place) => inAstana(place) && !seen.has(place.id) && seen.add(place.id))
         .map((place) => ({ place, starts: variants.some((variant) => place.name.toLowerCase().replace(/ё/g, 'е').startsWith(variant)) }))
-        .sort((a, b) => b.starts - a.starts || a.place.distanceMeters - b.place.distanceMeters).slice(0, 5)
+        .sort((a, b) => b.starts - a.starts || a.place.distanceMeters - b.place.distanceMeters)
         .map(({ place }) => {
           const walkMinutes = Math.max(1, Math.ceil(place.distanceMeters / METERS_PER_MINUTE));
-          const visitMinutes = Math.max(10, state.minutes - 2 * walkMinutes - RESERVE_MINUTES);
+          const visitMinutes = state.minutes - 2 * walkMinutes - RESERVE_MINUTES;
           return { ...place, walkMinutes, visitMinutes, returnMinutes: walkMinutes, totalMinutes: 2 * walkMinutes + visitMinutes + RESERVE_MINUTES, hours: { status: 'no_data' } };
         });
       if (!found.length && query.includes(' ')) { state.lastSearch = null; askAssistant(raw); return; }
-      state.plan = { places: found, query: '', start, minutes: state.minutes, at: Date.now(), search: query };
+      // Only places with time for the way there and back and at least a few minutes on site, as the chip says.
+      const fits = found.filter((place) => place.visitMinutes >= MIN_VISIT_MINUTES).slice(0, 5);
+      // Nothing fits: the best match is named with the time it needs.
+      const best = found[0];
+      state.plan = { places: fits, query: '', start, minutes: state.minutes, at: Date.now(), search: query,
+        tooFar: !fits.length && best ? { name: best.name, need: 2 * best.walkMinutes + RESERVE_MINUTES + MIN_VISIT_MINUTES } : null };
       renderResults();
       $('ask-gemini').hidden = true;
       show('results');
     } catch {
-      showError('Нет связи с Aidem. Проверьте интернет на часах или телефоне.', () => searchPlaces(query));
+      showError(t('error.offline'), () => { state.lastSearch = null; searchPlaces(query); });
     }
   }
 
@@ -226,13 +257,13 @@
   const canRecord = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
 
   // Each field has its own mic: the home search and the question to the assistant.
-  const MICS = { voice: { input: 'search-input', placeholder: 'Найти место', send: (text) => searchPlaces(text) },
-    'ask-voice': { input: 'ask-input', placeholder: 'Ваш вопрос', send: (text) => askAssistant(text) } };
+  const MICS = { voice: { input: 'search-input', placeholder: 'search.placeholder', send: (text) => searchPlaces(text) },
+    'ask-voice': { input: 'ask-input', placeholder: 'ask.placeholder', send: (text) => askAssistant(text) } };
 
   function setListening(on) {
     const mic = state.mic || MICS.voice;
     $(mic === MICS.voice ? 'voice' : 'ask-voice').classList.toggle('rec', on);
-    $(mic.input).placeholder = on ? 'Говорите…' : mic.placeholder;
+    $(mic.input).placeholder = t(on ? 'listening' : mic.placeholder);
     buzz(on ? 30 : 15);
   }
 
@@ -253,7 +284,7 @@
 
   function recognize() {
     const recognition = new Recognition();
-    recognition.lang = 'ru-RU';
+    recognition.lang = SPEECH;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     let result = '';
@@ -286,15 +317,15 @@
       const blob = new Blob(chunks, { type: (recorder.mimeType || type || 'audio/webm').split(';')[0] });
       if (blob.size < 800) return;
       show('loading');
-      $('loading-text').textContent = 'Распознаём…';
+      $('loading-text').textContent = t('loading.listen');
       try {
         const recording = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); });
-        const response = await fetch('/api/listen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: recording, mimeType: blob.type, lang: 'ru' }) });
+        const response = await fetch('/api/listen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: recording, mimeType: blob.type, lang: LANG }) });
         const data = await response.json();
-        if (!response.ok || !data.text) throw new Error(typeof data.error === 'string' ? data.error : 'Не расслышали. Попробуйте ещё раз.');
+        if (!response.ok || !data.text) throw new Error(typeof data.error === 'string' ? data.error : t('error.unheard'));
         heard(data.text);
       } catch (error) {
-        showError(error instanceof TypeError ? 'Нет связи с Aidem. Проверьте интернет на часах или телефоне.' : error.message, () => { renderHome(); show('home'); });
+        showError(error instanceof TypeError ? t('error.offline') : error.message, () => { renderHome(); show('home'); });
       }
     };
     state.recording = recorder;
@@ -321,17 +352,31 @@
       list.append(answerCard(answer));
       if (!places.length) return;
     }
+    if (!places.length && state.plan.tooFar) {
+      const { name, need } = state.plan.tooFar;
+      const card = element('article', 'card');
+      card.append(element('p', 'card-name', t('results.tooFar', { name })), element('p', 'card-hours', t('results.tooFarHint', { need, minutes: state.plan.minutes })));
+      if (state.minutes < TIMES[TIMES.length - 1]) {
+        const more = element('button', 'action', t('results.more'));
+        more.type = 'button';
+        more.addEventListener('click', () => { state.minutes = TIMES.find((value) => value >= Math.max(need, state.plan.minutes + 30)) || TIMES[TIMES.length - 1]; save(); state.lastSearch = null; searchPlaces(state.plan.search); });
+        card.append(more);
+      }
+      list.append(card);
+      $('ask-gemini').hidden = true;
+      return;
+    }
     if (!places.length && state.plan.search) {
       const card = element('article', 'card');
-      card.append(element('p', 'card-name', `Не нашли «${state.plan.search}»`), element('p', 'card-hours', 'Попробуйте сказать название иначе или выберите настроение.'));
+      card.append(element('p', 'card-name', t('results.notFound', { q: state.plan.search })), element('p', 'card-hours', t('results.notFoundHint')));
       list.append(card);
       $('ask-gemini').hidden = true;
       return;
     }
     if (!places.length) {
       const card = element('article', 'card');
-      card.append(element('p', 'card-name', 'Рядом ничего не успеть'), element('p', 'card-hours', `За ${state.plan.minutes} мин с дорогой обратно подходящих мест нет.`));
-      const more = element('button', 'action', '+30 минут');
+      card.append(element('p', 'card-name', t('results.none')), element('p', 'card-hours', t('results.noneHint', { minutes: state.plan.minutes })));
+      const more = element('button', 'action', t('results.more'));
       more.type = 'button';
       more.addEventListener('click', () => { state.minutes = TIMES.find((value) => value >= state.plan.minutes + 30) || 120; save(); findPlaces(state.mood); });
       card.append(more);
@@ -340,9 +385,10 @@
       return;
     }
     places.forEach((place, index) => {
-      const [iconName, label] = CATEGORIES[place.category] || ['landmark', 'Место'];
+      const iconName = CATEGORIES[place.category] || 'landmark';
+      const label = t(CATEGORIES[place.category] ? `cat.${place.category}` : 'cat.other');
       const card = element('article', 'card');
-      card.setAttribute('aria-label', `${index + 1} из ${places.length}: ${place.name}`);
+      card.setAttribute('aria-label', t('card.aria', { i: index + 1, n: places.length, name: place.name }));
       const top = element('p', 'card-top');
       const image = element('img');
       image.src = `/assets/icons/categories/${iconName}-64.webp`;
@@ -350,13 +396,13 @@
       top.append(image, element('span', '', `${index + 1}/${places.length} · ${label}`));
       const walk = element('p', 'card-walk');
       const caption = element('span');
-      caption.append('мин', document.createElement('br'), 'пешком');
+      caption.append(t('card.walk1'), document.createElement('br'), t('card.walk2'));
       walk.append(element('b', '', String(place.walkMinutes)), caption);
-      const back = element('p', 'card-back', 'обратно к ');
+      const back = element('p', 'card-back', t('card.back'));
       back.append(element('b', '', time(Date.now() + backIn(place) * 60000)));
       const facts = [distanceText(place.distanceMeters)];
-      facts.push(place.hours?.status === 'open' && place.hours.closesAt ? `открыто до ${place.hours.closesAt}` : 'часы неизвестны');
-      const go = element('button', 'action', 'Идём');
+      facts.push(place.hours?.status === 'open' && place.hours.closesAt ? t('card.open', { time: place.hours.closesAt }) : t('card.hoursUnknown'));
+      const go = element('button', 'action', t('card.go'));
       go.type = 'button';
       go.addEventListener('click', () => startWalk(place));
       card.dataset.place = place.id;
@@ -373,13 +419,14 @@
   // They are people's stars, not open data; they are given on the phone.
   function ratingLine(rating) {
     if (!rating?.count) return null;
-    const many = rating.count % 10 === 1 && rating.count % 100 !== 11 ? 'оценка' : [2, 3, 4].includes(rating.count % 10) && ![12, 13, 14].includes(rating.count % 100) ? 'оценки' : 'оценок';
+    const many = LANG === 'en' ? (rating.count === 1 ? 'rating' : 'ratings')
+      : rating.count % 10 === 1 && rating.count % 100 !== 11 ? 'оценка' : [2, 3, 4].includes(rating.count % 10) && ![12, 13, 14].includes(rating.count % 100) ? 'оценки' : 'оценок';
     const enough = rating.state === 'enough' && Number.isFinite(rating.average);
-    const text = enough ? `${rating.average.toFixed(1).replace('.', ',')} · ${rating.count} ${many}` : `мало оценок (${rating.count})`;
+    const text = enough ? `${decimal(rating.average.toFixed(1))} · ${t('rating.count', { n: rating.count, word: many })}` : t('rating.few', { n: rating.count });
     const line = element('p', 'card-rating');
     if (enough) line.append(element('span', 'card-star', '★'), ' ');
     line.append(text);
-    line.setAttribute('aria-label', `Оценки пользователей Aidem: ${text}`);
+    line.setAttribute('aria-label', t('rating.aria', { text }));
     return line;
   }
 
@@ -404,7 +451,7 @@
     const level = place.confidence?.level;
     if (level) {
       // Round screens drop the second word to keep «Идём» on screen: «● Высокая · OpenStreetMap».
-      const [word, ...rest] = (place.confidence.label || 'Уверенность').split(' ');
+      const [word, ...rest] = t(CONFIDENCE.includes(level) ? `conf.${level}` : 'conf.any').split(' ');
       const badge = element('span', `conf conf-${level}`, word);
       if (rest.length) badge.append(element('span', 'conf-word', ` ${rest.join(' ')}`));
       line.append(badge, ' · ');
@@ -415,17 +462,15 @@
 
   // The assistant: a question by voice or text goes to the same Gemini agent as /agent on the phone (/api/agent),
   // with the real start point; the answer comes back as text, read aloud where the watch can play sound, and as cards with «Идём».
-  const EXAMPLES = ['Кофе рядом на полчаса', 'Куда с ребёнком на час?', 'Что посмотреть до заката?'];
-  const FOLLOW_UPS = ['А поближе?', 'А под крышей?', 'А на полчаса?'];
-  const CONFIDENCE = { high: 'Высокая уверенность', medium: 'Средняя уверенность', low: 'Низкая уверенность' };
+  const CONFIDENCE = ['high', 'medium', 'low'];
 
   function openAsk() {
     const chat = state.chat;
     $('ask-context').hidden = !chat;
-    if (chat) $('ask-context').textContent = `Продолжаем: «${chat.question}»`;
+    if (chat) $('ask-context').textContent = t('ask.context', { q: chat.question });
     $('ask-reset').hidden = !chat;
     $('ask-input').value = '';
-    $('ask-examples').replaceChildren(...(chat ? FOLLOW_UPS : EXAMPLES).map((text) => {
+    $('ask-examples').replaceChildren(...t(chat ? 'ask.followUps' : 'ask.examples').map((text) => {
       const button = element('button', 'example', text);
       button.type = 'button';
       button.addEventListener('click', () => askAssistant(text));
@@ -445,7 +490,7 @@
       walkMinutes, visitMinutes, returnMinutes: timed ? place.returnMinutes : walkMinutes,
       totalMinutes: timed ? place.totalMinutes : 2 * walkMinutes + visitMinutes + RESERVE_MINUTES,
       hours: place.hours || { status: 'no_data' }, source: { label: place.dataSource || 'OpenStreetMap' },
-      confidence: CONFIDENCE[level] ? { level, label: CONFIDENCE[level] } : null };
+      confidence: CONFIDENCE.includes(level) ? { level, label: t(`conf.${level}`) } : null };
   }
 
   async function askAssistant(raw) {
@@ -457,22 +502,22 @@
     stopVoice();
     state.mood = null;
     show('loading');
-    $('loading-text').textContent = '✦ Aidem думает…';
+    $('loading-text').textContent = t('loading.think');
     const start = await resolveStart();
     const previous = state.chat ? { query: state.chat.question, summary: state.chat.summary } : undefined;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 45000);
     try {
       const response = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
-        body: JSON.stringify({ query: question, ...sent(start), minutes: state.minutes, lang: 'ru', ...(previous ? { previous } : {}) }) });
+        body: JSON.stringify({ query: question, ...sent(start), minutes: state.minutes, lang: LANG, ...(previous ? { previous } : {}) }) });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Помощник сейчас недоступен. Попробуйте ещё раз.');
+      if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : t('ask.unavailable'));
       const places = (data.places || []).filter((place) => inAstana(place)).slice(0, 3).map((place) => fitPlace(place, start));
       // Without Gemini the agent's summary is a generic line; the watch says what it found instead, and says Gemini was not there.
       const first = places[0];
       const summary = data.mode === 'agent' ? String(data.summary || '').trim()
-        : first ? `Gemini сейчас не ответил. Ближе всего «${first.name}»: ${first.walkMinutes} мин пешком, обратно к ${time(Date.now() + backIn(first) * 60000)}.`
-          : 'Gemini сейчас не ответил, а рядом под ваш вопрос ничего не нашлось. Попробуйте спросить иначе.';
+        : first ? t('ask.noModel', { name: first.name, walk: first.walkMinutes, time: time(Date.now() + backIn(first) * 60000) })
+          : t('ask.noModelNothing');
       state.chat = { question, summary };
       state.plan = { places, query: '', start, minutes: state.minutes, at: Date.now(),
         answer: { question, summary, ai: data.mode === 'agent', steps: (data.steps || []).map((step) => step.label).filter(Boolean).slice(0, 4) } };
@@ -481,25 +526,24 @@
       buzz([20, 60, 20]);
       speak(summary);
     } catch (error) {
-      const message = error?.name === 'AbortError' ? 'Помощник отвечает слишком долго. Попробуйте ещё раз.'
-        : error instanceof TypeError ? 'Нет связи с Aidem. Проверьте интернет на часах или телефоне.' : error.message;
+      const message = error?.name === 'AbortError' ? t('ask.slow') : error instanceof TypeError ? t('error.offline') : error.message;
       showError(message, () => { state.lastAsk = null; askAssistant(question); });
     } finally { clearTimeout(timer); }
   }
 
   function answerCard(answer) {
     const card = element('article', 'card answer-card');
-    card.setAttribute('aria-label', 'Ответ Aidem');
-    card.append(element('p', 'answer-head', answer.ai ? '✦ Aidem · Gemini' : '✦ Aidem · без модели'),
-      element('p', 'answer-q', `«${answer.question}»`), element('p', 'answer-text', answer.summary));
+    card.setAttribute('aria-label', t('answer.aria'));
+    card.append(element('p', 'answer-head', t(answer.ai ? 'answer.ai' : 'answer.plain')),
+      element('p', 'answer-q', LANG === 'en' ? `“${answer.question}”` : `«${answer.question}»`), element('p', 'answer-text', answer.summary));
     if (canSpeak && answer.summary) {
-      const play = element('button', 'action ghost answer-play', '🔊 Прослушать');
+      const play = element('button', 'action ghost answer-play', t('answer.play'));
       play.type = 'button';
       play.addEventListener('click', () => { unlockVoice(); speak(answer.summary); });
       card.append(play);
     }
     if (answer.steps.length) card.append(element('p', 'answer-steps', answer.steps.join(' → ')));
-    if (state.plan.places.length) card.append(element('p', 'answer-more', 'Ниже места ↓'));
+    if (state.plan.places.length) card.append(element('p', 'answer-more', t('answer.below')));
     return card;
   }
 
@@ -539,7 +583,7 @@
     const clean = text.length <= 400 ? text : (text.slice(0, 400).match(/^.*[.!?…](?=\s|$)/s)?.[0] || text.slice(0, 400));
     try {
       if (!audio) throw new Error('no audio');
-      const response = await fetch('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: clean, lang: 'ru' }) });
+      const response = await fetch('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: clean, lang: LANG }) });
       const data = await response.json();
       if (!response.ok || !data.data || id !== speech) throw new Error('no voice');
       const bytes = Uint8Array.from(atob(data.data), (char) => char.charCodeAt(0));
@@ -560,7 +604,7 @@
     } catch {
       if (id !== speech || !('speechSynthesis' in window)) return;
       const utterance = new SpeechSynthesisUtterance(clean);
-      utterance.lang = 'ru-RU';
+      utterance.lang = SPEECH;
       speechSynthesis.speak(utterance);
     }
   }
@@ -570,19 +614,19 @@
     const tip = $('gemini-tip');
     button.disabled = true;
     tip.hidden = false;
-    tip.textContent = 'Gemini думает…';
+    tip.textContent = t('gemini.thinking');
     const { start, minutes } = state.plan;
     try {
       const response = await fetch('/api/recommend', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...sent(start), minutes, maxWalkMinutes: Math.min(30, Math.max(5, Math.round(minutes / 3))),
-          query: state.plan.query || '', withChild: state.mood === 'child', category: 'any', returnToStart: true }) });
+          query: state.plan.query || '', withChild: state.mood === 'child', category: 'any', returnToStart: true, lang: LANG }) });
       const data = await response.json();
-      if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Gemini сейчас недоступен.');
-      tip.replaceChildren(data.generation?.mode === 'llm' ? data.generation.summary : 'Gemini сейчас не ответил. Варианты подобраны по данным OpenStreetMap и Overture Maps.',
-        element('small', '', data.generation?.mode === 'llm' ? 'Gemini · факты из OpenStreetMap и Overture Maps' : 'Подбор без модели'));
+      if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : t('gemini.unavailable'));
+      const ai = data.generation?.mode === 'llm';
+      tip.replaceChildren(ai ? data.generation.summary : t('gemini.fallback'), element('small', '', t(ai ? 'gemini.facts' : 'gemini.plain')));
       button.hidden = true;
     } catch (error) {
-      tip.textContent = error instanceof TypeError ? 'Нет связи. Попробуйте ещё раз.' : error.message;
+      tip.textContent = error instanceof TypeError ? t('gemini.offline') : error.message;
       button.disabled = false;
     }
   }
@@ -682,7 +726,7 @@
     state.heading = null;
     state.walk = walk;
     setupRing(walk, parts);
-    setNote(walk.demo ? 'ДЕМО ×30' : '');
+    setNote(walk.demo ? t('go.demo', { n: 30 }) : '');
     $('view-go').classList.remove('late', 'over', 'stay', 'alert');
     if (!walk.demo) {
       listenCompass();
@@ -726,7 +770,7 @@
     if (walk && !walk.demo) {
       const live = walk.fix === 'watch' && Date.now() - walk.fixAt < 60000;
       // The first fix can take a few seconds.
-      if (!live && (walk.fix || Date.now() - walk.t0 > 8000)) shown = walk.fix === 'phone' ? `📍 с телефона, ${ago(walk.fixAt)}` : '⚠ нет GPS на часах';
+      if (!live && (walk.fix || Date.now() - walk.t0 > 8000)) shown = walk.fix === 'phone' ? t('go.fromPhone', { ago: ago(walk.fixAt) }) : t('go.noGps');
     }
     $('demo-badge').textContent = shown;
     $('demo-badge').hidden = !shown;
@@ -744,16 +788,16 @@
     const name = walk.place.name.slice(0, 60);
     const reminders = [];
     if (walk.leaveAt - 5 * 60000 > Date.now() + 60000) {
-      reminders.push({ at: walk.leaveAt - 5 * 60000, tag: 'seruen-soon', title: 'Через 5 минут обратно',
-        body: `Выйдите из «${name}» в ${time(walk.leaveAt)}, чтобы вернуться к ${time(walk.backAt)}.` });
+      reminders.push({ at: walk.leaveAt - 5 * 60000, tag: 'seruen-soon', title: t('remind.soonTitle'),
+        body: t('remind.soonBody', { name, leave: time(walk.leaveAt), back: time(walk.backAt) }) });
     }
-    reminders.push({ at: Math.max(Date.now(), walk.leaveAt), tag: 'seruen-back', title: 'Пора обратно',
-      body: `До старта примерно ${walk.place.returnMinutes} мин пешком. Успеете к ${time(walk.backAt)}.` });
+    reminders.push({ at: Math.max(Date.now(), walk.leaveAt), tag: 'seruen-back', title: t('remind.backTitle'),
+      body: t('remind.backBody', { n: walk.place.returnMinutes, back: time(walk.backAt) }) });
     window.SeruenRemind.schedule(reminders).then((result) => {
       if (!result.ok) return;
       if (state.walk !== walk) { window.SeruenRemind.cancel(result.id); return; }
       walk.reminderId = result.id;
-      setNote(`🔔 напомню в ${time(walk.leaveAt)}`);
+      setNote(t('go.remind', { time: time(walk.leaveAt) }));
     });
   }
 
@@ -815,8 +859,8 @@
     view.classList.add('alert');
     buzz([400, 150, 400, 150, 400]);
     if (walk.demo && window.SeruenRemind?.supported() && Notification.permission === 'granted') {
-      window.SeruenRemind.schedule([{ at: Date.now(), tag: 'seruen-back', title: 'Пора обратно',
-        body: `До старта примерно ${walk.place.returnMinutes} мин пешком. Успеете к ${time(walk.backAt)}.` }]);
+      window.SeruenRemind.schedule([{ at: Date.now(), tag: 'seruen-back', title: t('remind.backTitle'),
+        body: t('remind.backBody', { n: walk.place.returnMinutes, back: time(walk.backAt) }) }]);
     }
     setPhase('back');
   }
@@ -826,9 +870,9 @@
     stopWalk();
     const spent = Math.max(1, Math.round((clock() - walk.t0) / 60000));
     const late = Math.round((clock() - walk.deadline) / 60000);
-    $('done-title').textContent = late > 0 ? 'Почти вовремя' : 'Вы вернулись';
-    $('done-text').textContent = late > 0 ? `${spent} мин, на ${late} мин позже плана.` : `${spent} мин из ${walk.minutes}. Вовремя.`;
-    $('done-home').textContent = 'Ещё прогулка';
+    $('done-title').textContent = t(late > 0 ? 'done.almost' : 'done.back');
+    $('done-text').textContent = late > 0 ? t('done.late', { spent, late }) : t('done.onTime', { spent, minutes: walk.minutes });
+    $('done-home').textContent = t('done.more');
     state.doneTo = 'home';
     buzz([70, 70, 70]);
     state.walk = null;
@@ -865,21 +909,21 @@
     view.classList.toggle('late', now <= walk.deadline && (walk.phase === 'back' ? now + walkMinutes * 60000 > walk.deadline : now >= leaveBy - 3 * 60000));
 
     pointArrow(toTarget);
-    if (walk.demo) $('demo-badge').textContent = `ДЕМО ×${walk.phase === 'stay' ? 120 : 30}`;
+    if (walk.demo) $('demo-badge').textContent = t('go.demo', { n: walk.phase === 'stay' ? 120 : 30 });
 
     $('go-name').textContent = walk.phase === 'back' ? walk.start.name : walk.place.name;
     if (walk.phase === 'stay') {
-      $('go-phase').textContent = 'На месте';
+      $('go-phase').textContent = t('go.stay');
       $('go-minutes').textContent = String(Math.max(0, Math.floor((leaveBy - now) / 60000)));
-      $('go-unit').textContent = 'мин ещё';
-      $('go-back').replaceChildren('выйти до ', element('b', '', time(leaveBy)));
+      $('go-unit').textContent = t('go.minLeft');
+      $('go-back').replaceChildren(t('go.leaveBy'), element('b', '', time(leaveBy)));
     } else {
-      $('go-phase').textContent = `${walk.phase === 'back' ? (walk.alerted ? 'Пора обратно' : 'Обратно') : 'Туда'} · ${distanceText(distance)}`;
+      $('go-phase').textContent = `${t(walk.phase === 'back' ? (walk.alerted ? 'go.headBack' : 'go.back') : 'go.there')} · ${distanceText(distance)}`;
       $('go-minutes').textContent = String(walkMinutes);
-      $('go-unit').textContent = 'мин';
-      $('go-back').replaceChildren(walk.phase === 'back' ? 'успеть к ' : 'обратно к ', element('b', '', time(walk.backAt)));
+      $('go-unit').textContent = t('min');
+      $('go-back').replaceChildren(t(walk.phase === 'back' ? 'go.makeIt' : 'go.backBy'), element('b', '', time(walk.backAt)));
     }
-    $('go-next').textContent = { to: 'Я на месте', stay: 'Обратно', back: 'Я вернулся' }[walk.phase];
+    $('go-next').textContent = t({ to: 'go.here', stay: 'go.return', back: 'go.returned' }[walk.phase]);
   }
 
   function pointArrow(toTarget) {
@@ -905,7 +949,6 @@
   // Meetups and friends come from the Aidem account on the phone. The watch is linked once with a 6-digit code
   // (phone: Профиль → Связать часы) and then keeps its own token.
   const SOCIAL_KEY = 'seruen-watch-social';
-  const MEMBER_STATUS = { arrived: 'на месте', on_way: 'в пути', going: 'придёт', maybe: 'может быть', invited: 'приглашён', declined: 'не придёт' };
 
   function socialToken() {
     try { return localStorage.getItem(SOCIAL_KEY) || state.socialToken; } catch { return state.socialToken; }
@@ -928,11 +971,11 @@
       let data = {};
       try { data = await response.json(); } catch { /* not JSON */ }
       if (response.status === 401 && token) rememberToken(null);
-      if (!response.ok) throw Object.assign(new Error(typeof data.error === 'string' ? data.error : 'Не получилось. Попробуйте ещё раз.'), { status: response.status });
+      if (!response.ok) throw Object.assign(new Error(typeof data.error === 'string' ? data.error : t('error.generic')), { status: response.status });
       return data;
     } catch (error) {
-      if (error.name === 'AbortError') throw new Error('Сеть отвечает слишком долго. Попробуйте ещё раз.');
-      if (error instanceof TypeError) throw new Error('Нет связи с Aidem. Проверьте интернет на часах или телефоне.');
+      if (error.name === 'AbortError') throw new Error(t('error.slow'));
+      if (error instanceof TypeError) throw new Error(t('error.offline'));
       throw error;
     } finally { clearTimeout(timer); }
   }
@@ -960,7 +1003,7 @@
   }
 
   function showLink(message) {
-    $('link-text').textContent = message || 'На телефоне: Aidem → Профиль → ⌚ Связать часы';
+    $('link-text').textContent = message || t('link.text');
     $('link-text').classList.toggle('error', Boolean(message));
     show('link');
   }
@@ -976,7 +1019,7 @@
       slot.textContent = state.code[index] || '';
       slot.classList.toggle('filled', index < state.code.length);
     });
-    $('pair-code').setAttribute('aria-label', `Код с телефона: ${state.code.length} из 6 цифр`);
+    $('pair-code').setAttribute('aria-label', t('pair.progress', { n: state.code.length }));
   }
 
   function press(key) {
@@ -1010,13 +1053,13 @@
   async function openMeet() {
     if (!socialToken()) { showLink(); return; }
     show('loading');
-    $('loading-text').textContent = 'Загружаем встречи…';
+    $('loading-text').textContent = t('loading.meet');
     try {
       [, state.meetStart] = await Promise.all([loadSocial(), resolveStart()]);
       renderMeet();
       show('meet');
     } catch (error) {
-      if (error.status === 401) showLink('Часы отвязаны. Получите новый код на телефоне.');
+      if (error.status === 401) showLink(t('link.unlinked'));
       else showError(error.message, openMeet);
     }
   }
@@ -1028,20 +1071,20 @@
     return node;
   }
 
+  // Days are Astana days too, so a meetup at 00:30 is «Завтра» whatever zone the watch is set to.
   function day(ms) {
-    const date = new Date(ms);
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    if (date.toDateString() === new Date().toDateString()) return 'Сегодня';
-    if (date.toDateString() === tomorrow.toDateString()) return 'Завтра';
-    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '');
+    const astanaDay = (value) => Math.floor((value + ASTANA_OFFSET) / 86400000);
+    const ahead = astanaDay(ms) - astanaDay(Date.now());
+    if (ahead === 0) return t('day.today');
+    if (ahead === 1) return t('day.tomorrow');
+    return astana(ms).toLocaleDateString(SPEECH, { day: 'numeric', month: 'short', timeZone: 'UTC' }).replace('.', '');
   }
 
   function peopleSummary(members) {
     const others = members.filter((member) => member.id !== state.me?.id);
     const arrived = others.filter((member) => member.status === 'arrived').length;
     const onWay = others.filter((member) => member.status === 'on_way').length;
-    return [arrived && `${arrived} на месте`, onWay && `${onWay} в пути`].filter(Boolean).join(' · ');
+    return [arrived && t('meet.arrivedCount', { n: arrived }), onWay && t('meet.onWayCount', { n: onWay })].filter(Boolean).join(' · ');
   }
 
   function renderMeet() {
@@ -1055,8 +1098,8 @@
     if (located.length) list.append(friendsCard(located));
     if (!meetups.length && !located.length) {
       const card = element('article', 'card');
-      card.append(element('p', 'card-top', state.me ? `${state.me.emoji} ${state.me.name}` : 'Aidem'), element('p', 'card-name', 'Пока нет встреч'),
-        element('p', 'card-hours', 'Позовите друзей на встречу в Aidem на телефоне, и она появится здесь.'));
+      card.append(element('p', 'card-top', state.me ? `${state.me.emoji} ${state.me.name}` : 'Aidem'), element('p', 'card-name', t('meet.none')),
+        element('p', 'card-hours', t('meet.noneHint')));
       list.append(card);
     }
     if (start.note) list.firstChild.prepend(startNote(start));
@@ -1069,13 +1112,14 @@
     const walkMinutes = Math.max(1, Math.ceil(meters / METERS_PER_MINUTE));
     const leaveAt = meetup.startsAt - walkMinutes * 60000;
     const card = element('article', 'card meet-card');
-    card.setAttribute('aria-label', `Встреча ${meetup.title}, ${day(meetup.startsAt).toLowerCase()} в ${time(meetup.startsAt)}`);
-    const top = element('p', 'card-top', `${meetup.changed ? 'Изменена' : day(meetup.startsAt)} · ${time(meetup.startsAt)}`);
+    const when = day(meetup.startsAt);
+    card.setAttribute('aria-label', t('meet.cardAria', { title: meetup.title, day: LANG === 'en' ? when : when.toLowerCase(), time: time(meetup.startsAt) }));
+    const top = element('p', 'card-top', `${meetup.changed ? t('meet.changed') : when} · ${time(meetup.startsAt)}`);
     const people = element('p', 'people');
     const members = meetup.members.filter((member) => member.status !== 'declined');
     for (const member of members.slice(0, 5)) {
       const chip = element('span', `person is-${member.status}`, member.emoji);
-      chip.title = `${member.name}: ${MEMBER_STATUS[member.status] || member.status}`;
+      chip.title = `${member.name}: ${TEXT.ru?.[`member.${member.status}`] ? t(`member.${member.status}`) : member.status}`;
       people.append(chip);
     }
     if (members.length > 5) people.append(element('span', 'person more', `+${members.length - 5}`));
@@ -1084,18 +1128,19 @@
     // The hero is when to leave; the walk itself goes into the place line.
     const timing = element('p', 'card-walk meet-when');
     const caption = element('span');
-    const [first, second, at] = now < leaveAt ? ['выйти', 'до', leaveAt] : now < meetup.startsAt ? ['пора', 'выходить', null] : ['началась', 'в', meetup.startsAt];
+    const [key, at] = now < leaveAt ? ['meet.leave', leaveAt] : now < meetup.startsAt ? ['meet.leaveNow', null] : ['meet.started', meetup.startsAt];
+    const [first, second] = t(key);
     caption.append(first, document.createElement('br'), second);
     timing.append(caption);
     if (at) timing.append(element('b', '', time(at)));
     else timing.classList.add('now');
     const where = element('p', 'card-hours card-place');
-    where.append(element('span', 'place-name', meetup.place.name), element('span', '', ` · ${walkMinutes} мин`));
+    where.append(element('span', 'place-name', meetup.place.name), element('span', '', ` · ${walkMinutes} ${t('min')}`));
     card.append(top, element('p', 'card-name', meetup.title), where, people, timing);
-    if (meetup.myStatus === 'arrived') { card.append(element('p', 'card-here', 'Вы на месте')); return card; }
-    card.append(button('action', 'Идём', () => startTargetWalk('meet', meetup)));
+    if (meetup.myStatus === 'arrived') { card.append(element('p', 'card-here', t('meet.youHere'))); return card; }
+    card.append(button('action', t('card.go'), () => startTargetWalk('meet', meetup)));
     if (!['going', 'on_way'].includes(meetup.myStatus)) {
-      const answer = button('action ghost', 'Приду', () => promise(meetup, answer, leaveAt, walkMinutes));
+      const answer = button('action ghost', t('meet.promise'), () => promise(meetup, answer, leaveAt, walkMinutes));
       card.append(answer);
     }
     return card;
@@ -1103,14 +1148,14 @@
 
   function friendsCard(located) {
     const card = element('article', 'card friends-card');
-    card.append(element('p', 'card-top', 'Друзья рядом'));
+    card.append(element('p', 'card-top', t('meet.friends')));
     for (const { friend, meters } of located) {
       const row = button('friend', undefined, () => startTargetWalk('friend', friend));
-      row.setAttribute('aria-label', `Идти к ${friend.name}, ${distanceText(meters)}`);
+      row.setAttribute('aria-label', t('meet.friendAria', { name: friend.name, distance: distanceText(meters) }));
       row.append(element('span', 'person', friend.emoji), element('span', 'friend-name', friend.name), element('span', 'friend-far', distanceText(meters)));
       card.append(row);
     }
-    card.append(element('p', 'card-hours', 'Нажмите, чтобы пойти к другу'));
+    card.append(element('p', 'card-hours', t('meet.friendHint')));
     return card;
   }
 
@@ -1124,15 +1169,15 @@
     const remindAt = leaveAt - 5 * 60000;
     if (window.SeruenRemind?.supported() && remindAt > Date.now() + 60000 && remindAt < Date.now() + 6 * 3600000) {
       // Started inside the tap, so the browser may show its permission prompt.
-      window.SeruenRemind.schedule([{ at: remindAt, tag: 'seruen-meet', title: `Через 5 минут выходить: ${meetup.title}`.slice(0, 80),
-        body: `${meetup.place.name} в ${time(meetup.startsAt)}, идти ${walkMinutes} мин.`.slice(0, 240) }]);
+      window.SeruenRemind.schedule([{ at: remindAt, tag: 'seruen-meet', title: t('meet.remindTitle', { title: meetup.title }).slice(0, 80),
+        body: t('meet.remindBody', { place: meetup.place.name, time: time(meetup.startsAt), n: walkMinutes }).slice(0, 240) }]);
     }
     if (await rsvp(meetup.id, 'going')) {
-      answer.textContent = '✓ Вы придёте';
+      answer.textContent = t('meet.promised');
       buzz(40);
     } else {
       answer.disabled = false;
-      answer.textContent = 'Приду · ещё раз';
+      answer.textContent = t('meet.promiseAgain');
     }
   }
 
@@ -1165,7 +1210,7 @@
         stopWalk();
         state.walk = null;
         buzz([250, 100, 250]);
-        showError(`Встречу «${walk.title}» отменили.`, openMeet);
+        showError(t('meet.cancelled', { title: walk.title }), openMeet);
         return;
       }
       Object.assign(walk.place, { name: meetup.place.name, lat: meetup.place.lat, lon: meetup.place.lon });
@@ -1195,18 +1240,18 @@
     view.classList.toggle('over', Boolean(walk.startsAt) && now > walk.startsAt);
     view.classList.toggle('late', Boolean(walk.startsAt) && now <= walk.startsAt && now + minutes * 60000 > walk.startsAt);
     pointArrow(bearing(walk.pos, walk.place));
-    $('go-phase').textContent = `${walk.kind === 'meet' ? 'К встрече' : 'К другу'} · ${distanceText(distance)}`;
+    $('go-phase').textContent = `${t(walk.kind === 'meet' ? 'target.meet' : 'target.friend')} · ${distanceText(distance)}`;
     $('go-name').textContent = walk.place.name;
     $('go-minutes').textContent = String(minutes);
-    $('go-unit').textContent = 'мин';
+    $('go-unit').textContent = t('min');
     if (walk.kind === 'meet') {
       const late = Math.ceil((now + minutes * 60000 - walk.startsAt) / 60000);
-      if (now > walk.startsAt) $('go-back').replaceChildren('началась в ', element('b', '', time(walk.startsAt)));
-      else if (late > 0) $('go-back').replaceChildren('опоздание ~', element('b', '', `${late} мин`));
-      else $('go-back').replaceChildren('начало в ', element('b', '', time(walk.startsAt)));
-    } else if (walk.lost) $('go-back').replaceChildren('друг скрыл место');
-    else $('go-back').replaceChildren(walk.approximate ? 'примерно · ' : 'место от ', element('b', '', time(walk.seen)));
-    $('go-next').textContent = 'Я на месте';
+      if (now > walk.startsAt) $('go-back').replaceChildren(t('target.startedAt'), element('b', '', time(walk.startsAt)));
+      else if (late > 0) $('go-back').replaceChildren(t('target.late'), element('b', '', `${late} ${t('min')}`));
+      else $('go-back').replaceChildren(t('target.startsAt'), element('b', '', time(walk.startsAt)));
+    } else if (walk.lost) $('go-back').replaceChildren(t('target.hidden'));
+    else $('go-back').replaceChildren(t(walk.approximate ? 'target.approx' : 'target.seen'), element('b', '', time(walk.seen)));
+    $('go-next').textContent = t('go.here');
   }
 
   function arriveAtTarget() {
@@ -1217,13 +1262,13 @@
     if (walk.kind === 'meet') {
       if (!walk.demo) rsvp(walk.id, 'arrived');
       const early = Math.round((walk.startsAt - now) / 60000);
-      $('done-title').textContent = 'На месте';
-      $('done-text').textContent = `${early > 0 ? `За ${early} мин до начала.` : early < 0 ? `Опоздание ${-early} мин.` : 'Ровно к началу.'}${walk.demo ? '' : ' Друзья это видят.'}`;
+      $('done-title').textContent = t('target.here');
+      $('done-text').textContent = `${early > 0 ? t('target.early', { n: early }) : early < 0 ? t('target.lateBy', { n: -early }) : t('target.onTime')}${walk.demo ? '' : t('target.friendsSee')}`;
     } else {
-      $('done-title').textContent = 'Вы рядом';
-      $('done-text').textContent = `${walk.place.name} где-то здесь.`;
+      $('done-title').textContent = t('target.near');
+      $('done-text').textContent = t('target.somewhere', { name: walk.place.name });
     }
-    $('done-home').textContent = 'К встречам';
+    $('done-home').textContent = t('target.toMeetups');
     state.doneTo = 'meet';
     buzz([70, 70, 70]);
     show('done');
@@ -1239,8 +1284,8 @@
     const given = pair(hash.get('from'));
     const fromName = (hash.get('fromName') || '').slice(0, 60);
     show('loading');
-    $('loading-text').textContent = 'Где вы?…';
-    const start = await resolveStart(given ? { ...given, name: fromName || 'Старт', label: fromName || 'точки с телефона' } : undefined);
+    $('loading-text').textContent = t('loading.where');
+    const start = await resolveStart(given ? { ...given, name: fromName || t('handoff.start'), label: fromName || t('start.phonePoint') } : undefined);
     const whole = (name, fallback) => {
       const value = hash.has(name) ? Math.round(Number(hash.get(name))) : NaN;
       return Number.isFinite(value) && value >= 0 && value <= 240 ? value : fallback;
@@ -1254,7 +1299,7 @@
     const minutes = Math.max(whole('min', total), total);
     state.mood = 'any';
     state.plan = { minutes, at: Date.now(), start,
-      places: [{ id: 'handoff', name: (hash.get('name') || 'Место').slice(0, 80), category: hash.get('cat') || 'attraction', ...to,
+      places: [{ id: 'handoff', name: (hash.get('name') || t('handoff.place')).slice(0, 80), category: hash.get('cat') || 'attraction', ...to,
         distanceMeters: Math.round(meters), walkMinutes, visitMinutes, returnMinutes, totalMinutes: total, hours: { status: 'no_data' } }] };
     renderResults();
     $('ask-gemini').hidden = true;
@@ -1329,6 +1374,7 @@
   }
   $('demo-toggle').checked = state.demo;
   $('watch-url').textContent = `${location.host}/watch`;
+  translatePage();
   bind();
   renderHome();
   handoff().then((handled) => { if (!handled) show('home'); });

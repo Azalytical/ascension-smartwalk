@@ -44,8 +44,17 @@ p,h1,h2{margin:0}
 .view.view-results,.view.view-meet{padding:0}
 .results{width:100%}
 .card{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:var(--h);padding:calc(var(--k)*7) calc(var(--k)*5) calc(var(--k)*8);scroll-snap-align:start}
-.round .card{padding:calc(var(--k)*11) calc(var(--k)*13) calc(var(--k)*12)}
-.round .card .action{width:84%}
+/* A round screen is narrow at the top and bottom: the card is set smaller so «Идём» stays inside the circle. */
+.round .card{padding:calc(var(--k)*8) calc(var(--k)*13) calc(var(--k)*8)}
+.round .card .action{width:58%;min-height:calc(var(--k)*15);margin-top:calc(var(--k)*2.4);font-size:calc(var(--k)*6.2)}
+.round .card .start-note{margin-bottom:calc(var(--k)*.6);font-size:calc(var(--k)*4.2)}
+.round .card-top{font-size:calc(var(--k)*4.6)}
+.round .card-top img{width:calc(var(--k)*8);height:calc(var(--k)*8)}
+.round .card-name{font-size:calc(var(--k)*7.4)}
+.round .card-walk b{font-size:calc(var(--k)*13)}
+.round .card-walk span{font-size:calc(var(--k)*4.8)}
+.round .card-back{font-size:calc(var(--k)*5.4)}
+.round .card-hours,.round .card-trust,.round .card-rating{font-size:calc(var(--k)*4.4)}
 .round .conf-word{display:none}
 .start-note{margin-bottom:calc(var(--k)*1.5);font-size:calc(var(--k)*4.8);font-weight:650;color:var(--muted)}
 .start-note.from-watch,.start-note.from-phone{color:var(--sky)}

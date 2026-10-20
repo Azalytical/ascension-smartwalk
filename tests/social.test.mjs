@@ -156,6 +156,13 @@ test('fairMeetingPoints prefers an even split over a shorter total', () => {
   assert.ok(options[0].maxMinutes < options[1].maxMinutes);
 });
 
+test('a meeting place names its dataset, not always OSM', () => {
+  const people = [{ id: 'a', lat: 51.1283, lon: 71.4400 }, { id: 'b', lat: 51.1283, lon: 71.4610 }];
+  const overture = dataset.map(place => ({ ...place, source: { label: 'Overture Maps · Meta' } }));
+  assert.equal(fairMeetingPoints(overture, people, { kind: 'coffee', at: new Date('2026-10-20T10:00:00Z') }).options[0].place.source.label, 'Overture Maps · Meta');
+  assert.equal(fairMeetingPoints(dataset, people, { kind: 'coffee', at: new Date('2026-10-20T10:00:00Z') }).options[0].place.source.label, 'OpenStreetMap');
+});
+
 test('meetups invite friends only and collect answers', async () => {
   const { api, person, befriend, now } = setup();
   const ana = await person('Ана'), bek = await person('Бек'), stranger = await person('Чужой');

@@ -7,7 +7,8 @@ import { coarse } from './privacy.mjs';
 // so a glance on the wrist answers within one request and does not spend the Gemini quota.
 const MOODS = {
   coffee: { query: 'Хочу выпить кофе и немного отдохнуть.' },
-  park: { query: 'Погулять на свежем воздухе: парк, сквер или памятник.' },
+  // Only parks and squares: «или памятник» used to bring a monument first («Бәйтерек» for «Парк»).
+  park: { query: 'Погулять в парке или сквере.', category: 'park' },
   child: { query: 'Прогуляться с ребёнком: детская площадка, парк или сквер.', withChild: true },
   indoor: { query: 'Идёт дождь, хочу под крышу.' },
   food: { query: 'Хочу поесть или перекусить в кафе.' },
@@ -163,7 +164,7 @@ export async function handleWatch(request, env, pois) {
   const query = [MOODS[mood].query, (url.searchParams.get('q') || '').slice(0, 200)].filter(Boolean).join(' ');
   const total = url.searchParams.has('minutes') ? number('minutes') : 45;
   // The reserve and «Больше не предлагать» from the phone's settings: reserve=10, exclude=id1,id2.
-  const input = { lat: point('lat'), lon: point('lon'), minutes: total, query, category: 'any', returnToStart: true,
+  const input = { lat: point('lat'), lon: point('lon'), minutes: total, query, category: MOODS[mood].category || 'any', returnToStart: true,
     maxWalkMinutes: Number.isFinite(total) ? Math.min(30, Math.max(5, Math.round(total / 3))) : 15,
     withChild: Boolean(MOODS[mood].withChild) || url.searchParams.get('child') === '1',
     ...(url.searchParams.has('reserve') ? { reserveMinutes: number('reserve') } : {}),
