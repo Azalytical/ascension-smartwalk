@@ -68,10 +68,22 @@ test('Siri can ask the assistant a free question and hears a text answer', async
   const json = await (await ask('lat=51.1283&lon=71.4304&q=coffee')).json();
   assert.equal(json.mode, 'fallback');
   assert.ok(json.places.length >= 1);
-  const outside = await ask('format=text&lat=43.2&lon=76.9&q=coffee');
+  const outside = await ask(`format=text&lat=43.2&lon=76.9&q=${encodeURIComponent('кофе')}`);
   assert.equal(outside.status, 200);
   assert.match(await outside.text(), /только в Астане/);
   assert.equal((await ask('lat=51.1283&lon=71.4304', { method: 'POST' })).status, 405);
+});
+
+test('an English question gets an English spoken answer', async () => {
+  const text = await (await plan('format=text&lat=51.1283&lon=71.4304&mood=coffee&q=coffee%20nearby')).text();
+  assert.match(text, /^Кофейня у Байтерека, a cafe\. About \d+ minutes? on foot; the whole walk there and back takes about \d+ minutes?, so you are back by \d\d:\d\d\./);
+  assert.match(await (await plan('format=text&lat=51.1283&lon=71.4304&mood=coffee&lang=en')).text(), /on foot/);
+  assert.match(await (await plan('format=text&lat=43.2&lon=76.9&mood=coffee&q=coffee')).text(), /only in Astana/);
+  const ask = await handleApi(new Request('https://demo.example/api/watch/ask?format=text&lat=51.1283&lon=71.4304&q=where%20can%20I%20get%20coffee%3F'), {}, pois);
+  assert.match(await ask.text(), /^Кофейня у Байтерека, a cafe\. About/);
+  assert.match(spokenPlan({ places: [] }, new Date(), 'en'), /^Nothing nearby/);
+  // A Russian question stays Russian.
+  assert.match(await (await plan('format=text&lat=51.1283&lon=71.4304&mood=coffee&q=кофе')).text(), /Идти примерно/);
 });
 
 test('nothing in reach is said honestly', () => {
