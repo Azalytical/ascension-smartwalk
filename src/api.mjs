@@ -459,9 +459,9 @@ async function watchAsk(request, url, env, dataset) {
     minutes: url.searchParams.has('minutes') ? number('minutes') : 45, ...(url.searchParams.has('lang') ? { lang: url.searchParams.get('lang') } : {}),
     ...(url.searchParams.has('reserve') ? { reserveMinutes: number('reserve') } : {}), ...hiddenParam(url) };
   const text = url.searchParams.get('format') === 'text';
-  // An English question gets an English answer, from Gemini and without it.
+  // A Kazakh or English question gets an answer in its language, from Gemini and without it.
   const lang = spokenLanguage(url.searchParams.get('q'), url.searchParams.get('lang'));
-  if (lang === 'en' && !body.lang) body.lang = 'en';
+  if (!body.lang) body.lang = lang;
   if (!(body.lat >= 51 && body.lat <= 51.35 && body.lon >= 71.25 && body.lon <= 71.65)) {
     const message = say('outside', lang);
     return text ? new Response(message, { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Access-Control-Allow-Origin': '*' } }) : json({ error: message }, 400);

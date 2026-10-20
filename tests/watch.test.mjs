@@ -86,6 +86,18 @@ test('an English question gets an English spoken answer', async () => {
   assert.match(await (await plan('format=text&lat=51.1283&lon=71.4304&mood=coffee&q=кофе')).text(), /Идти примерно/);
 });
 
+test('a Kazakh question gets a Kazakh spoken answer without Gemini', async () => {
+  const question = encodeURIComponent('жақын жерде кофе қайда?');
+  const ask = await handleApi(new Request(`https://demo.example/api/watch/ask?format=text&lat=51.1283&lon=71.4304&q=${question}`), {}, pois);
+  const text = await ask.text();
+  assert.match(text, /^Кофейня у Байтерека, кафе\. Жаяу шамамен \d+ минут, барып-қайтқанда бүкіл серуен шамамен \d+ минут алады, сағат \d\d:\d\d шамасында ораласыз\./);
+  assert.doesNotMatch(text, /Идти|пешком|вернётесь/);
+  assert.match(await (await plan(`format=text&lat=51.1283&lon=71.4304&mood=coffee&q=${question}`)).text(), /Жаяу шамамен/);
+  assert.match(await (await plan('format=text&lat=51.1283&lon=71.4304&mood=coffee&lang=kk')).text(), /Жаяу шамамен/);
+  assert.match(await (await plan(`format=text&lat=43.2&lon=76.9&mood=coffee&q=${question}`)).text(), /тек Астанада/);
+  assert.match(spokenPlan({ places: [] }, new Date(), 'kk'), /табылмады/);
+});
+
 test('nothing in reach is said honestly', () => {
   assert.match(spokenPlan({ places: [] }), /не нашлось/);
 });
