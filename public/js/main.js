@@ -6,6 +6,7 @@ import { on } from './core/store.js';
 import { applyTheme, isDark } from './core/theme.js';
 import { initShell, openTab, allTabs } from './shell.js';
 import { initSheet, setSnap } from './ui/sheet.js';
+import { askPhoto } from './ui/vision.js';
 import { initMap, setDark, setPadding, refreshOverlays, toggleTilt, getMap, mapReady, marker, flyTo, userDot } from './map/map.js';
 import { toast } from './ui/toast.js';
 import './tabs/index.js';
@@ -19,7 +20,8 @@ function applySheet(state) {
   lastSheet = state;
   const { visible, panel, desktop } = state;
   document.documentElement.style.setProperty('--sheet-visible', `${visible}px`);
-  setPadding(desktop ? { left: panel + 8, bottom: 0, top: 0 } : { left: 0, bottom: Math.max(0, visible - 8), top: 60 }, Boolean(getMap()));
+  // The buttons on the right edge take about 60 px; framed points stay clear of them.
+  setPadding(desktop ? { left: panel + 8, bottom: 0, top: 0, right: 64 } : { left: 0, bottom: Math.max(0, visible - 8), top: 60, right: 60 }, Boolean(getMap()));
 }
 on('sheet', applySheet);
 initShell(body, $('#tabbar'));
@@ -43,12 +45,14 @@ $('#fab-tilt').addEventListener('click', (event) => {
   const on3d = toggleTilt();
   event.currentTarget.setAttribute('aria-pressed', String(on3d));
 });
+$('#fab-camera').addEventListener('click', askPhoto);
 $('#fab-zoom-in').addEventListener('click', () => getMap()?.zoomIn());
 $('#fab-zoom-out').addEventListener('click', () => getMap()?.zoomOut());
 
 function labelControls() {
   $('#fab-locate').setAttribute('aria-label', t('fab.locate'));
   $('#fab-tilt').setAttribute('aria-label', t('fab.tilt'));
+  $('#fab-camera').setAttribute('aria-label', t('vision.title'));
   $('#fab-zoom-in').setAttribute('aria-label', t('fab.zoomIn'));
   $('#fab-zoom-out').setAttribute('aria-label', t('fab.zoomOut'));
   $('#map').setAttribute('aria-label', t('map.label'));

@@ -9,9 +9,11 @@ import { lang } from '../core/i18n.js';
 import { setOverlay, removeOverlay, setData, onLayerClick, cssVar, fitPoints, flyTo, mapReady } from '../map/map.js';
 import * as layers from '../map/layers.js';
 import { setSnap } from '../ui/sheet.js';
-import { categoryArt, categoryName, hoursStatus, hoursChip, CATEGORY_COLOR, backButton } from '../ui/common.js';
+import { categoryArt, categoryName, hoursStatus, hoursChip, CATEGORY_COLOR, backButton, listenButton } from '../ui/common.js';
 import { placeView } from '../ui/place.js';
 import { startWalk } from '../ui/live.js';
+import { askPhoto } from '../ui/vision.js';
+import { identify } from '../core/media.js';
 
 const FILTERS = [['all', null], ['cafe', ['cafe']], ['restaurant', ['restaurant']], ['park', ['park', 'playground']], ['family', ['family', 'playground']], ['culture', ['museum', 'culture']], ['attraction', ['attraction']], ['nightlife', ['nightlife']], ['mall', ['mall']]];
 const PAGE = 40;
@@ -22,6 +24,7 @@ let openNow = false;
 let search = '';
 let shown = PAGE;
 let current = null;
+let vision = null;
 let listHost = null;
 let countHost = null;
 
@@ -95,6 +98,8 @@ function renderBrowse() {
     h('h1', { id: 'explore-title', class: 'title-1', text: t('tab.explore') }),
     h('p', { class: 'meta' }, icon('pin', 'icon-xs'), t('explore.near', { name: start.name })),
     h('div', { class: 'search-field' }, icon('search', 'search-icon'), input),
+    h('button', { class: 'vision-cta', type: 'button', onclick: askPhoto }, h('span', { class: 'vision-cta-icon', 'aria-hidden': 'true' }, icon('camera')),
+      h('span', { class: 'row-text' }, h('strong', { text: t('vision.title') }), h('small', { text: t('vision.cta') })), h('span', { class: 'ai-chip' }, icon('sparkle', 'icon-xs'), 'Gemini')),
     chips, countHost, listHost));
   layers.showStart(start, start.name);
   if (data) { drawMap(filtered()); renderList(); }
@@ -117,6 +122,63 @@ function openPlace(place) {
   fitPoints([[start.lon, start.lat], [place.lon, place.lat]], { maxZoom: 17 });
 }
 
+// ---------- «Что это за здание?» ----------
+function startVision(image) {
+  const start = startPoint();
+  vision = { image, status: 'loading' };
+  renderVision();
+  identify({ image, lat: start.lat, lon: start.lon })
+    .then((data) => { if (vision?.image === image) { vision = { image, status: 'done', data }; renderVision(); } })
+    .catch((error) => { if (vision?.image === image) { vision = { image, status: 'error', error: error.message }; renderVision(); } });
+}
+
+function renderVision() {
+  if (!root || !vision) return;
+  setSnap('half');
+  const { image, status, data } = vision;
+  const back = backButton(t('common.back'), () => { vision = null; renderBrowse(); });
+  const photo = h('img', { class: 'vision-photo', src: image, alt: t('vision.photo') });
+  const again = h('button', { class: 'btn btn-quiet', type: 'button', onclick: askPhoto }, icon('camera'), t('vision.again'));
+  const body = [];
+  if (status === 'loading') {
+    body.push(h('p', { class: 'lead vision-wait' }, h('span', { class: 'spinner', 'aria-hidden': 'true' }), t('vision.loading')));
+  } else if (status === 'error') {
+    body.push(h('p', { class: 'banner is-bad' }, icon('warning'), vision.error || t('vision.fail')), again);
+  } else {
+    const found = data.place;
+    if (found) {
+      const known = (data?.items || []).find((item) => item.id === found.id);
+      const place = known || { ...found, sourceUrl: found.sourceUrl };
+      const facts = Array.isArray(data.facts) ? data.facts : [];
+      body.push(h('div', { class: 'vision-found' }, categoryArt(found.category, 48, 'art art-lg'),
+        h('div', {}, h('h3', { class: 'title-2', text: found.name }),
+          h('p', { class: 'meta' }, categoryName(found.category), found.distanceMeters ? h('span', { class: 'meta-sep', 'aria-hidden': 'true' }) : null,
+            found.distanceMeters ? t('vision.away', { d: formatDistance(found.distanceMeters, lang()) }) : null),
+          h('div', { class: 'place-badges' }, CONF[data.confidence] ? h('span', { class: `confidence confidence-${data.confidence}` }, t(CONF[data.confidence])) : null,
+            h('span', { class: 'fine', text: t('vision.name', { source: data.nameSource || 'OpenStreetMap' }) })))));
+      if (facts.length) body.push(h('ul', { class: 'vision-facts' }, facts.map((fact) => h('li', {}, h('span', { class: 'ai-chip' }, icon('sparkle', 'icon-xs'), t('vision.idea')), h('span', { text: fact })))));
+      body.push(h('div', { class: 'place-actions' },
+        h('button', { class: 'btn btn-gold', type: 'button', onclick: () => { vision = null; openPlace(place); } }, icon('walk'), t('vision.open')),
+        listenButton(() => [found.name, ...facts].join('. '))));
+      mapReady.then(() => { const start = startPoint(); layers.showStart(start, start.name); fitPoints([[start.lon, start.lat], [found.lon, found.lat]], { maxZoom: 17 }); });
+    } else {
+      body.push(h('p', { class: 'lead', text: data.seen ? `${t('vision.unknown')} ${t('vision.seen', { seen: data.seen })}` : t('vision.unknown') }));
+    }
+    if (data.nearby?.length) {
+      body.push(h('h3', { class: 'block-title', text: t('vision.nearby') }), h('div', { class: 'list' }, data.nearby.map((item) => h('button', { class: 'list-row', type: 'button',
+        onclick: () => { const known = (data?.items || []).find((p) => p.id === item.id); if (known) { vision = null; openPlace(known); } } },
+      categoryArt(item.category, 32, 'art'), h('span', { class: 'row-text' }, h('strong', { text: item.name }), h('small', { text: formatDistance(item.distanceMeters, lang()) })), icon('chevron', 'row-chevron')))));
+    }
+    body.push(again);
+    if (data.privacy) body.push(h('p', { class: 'fine', text: data.privacy }));
+  }
+  clear(root, h('section', { class: 'view vision-view', 'aria-labelledby': 'vision-title', 'aria-busy': String(status === 'loading') },
+    h('div', { class: 'view-bar' }, back),
+    h('h2', { id: 'vision-title', class: 'title-1', text: t('vision.title') }),
+    photo, ...body));
+}
+const CONF = { high: 'conf.high', medium: 'conf.medium', low: 'conf.low' };
+
 registerTab({
   id: 'explore', ownMap: true, order: 20, icon: 'map', title: 'tab.explore',
   mount(container) {
@@ -125,6 +187,7 @@ registerTab({
     api.places().then((loaded) => {
       data = loaded;
       if (root !== container) return;
+      if (vision) { drawMap(filtered()); return; }
       const wanted = new URLSearchParams(location.search).get('place');
       const place = wanted && data.items.find((item) => item.id === wanted);
       if (place) { history.replaceState(null, '', location.pathname); openPlace(place); return; }
@@ -132,6 +195,6 @@ registerTab({
       mapReady.then(() => { const start = startPoint(); flyTo([start.lon, start.lat], 14.6, 600, { exact: true }); });
     }).catch(() => { if (listHost) clear(listHost, h('p', { class: 'empty-note', text: t('explore.failed') })); });
   },
-  reopen() { if (root) renderBrowse(); },
-  unmount() { removeOverlay('places'); layers.hideRoutes(); layers.hideStart(); root = null; },
+  reopen(params) { if (!root) return; if (params?.vision) startVision(params.vision); else { vision = null; renderBrowse(); } },
+  unmount() { removeOverlay('places'); layers.hideRoutes(); layers.hideStart(); root = null; vision = null; },
 });

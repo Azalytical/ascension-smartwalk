@@ -10,7 +10,7 @@ import * as layers from '../map/layers.js';
 import { setSnap, ensureAtLeast, getSnap } from '../ui/sheet.js';
 import { toast, announce } from '../ui/toast.js';
 import { timeRing } from '../ui/ring.js';
-import { art, categoryArt, categoryName, hoursStatus, hoursChip, share, returnBy, backButton } from '../ui/common.js';
+import { art, categoryArt, categoryName, hoursStatus, hoursChip, share, returnBy, backButton, listenButton } from '../ui/common.js';
 import { placeView } from '../ui/place.js';
 import { mountLive, startWalk } from '../ui/live.js';
 
@@ -393,7 +393,8 @@ function aiCard(generation) {
   const note = h('p', { class: 'fine', text: t('results.aiNote'), hidden: true });
   const more = h('button', { class: 'ai-more', type: 'button', 'aria-expanded': 'false', text: t('results.aiMore') });
   const card = h('div', { class: 'ai-card' }, h('p', { class: 'ai-label' }, icon('sparkle'), t(generation.provider === 'gemini' ? 'results.aiGemini' : 'results.ai')),
-    h('p', { class: 'ai-text', text: generation.summary }), generation.label ? h('p', { class: 'origin', text: generation.label }) : null, note, more);
+    h('p', { class: 'ai-text', text: generation.summary }), generation.label ? h('p', { class: 'origin', text: generation.label }) : null, note,
+    h('div', { class: 'ai-actions' }, more, listenButton(generation.summary)));
   more.addEventListener('click', () => {
     const open = !card.classList.contains('is-open');
     card.classList.toggle('is-open', open);

@@ -35,11 +35,12 @@ export function hoursChip(status) {
   return h('span', { class: `status status-${status.tone}` }, h('span', { class: 'status-dot', 'aria-hidden': 'true' }), status.text);
 }
 
-export function navLinks(from, to) {
+export function navLinks(from, to, serverLinks = null) {
+  // The server's links carry no start point: the map app starts from where the person is.
   const links = [
-    ['2ГИС', `https://2gis.kz/astana/routeSearch/rsType/pedestrian/from/${from.lon},${from.lat}/to/${to.lon},${to.lat}`],
+    ['2ГИС', serverLinks?.twoGis || `https://2gis.kz/astana/routeSearch/rsType/pedestrian/from/${from.lon},${from.lat}/to/${to.lon},${to.lat}`],
     [lang() === 'en' ? 'Yandex Maps' : 'Яндекс Карты', `https://yandex.kz/maps/?rtext=${from.lat},${from.lon}~${to.lat},${to.lon}&rtt=pd`],
-    ['Google Maps', `https://www.google.com/maps/dir/?api=1&origin=${from.lat},${from.lon}&destination=${to.lat},${to.lon}&travelmode=walking`],
+    ['Google Maps', serverLinks?.googleMapsWalk || `https://www.google.com/maps/dir/?api=1&origin=${from.lat},${from.lon}&destination=${to.lat},${to.lon}&travelmode=walking`],
   ];
   return h('div', { class: 'nav-links' }, h('span', { class: 'nav-links-label', text: t('place.routeIn') }),
     h('div', { class: 'nav-links-row' }, links.map(([label, href]) => h('a', { class: 'btn btn-quiet btn-sm', href, target: '_blank', rel: 'noopener noreferrer' }, label))));
@@ -64,6 +65,20 @@ export function watchUrl({ place, start, walk, visit, back, minutes }) {
 
 export function watchButton(options) {
   return h('button', { class: 'btn btn-quiet btn-sm watch-btn', type: 'button', onclick: () => share({ title: 'Seruen', text: t('place.watchText', { name: options.place.name }), url: watchUrl(options) }) }, icon('watch'), t('place.watch'));
+}
+
+/** «Слушать»: Gemini reads the text aloud; a second tap stops it. */
+export function listenButton(getText) {
+  const button = h('button', { class: 'btn btn-quiet btn-sm listen-btn', type: 'button', 'aria-pressed': 'false' }, icon('speaker'), h('span', { text: t('common.listen') }));
+  const label = button.querySelector('span');
+  button.addEventListener('click', async () => {
+    const { speakText, stopSpeaking } = await import('../core/media.js');
+    if (button.getAttribute('aria-pressed') === 'true') { stopSpeaking(); return; }
+    button.setAttribute('aria-pressed', 'true'); label.textContent = t('common.stop');
+    try { await speakText(typeof getText === 'function' ? getText() : getText); }
+    finally { button.setAttribute('aria-pressed', 'false'); label.textContent = t('common.listen'); }
+  });
+  return button;
 }
 
 export const returnBy = (minutes, startAt = Date.now()) => time(new Date(startAt + minutes * 60000));
