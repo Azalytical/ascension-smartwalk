@@ -2,7 +2,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { recommend } from '../src/retrieval.mjs';
+import { recommend, notabilityFor } from '../src/retrieval.mjs';
+import { runAgent } from '../src/agent.mjs';
+import { limitedJson, answerLanguage, UNSUPPORTED } from '../src/api.mjs';
 import { queryIntents, nightReference } from '../src/intent.mjs';
 import { weatherCondition, currentWeather, resetWeatherCache } from '../src/weather.mjs';
 import { handleApi } from '../src/api.mjs';
@@ -279,4 +281,30 @@ test('jury v4: wishes no source confirms reach Gemini as «unconfirmed», and ho
 test('jury v4: the agent\'s plan_walk passes unconfirmed wishes to Gemini', async () => {
   const plan = await runTool('plan_walk', { minutes: 60, query: 'тихое кафе с розеткой', lat: at.baiterek[0], lon: at.baiterek[1] }, { dataset: places });
   assert.deepEqual(plan.unconfirmed, ['розетки', 'тишина']);
+});
+
+test('jury v5: notability from open data is shown as such, never as a rating, and leads a tourist to Бәйтерек', () => {
+  const result = ask('baiterek', { minutes: 120, maxWalkMinutes: 30, query: 'Я турист, у меня 2 часа перед вылетом: что можно посмотреть поблизости?', visitDate: '2026-10-22T14:00:00+05:00' });
+  const baiterek = result.recommendations[0];
+  assert.equal(baiterek.name, 'Бәйтерек');
+  assert.equal(baiterek.notability.level, 'high');
+  assert.equal(baiterek.notability.isRating, false);
+  assert.ok(baiterek.notability.reasons.includes('есть в Wikidata'));
+  assert.equal(notabilityFor({ name: 'Детская площадка', nameIsGenerated: true }).level, 'low');
+});
+
+test('jury v5: the airport transport hint reaches Gemini as beyondWalk, and the agent without a model answers in the asker\'s language', async () => {
+  at.airport = [51.0269, 71.4614];
+  const query = 'I am a tourist with 2 hours before my flight, what can I see nearby?';
+  const plan = await runTool('plan_walk', { minutes: 120, query, lat: at.airport[0], lon: at.airport[1] }, { dataset: places });
+  assert.equal(plan.beyondWalk.needsTransport, true);
+  assert.ok(plan.beyondWalk.name && plan.beyondWalk.distanceKm > 1);
+  const answer = await runAgent({ query, lat: at.airport[0], lon: at.airport[1], minutes: 120 },
+    { env: {}, dataset: places, limitedJson, answerLanguage, unsupported: UNSUPPORTED });
+  assert.equal(answer.mode, 'fallback');
+  assert.match(answer.summary, /^Below are separate options/);
+  assert.match(answer.summary, new RegExp(`the nearest beyond it is «${plan.beyondWalk.name}», about ${plan.beyondWalk.distanceKm} km away, so you would need transport`));
+  const kk = await runAgent({ query: 'Маған жақын жерде кофе ішкім келеді', lat: at.mega[0], lon: at.mega[1], minutes: 45 },
+    { env: {}, dataset: places, limitedJson, answerLanguage, unsupported: UNSUPPORTED });
+  assert.match(kk.summary, /^Төменде бөлек нұсқалар/);
 });
