@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- Apple Watch renders pages at a shrunk desktop width unless the page opts out of the adaptation. -->
+  <meta name="disabled-adaptations" content="watch">
+  <meta name="theme-color" content="#0A0F15">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Seruen на часах: куда пойти, сколько идти и когда пора обратно.">
+  <title>Seruen · часы</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230E1621'/%3E%3Cpath d='M37.6 16.7A16 16 0 1 0 48 30' fill='none' stroke='%23F5B700' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='43.5' cy='20.5' r='3.6' fill='%234AA8FF'/%3E%3C/svg%3E" type="image/svg+xml">
+  <link rel="stylesheet" href="/watch.css">
+  <script src="/watch.js" defer></script>
+</head>
+<body>
+  <div class="stage">
+    <div class="device" id="device">
+      <div class="crown" aria-hidden="true"></div>
+      <main class="screen" id="screen">
+        <section class="view view-home" id="view-home" aria-labelledby="home-title">
+          <p class="clock" aria-hidden="true"><svg class="mark" viewBox="0 0 64 64"><path d="M37.6 16.7A16 16 0 1 0 48 30"/><circle cx="43.5" cy="20.5" r="3.6"/></svg><span id="clock">--:--</span></p>
+          <h1 class="title" id="home-title">Куда?</h1>
+          <div class="moods">
+            <button class="mood" type="button" data-mood="coffee"><img src="/assets/icons/categories/coffee-64.webp" alt="" width="32" height="32"><span>Кофе</span></button>
+            <button class="mood" type="button" data-mood="park"><img src="/assets/icons/categories/park-64.webp" alt="" width="32" height="32"><span>Парк</span></button>
+            <button class="mood" type="button" data-mood="child"><img src="/assets/icons/categories/family-64.webp" alt="" width="32" height="32"><span>С ребёнком</span></button>
+            <button class="mood" type="button" data-mood="indoor"><img src="/assets/icons/categories/indoor-64.webp" alt="" width="32" height="32"><span>Под крышей</span></button>
+            <button class="mood" type="button" data-mood="food"><img src="/assets/icons/categories/food-64.webp" alt="" width="32" height="32"><span>Поесть</span></button>
+            <button class="mood" type="button" data-mood="sights"><img src="/assets/icons/categories/landmark-64.webp" alt="" width="32" height="32"><span>Интересное</span></button>
+          </div>
+          <button class="chip" id="time-chip" type="button" aria-label="Время на прогулку, нажмите, чтобы изменить"><span class="chip-label">Есть</span> <b id="time-value">45</b> мин</button>
+          <button class="chip chip-start" id="start-chip" type="button" aria-label="Откуда идём, нажмите, чтобы изменить"><span class="chip-label">От</span> <b id="start-value">моего места</b></button>
+          <p class="footnote">Места из OpenStreetMap</p>
+        </section>
+
+        <section class="view view-loading" id="view-loading" hidden>
+          <div class="spinner" aria-hidden="true"></div>
+          <p class="loading-text" id="loading-text" role="status">Ищем рядом…</p>
+        </section>
+
+        <section class="view view-results" id="view-results" aria-label="Варианты прогулки" hidden>
+          <div class="results" id="results"></div>
+          <div class="results-end">
+            <button class="action ghost" id="ask-gemini" type="button">Почему эти? · Gemini</button>
+            <p class="tip" id="gemini-tip" role="status" hidden></p>
+            <button class="action ghost" id="back-home" type="button">Назад</button>
+          </div>
+        </section>
+
+        <section class="view view-go" id="view-go" aria-label="Прогулка" hidden>
+          <!-- The brand ring as a clock: planned there / stay / back / reserve, a blue dot for now. -->
+          <svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
+            <g id="ring-plan" class="ring-plan" transform="rotate(-90 50 50)"></g>
+            <g id="ring-done" class="ring-done" transform="rotate(-90 50 50)"></g>
+            <circle id="ring-dot" class="ring-dot" cx="50" cy="3.5" r="3.4"></circle>
+          </svg>
+          <div class="north" id="north" aria-hidden="true"><span>С</span></div>
+          <p class="go-phase" id="go-phase">Туда</p>
+          <p class="go-name" id="go-name"></p>
+          <div class="go-main">
+            <div class="arrow-wrap" aria-hidden="true">
+              <svg class="arrow" id="arrow" viewBox="0 0 64 64"><path d="M32 4 54 56 32 45 10 56Z"/></svg>
+            </div>
+            <p class="go-big" aria-live="polite"><b id="go-minutes">–</b><span id="go-unit">мин</span></p>
+          </div>
+          <p class="go-back" id="go-back"></p>
+          <div class="go-actions">
+            <button class="action" id="go-next" type="button">Я на месте</button>
+            <button class="icon-button" id="go-stop" type="button" aria-label="Закончить прогулку">✕</button>
+          </div>
+          <p class="demo-badge" id="demo-badge" hidden>ДЕМО ×30</p>
+        </section>
+
+        <section class="view view-done" id="view-done" hidden>
+          <p class="done-mark" aria-hidden="true">✓</p>
+          <h2 class="title" id="done-title">Вы вернулись</h2>
+          <p class="done-text" id="done-text"></p>
+          <button class="action" id="done-home" type="button">Ещё прогулка</button>
+        </section>
+
+        <section class="view view-error" id="view-error" hidden>
+          <p class="error-text" id="error-text" role="alert"></p>
+          <button class="action" id="error-retry" type="button">Ещё раз</button>
+          <button class="action ghost" id="error-home" type="button">Назад</button>
+        </section>
+      </main>
+    </div>
+
+    <aside class="caption" aria-label="О версии для часов">
+      <p class="kicker"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><path d="M37.6 16.7A16 16 0 1 0 48 30"/><circle cx="43.5" cy="20.5" r="3.6"/></svg>seruen · часы</p>
+      <h2>Взгляните на запястье: куда идти, сколько и когда обратно.</h2>
+      <p>Выберите настроение, и часы покажут стрелку к месту, минуты пешком и кольцо времени: туда, на месте, обратно. Синяя точка идёт по кольцу, а когда пора возвращаться, часы вибрируют.</p>
+      <div class="segmented" role="group" aria-label="Форма часов">
+        <button type="button" data-shape="round" aria-pressed="true">Круглые</button>
+        <button type="button" data-shape="square" aria-pressed="false">Apple Watch</button>
+      </div>
+      <label class="demo-toggle"><input type="checkbox" id="demo-toggle"> Демо-прогулка: время ×30</label>
+      <p class="open-on-watch">На часах откройте <b id="watch-url">/watch</b></p>
+      <a class="caption-link" href="/">← Полная версия Seruen</a>
+    </aside>
+  </div>
+</body>
+</html>

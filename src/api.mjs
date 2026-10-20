@@ -1,6 +1,7 @@
 import { recommend } from './retrieval.mjs';
 import { handleTelegram } from './telegram.mjs';
 import { handleSocial } from './social/routes.mjs';
+import { handleWatch } from './watch.mjs';
 
 const HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
@@ -192,6 +193,7 @@ export async function handleApi(request, env = {}, dataset = []) {
       generationAvailable: Boolean(activeProvider(env)), generationProvider: activeProvider(env)?.name ?? null,
       source: 'OpenStreetMap', version: '1.1.0', social: Boolean(env.SOCIAL || env.SOCIAL_LOCAL) });
   }
+  if (url.pathname.startsWith('/api/watch/')) return handleWatch(request, env, pois) ?? json({ error: 'Не найдено' }, 404);
   if (url.pathname === '/telegram/webhook') {
     if (request.method !== 'POST') return json({ error: 'Метод не поддерживается' }, 405, { Allow: 'POST' });
     // Per-chat limit through the same in-memory budget; over the limit the bot answers without the model.
