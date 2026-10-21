@@ -50,8 +50,36 @@
   function element(tag, className, text) {
     const node = document.createElement(tag);
     if (className) node.className = className;
-    if (text !== undefined) node.textContent = text;
+    if (text !== undefined) setText(node, text);
     return node;
+  }
+
+  // Icons come from the sprite in watch.html. Watch fonts lack symbols such as ✦ ✓ ★, which showed as empty boxes,
+  // so texts keep them as markers and setText draws each one as an icon.
+  const GLYPHS = { '✦': 'spark', '📍': 'pin', '⚠': 'warning', '🔔': 'bell', '🔊': 'sound', '✓': 'check', '★': 'star', '↓': 'down', '→': 'next', '⌚': 'watch' };
+  const GLYPH = new RegExp(`(${Object.keys(GLYPHS).join('|')})\uFE0F?`, 'u');
+
+  function icon(name) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'i');
+    svg.setAttribute('aria-hidden', 'true');
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', `#i-${name}`);
+    svg.append(use);
+    return svg;
+  }
+
+  function setText(node, text) {
+    const parts = String(text).split(GLYPH);
+    if (parts.length === 1) node.textContent = parts[0];
+    else node.replaceChildren(...parts.map((part, index) => (index % 2 ? icon(GLYPHS[part]) : part)).filter((part) => part !== ''));
+  }
+
+  // A category as on the mood buttons: its icon in a tinted circle.
+  function categoryIcon(name) {
+    const badge = element('span', `cat cat-${name}`);
+    badge.append(icon(name));
+    return badge;
   }
 
   // Clock times are Astana time (UTC+5 all year) whatever zone the watch is set to; shifting by hand avoids outdated time zone data.
@@ -64,7 +92,7 @@
   // The page's own texts are marked in watch.html: data-t for the text, data-t-placeholder, data-t-aria and data-t-content.
   function translatePage() {
     document.documentElement.lang = LANG;
-    for (const node of document.querySelectorAll('[data-t]')) node.textContent = t(node.dataset.t);
+    for (const node of document.querySelectorAll('[data-t]')) setText(node, t(node.dataset.t));
     for (const node of document.querySelectorAll('[data-t-placeholder]')) node.placeholder = t(node.dataset.tPlaceholder);
     for (const node of document.querySelectorAll('[data-t-aria]')) node.setAttribute('aria-label', t(node.dataset.tAria));
     for (const node of document.querySelectorAll('[data-t-content]')) node.setAttribute('content', t(node.dataset.tContent));
@@ -390,10 +418,7 @@
       const card = element('article', 'card');
       card.setAttribute('aria-label', t('card.aria', { i: index + 1, n: places.length, name: place.name }));
       const top = element('p', 'card-top');
-      const image = element('img');
-      image.src = `/assets/icons/categories/${iconName}-64.webp`;
-      image.alt = '';
-      top.append(image, element('span', '', `${index + 1}/${places.length} · ${label}`));
+      top.append(categoryIcon(iconName), element('span', '', `${index + 1}/${places.length} · ${label}`));
       const walk = element('p', 'card-walk');
       const caption = element('span');
       caption.append(t('card.walk1'), document.createElement('br'), t('card.walk2'));
@@ -502,7 +527,7 @@
     stopVoice();
     state.mood = null;
     show('loading');
-    $('loading-text').textContent = t('loading.think');
+    setText($('loading-text'), t('loading.think'));
     const start = await resolveStart();
     const previous = state.chat ? { query: state.chat.question, summary: state.chat.summary } : undefined;
     const controller = new AbortController();
@@ -772,7 +797,7 @@
       // The first fix can take a few seconds.
       if (!live && (walk.fix || Date.now() - walk.t0 > 8000)) shown = walk.fix === 'phone' ? t('go.fromPhone', { ago: ago(walk.fixAt) }) : t('go.noGps');
     }
-    $('demo-badge').textContent = shown;
+    setText($('demo-badge'), shown);
     $('demo-badge').hidden = !shown;
     $('demo-badge').classList.toggle('gps-off', Boolean(walk && !walk.demo && shown !== text));
   }
@@ -1003,7 +1028,7 @@
   }
 
   function showLink(message) {
-    $('link-text').textContent = message || t('link.text');
+    setText($('link-text'), message || t('link.text'));
     $('link-text').classList.toggle('error', Boolean(message));
     show('link');
   }
@@ -1173,7 +1198,7 @@
         body: t('meet.remindBody', { place: meetup.place.name, time: time(meetup.startsAt), n: walkMinutes }).slice(0, 240) }]);
     }
     if (await rsvp(meetup.id, 'going')) {
-      answer.textContent = t('meet.promised');
+      setText(answer, t('meet.promised'));
       buzz(40);
     } else {
       answer.disabled = false;

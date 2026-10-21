@@ -10,12 +10,36 @@
   <meta name="description" content="Aidem на часах: куда пойти, сколько идти и когда пора обратно." data-t-content="page.description">
   <title data-t="page.title">Aidem · часы</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230E1621'/%3E%3Cpath d='M37.6 16.7A16 16 0 1 0 48 30' fill='none' stroke='%23F5B700' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='43.5' cy='20.5' r='3.6' fill='%234AA8FF'/%3E%3C/svg%3E" type="image/svg+xml">
-  <link rel="stylesheet" href="/watch.css">
+  <link rel="stylesheet" href="/watch.css?v=icons">
   <script src="/watch-text.js" defer></script>
   <script src="/watch-remind.js" defer></script>
-  <script src="/watch.js" defer></script>
+  <script src="/watch.js?v=icons" defer></script>
 </head>
 <body>
+  <!-- Icons. Symbols such as ✦ ✓ ★ ⌫ are missing from watch fonts and showed as empty boxes, so every icon is drawn here; watch.js uses the same sprite. -->
+  <svg class="sprite" aria-hidden="true">
+    <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M3.5 9.5h13v4a5.5 5.5 0 0 1-5.5 5.5H9a5.5 5.5 0 0 1-5.5-5.5Z"/><path d="M16.5 11h1.3a2.7 2.7 0 0 1 0 5.4h-2M2.5 21.5h15M8 2c-1.2 1.4 1.2 2.6 0 5m4-5c-1.2 1.4 1.2 2.6 0 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-park" viewBox="0 0 24 24"><path d="M12 1.8a5.2 5.2 0 0 0-5 3.9 4.6 4.6 0 0 0-.4 9.1H11V22h2v-7.2h4.4a4.6 4.6 0 0 0-.4-9.1 5.2 5.2 0 0 0-5-3.9Z"/></symbol>
+    <symbol id="i-family" viewBox="0 0 24 24"><circle cx="8" cy="4.6" r="2.6"/><circle cx="17.5" cy="10.4" r="2.1"/><path d="M5.6 8.4h4.8a2.6 2.6 0 0 1 2.6 2.6v4.3h-1.6V22H4.6v-6.7H3V11a2.6 2.6 0 0 1 2.6-2.6Zm9.9 5h4a2 2 0 0 1 2 2v2.8h-1.2V22h-5.6v-3.8H14v-2.8a2 2 0 0 1 1.5-2Z"/></symbol>
+    <symbol id="i-indoor" viewBox="0 0 24 24"><path d="M4.2 2.5h15.6L22 8.3a2.7 2.7 0 0 1-5 1.5 2.7 2.7 0 0 1-5 0 2.7 2.7 0 0 1-5 0 2.7 2.7 0 0 1-5-1.5Z"/><path fill-rule="evenodd" d="M4 12.3a4.6 4.6 0 0 0 3-.7 4.6 4.6 0 0 0 5 0 4.6 4.6 0 0 0 5 0 4.6 4.6 0 0 0 3 .7V21.5H4Zm3 2.7v6.5h4V15Zm6.5 0v3.8H17V15Z"/></symbol>
+    <symbol id="i-food" viewBox="0 0 24 24"><path d="M5 2.5v5.8a2.5 2.5 0 0 0 5 0V2.5M7.5 2.5v19M17.5 13.5v8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M19 2.2c-2.8.9-4.6 4-4.6 7.9v4.4H19Z"/></symbol>
+    <symbol id="i-landmark" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M4 7.5h3.2l1.5-2.5h6.6l1.5 2.5H20a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9.5a2 2 0 0 1 2-2Zm8 2.3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/></symbol>
+    <symbol id="i-museum" viewBox="0 0 24 24"><path d="M12 2 2.5 7v2.2h19V7Z"/><path d="M4.5 10.7h3v7.3h-3Zm6 0h3v7.3h-3Zm6 0h3v7.3h-3ZM2.5 19.5h19V22h-19Z"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="8.5" y="2" width="7" height="12" rx="3.5"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 1.5c.8 5.7 4.8 9.7 10.5 10.5-5.7.8-9.7 4.8-10.5 10.5-.8-5.7-4.8-9.7-10.5-10.5C7.2 11.2 11.2 7.2 12 1.5Z"/></symbol>
+    <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="7.5" r="3.7"/><path d="M1.8 20.5c0-4.3 3.2-7 7.2-7s7.2 2.7 7.2 7Z"/><circle cx="17.2" cy="8.6" r="2.9"/><path d="M16.8 13.5c3.2.1 5.4 2.6 5.4 6.2v.8h-4.4c0-2.8-.8-5.1-2.6-6.8.5-.1 1-.2 1.6-.2Z"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="i-erase" viewBox="0 0 24 24"><path d="M8.6 5H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8.6L2.2 12Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="m11.5 9.5 5 5m0-5-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m4.5 12.5 5 5 10-11" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 2.2 2.9 6.2 6.8.8-5 4.7 1.3 6.7L12 17.3l-6 3.3 1.3-6.7-5-4.7 6.8-.8Z"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2a7 7 0 0 0-7 7c0 5.1 7 13 7 13s7-7.9 7-13a7 7 0 0 0-7-7Zm0 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></symbol>
+    <symbol id="i-warning" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M10.2 3.4a2.1 2.1 0 0 1 3.6 0l8 13.9a2.1 2.1 0 0 1-1.8 3.2H4a2.1 2.1 0 0 1-1.8-3.2Zm.8 4.6h2v6h-2Zm0 8h2v2h-2Z"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 2.5a6.2 6.2 0 0 0-6.2 6.2v4.1L3.6 17h16.8l-2.2-4.2V8.7A6.2 6.2 0 0 0 12 2.5Zm-2.8 16a2.8 2.8 0 0 0 5.6 0Z"/></symbol>
+    <symbol id="i-sound" viewBox="0 0 24 24"><path d="M2.5 8.8h4.2L12 4v16l-5.3-4.8H2.5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7m3-10a9.2 9.2 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v15m-6.5-6.5L12 19l6.5-6.5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-watch" viewBox="0 0 24 24"><path d="M8.2 1.8h7.6l.8 3.4H7.4Zm-.8 17h9.2l-.8 3.4H8.2Z"/><rect x="5.2" y="5.2" width="13.6" height="13.6" rx="3.6"/></symbol>
+  </svg>
   <div class="stage">
     <div class="device" id="device">
       <div class="crown" aria-hidden="true"></div>
@@ -26,30 +50,30 @@
           <!-- The mic is a label for the field: on Apple Watch a tap opens watchOS dictation; where the browser can listen, watch.js records instead. -->
           <form class="search" id="search-form" role="search" action="#">
             <input class="search-input" id="search-input" type="search" name="q" placeholder="Найти место" data-t-placeholder="search.placeholder" enterkeyhint="search" autocomplete="off" aria-label="Найти место по названию или задать вопрос" data-t-aria="search.aria" maxlength="120">
-            <label class="voice" id="voice" for="search-input" role="button" tabindex="0" aria-label="Сказать голосом, куда идти" data-t-aria="search.voice">🎤</label>
+            <label class="voice" id="voice" for="search-input" role="button" tabindex="0" aria-label="Сказать голосом, куда идти" data-t-aria="search.voice"><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg></label>
           </form>
-          <button class="chip chip-ai" id="ai-chip" type="button"><span class="spark" aria-hidden="true">✦</span> <b data-t="ai.chip">Спросить ИИ</b></button>
+          <button class="chip chip-ai" id="ai-chip" type="button"><span class="spark" aria-hidden="true"><svg class="i" aria-hidden="true"><use href="#i-spark"/></svg></span> <b data-t="ai.chip">Спросить ИИ</b></button>
           <div class="moods">
-            <button class="mood" type="button" data-mood="coffee"><img src="/assets/icons/categories/coffee-64.webp" alt="" width="32" height="32"><span data-t="mood.coffee">Кофе</span></button>
-            <button class="mood" type="button" data-mood="park"><img src="/assets/icons/categories/park-64.webp" alt="" width="32" height="32"><span data-t="mood.park">Парк</span></button>
-            <button class="mood" type="button" data-mood="child"><img src="/assets/icons/categories/family-64.webp" alt="" width="32" height="32"><span data-t="mood.child">С детьми</span></button>
-            <button class="mood" type="button" data-mood="indoor"><img src="/assets/icons/categories/indoor-64.webp" alt="" width="32" height="32"><span data-t="mood.indoor">Под крышей</span></button>
-            <button class="mood" type="button" data-mood="food"><img src="/assets/icons/categories/food-64.webp" alt="" width="32" height="32"><span data-t="mood.food">Поесть</span></button>
-            <button class="mood" type="button" data-mood="sights"><img src="/assets/icons/categories/landmark-64.webp" alt="" width="32" height="32"><span data-t="mood.sights">Интересное</span></button>
+            <button class="mood" type="button" data-mood="coffee"><span class="cat cat-coffee"><svg class="i" aria-hidden="true"><use href="#i-coffee"/></svg></span><span data-t="mood.coffee">Кофе</span></button>
+            <button class="mood" type="button" data-mood="park"><span class="cat cat-park"><svg class="i" aria-hidden="true"><use href="#i-park"/></svg></span><span data-t="mood.park">Парк</span></button>
+            <button class="mood" type="button" data-mood="child"><span class="cat cat-family"><svg class="i" aria-hidden="true"><use href="#i-family"/></svg></span><span data-t="mood.child">С детьми</span></button>
+            <button class="mood" type="button" data-mood="indoor"><span class="cat cat-indoor"><svg class="i" aria-hidden="true"><use href="#i-indoor"/></svg></span><span data-t="mood.indoor">Под крышей</span></button>
+            <button class="mood" type="button" data-mood="food"><span class="cat cat-food"><svg class="i" aria-hidden="true"><use href="#i-food"/></svg></span><span data-t="mood.food">Поесть</span></button>
+            <button class="mood" type="button" data-mood="sights"><span class="cat cat-landmark"><svg class="i" aria-hidden="true"><use href="#i-landmark"/></svg></span><span data-t="mood.sights">Интересное</span></button>
           </div>
           <button class="chip" id="time-chip" type="button" aria-label="Время на прогулку, нажмите, чтобы изменить" data-t-aria="time.aria"><span class="chip-label" data-t="time.label">Есть</span> <b id="time-value">45</b> <span data-t="min">мин</span></button>
           <button class="chip chip-start" id="start-chip" type="button" aria-label="Откуда идём, нажмите, чтобы изменить" data-t-aria="start.aria"><span class="chip-label" data-t="start.label">От</span> <b id="start-value">моего места</b></button>
-          <button class="chip chip-meet" id="meet-chip" type="button"><span aria-hidden="true">👥</span> <b data-t="meet.chip">Встречи</b><span class="count" id="meet-count" hidden></span></button>
+          <button class="chip chip-meet" id="meet-chip" type="button"><svg class="i" aria-hidden="true"><use href="#i-people"/></svg> <b data-t="meet.chip">Встречи</b><span class="count" id="meet-count" hidden></span></button>
           <p class="footnote">© OpenStreetMap contributors, Overture Maps Foundation</p>
         </section>
 
         <!-- The assistant: the same Gemini agent as /agent on the phone. Apple Watch answers through its own dictation in the field. -->
         <section class="view view-ask" id="view-ask" aria-labelledby="ask-title" hidden>
-          <h2 class="ask-title" id="ask-title"><span class="spark" aria-hidden="true">✦</span> <span data-t="ask.title">Спросите Aidem</span></h2>
+          <h2 class="ask-title" id="ask-title"><span class="spark" aria-hidden="true"><svg class="i" aria-hidden="true"><use href="#i-spark"/></svg></span> <span data-t="ask.title">Спросите Aidem</span></h2>
           <p class="ask-context" id="ask-context" hidden></p>
           <form class="search" id="ask-form" action="#">
             <input class="search-input" id="ask-input" type="text" name="q" placeholder="Ваш вопрос" data-t-placeholder="ask.placeholder" enterkeyhint="send" autocomplete="off" aria-label="Вопрос помощнику Aidem" data-t-aria="ask.aria" maxlength="300">
-            <label class="voice" id="ask-voice" for="ask-input" role="button" tabindex="0" aria-label="Спросить голосом" data-t-aria="ask.voice">🎤</label>
+            <label class="voice" id="ask-voice" for="ask-input" role="button" tabindex="0" aria-label="Спросить голосом" data-t-aria="ask.voice"><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg></label>
           </form>
           <div class="examples" id="ask-examples"></div>
           <button class="action ghost" id="ask-home" type="button" data-t="back">Назад</button>
@@ -64,7 +88,7 @@
         <section class="view view-results" id="view-results" aria-label="Варианты прогулки" data-t-aria="results.aria" hidden>
           <div class="results" id="results"></div>
           <div class="results-end">
-            <button class="action" id="ask-more" type="button" hidden><span class="spark" aria-hidden="true">✦</span>&nbsp;<span data-t="ask.more">Спросить ещё</span></button>
+            <button class="action" id="ask-more" type="button" hidden><span class="spark" aria-hidden="true"><svg class="i" aria-hidden="true"><use href="#i-spark"/></svg></span><span data-t="ask.more">Спросить ещё</span></button>
             <button class="action ghost" id="ask-gemini" type="button" data-t="gemini.ask">Почему эти? · Gemini</button>
             <p class="tip" id="gemini-tip" role="status" hidden></p>
             <button class="action ghost" id="back-home" type="button" data-t="back">Назад</button>
@@ -90,13 +114,13 @@
           <p class="go-back" id="go-back"></p>
           <div class="go-actions">
             <button class="action" id="go-next" type="button" data-t="go.here">Я на месте</button>
-            <button class="icon-button" id="go-stop" type="button" aria-label="Закончить прогулку" data-t-aria="go.stop">✕</button>
+            <button class="icon-button" id="go-stop" type="button" aria-label="Закончить прогулку" data-t-aria="go.stop"><svg class="i" aria-hidden="true"><use href="#i-close"/></svg></button>
           </div>
           <p class="demo-badge" id="demo-badge" hidden>ДЕМО ×30</p>
         </section>
 
         <section class="view view-link" id="view-link" aria-labelledby="link-title" hidden>
-          <p class="link-mark" aria-hidden="true">👥</p>
+          <p class="link-mark" aria-hidden="true"><svg class="i" aria-hidden="true"><use href="#i-people"/></svg></p>
           <h2 class="link-title" id="link-title" data-t="link.title">Встречи и друзья</h2>
           <p class="link-text" id="link-text" data-t="link.text">На телефоне: Aidem → Профиль → ⌚ Связать часы</p>
           <button class="action" id="link-enter" type="button" data-t="link.enter">Ввести код</button>
@@ -109,7 +133,7 @@
             <button type="button" data-key="1">1</button><button type="button" data-key="2">2</button><button type="button" data-key="3">3</button>
             <button type="button" data-key="4">4</button><button type="button" data-key="5">5</button><button type="button" data-key="6">6</button>
             <button type="button" data-key="7">7</button><button type="button" data-key="8">8</button><button type="button" data-key="9">9</button>
-            <button type="button" data-key="back" class="key-soft" aria-label="Назад" data-t-aria="back">✕</button><button type="button" data-key="0">0</button><button type="button" data-key="del" class="key-soft" aria-label="Стереть цифру" data-t-aria="pair.delete">⌫</button>
+            <button type="button" data-key="back" class="key-soft" aria-label="Назад" data-t-aria="back"><svg class="i" aria-hidden="true"><use href="#i-close"/></svg></button><button type="button" data-key="0">0</button><button type="button" data-key="del" class="key-soft" aria-label="Стереть цифру" data-t-aria="pair.delete"><svg class="i" aria-hidden="true"><use href="#i-erase"/></svg></button>
           </div>
         </section>
 
@@ -123,7 +147,7 @@
         </section>
 
         <section class="view view-done" id="view-done" hidden>
-          <p class="done-mark" aria-hidden="true">✓</p>
+          <p class="done-mark" aria-hidden="true"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg></p>
           <h2 class="title" id="done-title" data-t="done.back">Вы вернулись</h2>
           <p class="done-text" id="done-text"></p>
           <button class="action" id="done-home" type="button" data-t="done.more">Ещё прогулка</button>
