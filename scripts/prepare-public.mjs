@@ -1,5 +1,5 @@
 // Generated files the browser app needs next to public/: vendored MapLibre and fonts, the compact place list,
-// the opening-hours parser shared with the server, and the offline demo answers. Used by both build.mjs and dev.mjs; outputs are gitignored.
+// the opening-hours parser shared with the server, the offline demo answers and the places' H3 cells. Used by both build.mjs and dev.mjs; outputs are gitignored.
 import { readFile, writeFile, mkdir, copyFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -41,6 +41,8 @@ export async function preparePublic() {
   await writeFile(resolve(pub, 'data/places.json'), body);
   // Saved answers for the key scenarios, for when there is no internet.
   await writeFile(resolve(pub, 'data/demo-answers.json'), JSON.stringify(demoAnswers(dataset)));
+  // H3 cells of the places for the «Рядом» map, made by scripts/h3-cells.mjs (h3-js is needed only there).
+  await copyFile(resolve(root, 'data/h3-cells.json'), resolve(pub, 'data/h3.json'));
 
   // The service worker's cache name changes with every build so a deploy replaces the old shell.
   const buildId = createHash('sha256').update(body + Date.now()).digest('hex').slice(0, 10);
