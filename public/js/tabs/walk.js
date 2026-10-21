@@ -713,7 +713,7 @@ function eventsCard(events) {
     h('ul', { class: 'event-list' }, items.map((event) => h('li', {},
       h('a', { class: 'event-row', href: safeUrl(event.url), target: '_blank', rel: 'noopener noreferrer', 'aria-label': `${event.title}. ${t('events.open')}` },
         h('span', { class: 'row-text' }, h('strong', { text: event.title }),
-          h('small', { text: [eventWhen(event), event.venue, t('explore.walk', { n: event.walkMinutes }), event.price].filter(Boolean).join(' · ') })),
+          h('small', { text: [eventWhen(event), event.venue, t('explore.walk', { n: event.walkMinutes }), lang() === 'en' ? event.price?.replace(/теңге/gi, 'tenge') : event.price].filter(Boolean).join(' · ') })),
         icon('external', 'icon-xs'))))));
 }
 // Where the listing comes from and when it was read: collected by the server this morning, or the saved copy.
