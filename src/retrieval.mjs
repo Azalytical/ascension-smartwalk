@@ -768,7 +768,7 @@ function versusFor(cards, { weather, surprise, intents }) {
           { minutes: card.walkMinutes - nearest.walkMinutes, name: nearest.name });
       }
       // Or that it is as near as the others but, unlike them, its hours are not confirmed.
-      if (!reasons.length && ['no_data', 'unknown'].includes(card.hoursCheck?.status) && others.some(other => other.hoursCheck?.status === 'open')) {
+      if (!reasons.length && ['no_data', 'unknown'].includes(card.hoursCheck?.status) && others.every(other => other.hoursCheck?.status === 'open')) {
         add('hoursUnconfirmed', 'часы работы не подтверждены, в отличие от остальных');
       }
       if (!reasons.length) add('similar', 'по времени и условиям похоже на остальные варианты');
