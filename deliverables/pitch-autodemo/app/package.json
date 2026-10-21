@@ -1,0 +1,16 @@
+{
+  "name": "aidem-pitch-autodemo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aidem pitch show: the deck and the live site driven by one key, with a prompter on the laptop screen",
+  "type": "module",
+  "main": "show.mjs",
+  "scripts": {
+    "start": "node show.mjs",
+    "check": "node show.mjs --check"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "playwright-core": "1.64.0"
+  }
+}
