@@ -216,12 +216,22 @@ export const TOUR = [
     say: 'Интерфейс и ответы на русском, казахском и английском. Есть тёмная тема.',
     async run(c) {
       const { d, page } = c;
-      await d.tap('#tab-me', { after: 900 });
-      for (const label of [/ҚАЗ|KAZ|Қаз/i, /EN/i, /РУС|RU/i]) {
-        const b = page.locator('.me-view .seg', { hasText: label }).first();
-        if (await b.count()) { await d.scrollTo(b, { at: 0.35 }); await d.tap(b, { after: 1500 }); }
+      if (!(await page.locator('#tab-me').count())) await open(c, '/', '.view'); // started from this part
+      // The switch in the panel's header (РУС · ҚАЗ · ENG); a site without it: the same choice in «Моё».
+      const head = (id) => page.locator(`.lang-switch .lang-opt[data-lang="${id}"]:visible`).first();
+      if (await head('kk').isVisible().catch(() => false)) {
+        await d.cap('<i>Русский, казахский, английский</i>: переключатель в шапке', 9, 5200);
+        for (const id of ['kk', 'en', 'ru']) await d.tap(head(id), { after: 1700 });
+        await d.tap('#tab-me', { after: 900 });
+      } else {
+        await d.tap('#tab-me', { after: 900 });
+        for (const label of [/ҚАЗ|KAZ|Қаз/i, /EN/i, /РУС|RU/i]) {
+          const b = page.locator('.me-view .seg', { hasText: label }).first();
+          if (await b.count()) { await d.scrollTo(b, { at: 0.35 }); await d.tap(b, { after: 1500 }); }
+        }
+        await d.cap('<i>Русский, казахский, английский</i>', 9, 3800);
       }
-      await d.cap('<i>Русский, казахский, английский</i>', 9, 3800);
+      if (await head('ru').count() && await page.evaluate(() => document.documentElement.lang) !== 'ru') await head('ru').click().catch(() => {});
       const dark = page.locator('.me-view .seg', { hasText: /Тёмная|Dark/i }).first();
       if (await dark.count()) {
         await d.scrollTo(dark, { at: 0.35 });
