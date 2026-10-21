@@ -149,6 +149,31 @@ test('the fair meeting point minimises the longest walk and skips closed places'
   assert.ok(result.data.participants.every(person => person.lat === undefined), 'coordinates are not echoed back');
 });
 
+test('one friend is enough for a meeting point, with or without the caller\'s own point', async () => {
+  const { api, person, befriend, share, now } = setup();
+  const ana = await person('Ана'), bek = await person('Бек'), dina = await person('Дина');
+  await befriend(ana, bek);
+  await befriend(ana, dina);
+  await share(bek);
+  await api('publishLocation', { token: bek.token, body: { lat: 51.1283, lon: 71.4700 } });
+  // Only the friend's point is known (Ana shares nothing and sends no point): the nearest good places to the friend.
+  const friendOnly = await api('meeting-point', { token: ana.token, body: { userIds: [bek.id], kind: 'coffee', at: '2026-10-20T10:00:00Z' } });
+  assert.equal(friendOnly.status, 200, JSON.stringify(friendOnly.data));
+  assert.equal(friendOnly.data.options[0].place.name, 'Кофе у Бека');
+  assert.equal(friendOnly.data.options[0].walks.length, 1);
+  assert.equal(friendOnly.data.options[0].why, `Идти примерно ${friendOnly.data.options[0].maxMinutes} мин`);
+  // A friend without a point and Ana's own point (from her start point, not geolocation): the places near Ana, the friend listed as missing.
+  const meOnly = await api('meeting-point', { token: ana.token, body: { userIds: [dina.id], kind: 'coffee', me: { lat: 51.1283, lon: 71.4310 }, at: '2026-10-20T10:00:00Z' } });
+  assert.equal(meOnly.status, 200, JSON.stringify(meOnly.data));
+  assert.equal(meOnly.data.options[0].place.name, 'Кофе у Аны');
+  assert.deepEqual(meOnly.data.missing.map(friend => friend.name), ['Дина']);
+  // Nobody's point is known: nothing to count from.
+  assert.equal((await api('meeting-point', { token: ana.token, body: { userIds: [dina.id] } })).status, 409);
+  // A meetup with one invited friend, who does not share a location.
+  const place = { id: '2', name: 'Кофе посередине', lat: 51.1283, lon: 71.4504 };
+  assert.equal((await api('createMeetup', { token: ana.token, body: { title: 'Кофе', place, startsAt: now() + 3600_000, invitees: [dina.id] } })).status, 200);
+});
+
 test('fairMeetingPoints prefers an even split over a shorter total', () => {
   const people = [{ id: 'a', lat: 51.1283, lon: 71.4400 }, { id: 'b', lat: 51.1283, lon: 71.4610 }];
   const { options } = fairMeetingPoints(dataset, people, { kind: 'coffee', at: new Date('2026-10-20T10:00:00Z') });

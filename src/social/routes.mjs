@@ -71,8 +71,9 @@ async function meetingPoint(hub, token, body, meta, dataset) {
   // The caller's current position may be sent for this one calculation, rounded to the same cell as everywhere; it is not stored.
   const here = body.me && Number.isFinite(Number(body.me.lat)) && Number.isFinite(Number(body.me.lon)) ? { lat: coarse(body.me.lat), lon: coarse(body.me.lon) } : null;
   const people = here ? [{ ...me, ...here, self: true }, ...located.filter(person => !person.self)] : located;
-  if (people.length < 2) {
-    return json({ error: 'Нужны хотя бы двое с известной точкой: вы и друг, который показывает, где он.', code: 'NOT_ENOUGH_PEOPLE', missing }, 409);
+  // One known point is enough: with a single friend, or with only the caller's, the options are simply the nearest good places.
+  if (!people.length) {
+    return json({ error: 'Нужна хотя бы одна известная точка: ваша или друга, который показывает, где он.', code: 'NOT_ENOUGH_PEOPLE', missing }, 409);
   }
   const at = typeof body.at === 'string' && Number.isFinite(Date.parse(body.at)) ? new Date(body.at) : new Date();
   const points = fairMeetingPoints(dataset, people, { kind, at });

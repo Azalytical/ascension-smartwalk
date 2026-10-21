@@ -4,6 +4,11 @@ import { t } from '../core/i18n.js';
 import './strings.js';
 
 const STALE_MS = 10 * 60_000;
+// Place dots while a meetup place is picked on the map: the app's category colours, with a fallback for /friends.
+const DOT_COLORS = { cafe: ['--cat-cafe', '#C26A1B'], restaurant: ['--cat-food', '#D2453A'], park: ['--cat-park', '#1E9E57'], playground: ['--cat-family', '#EC4899'],
+  family: ['--cat-family', '#EC4899'], museum: ['--cat-culture', '#8B5CF6'], culture: ['--cat-culture', '#8B5CF6'], attraction: ['--cat-landmark', '#E0A500'],
+  mall: ['--cat-mall', '#64748B'], nightlife: ['--cat-night', '#6366F1'] };
+const cssColor = ([name, fallback]) => (typeof getComputedStyle === 'function' && getComputedStyle(document.documentElement).getPropertyValue(name).trim()) || fallback;
 const CATEGORY_EMOJI = { walk: '🚶', sport: '🏃', food: '🍽', culture: '🎭', study: '📚', kids: '🧸', other: '✨' };
 const EMPTY = { type: 'FeatureCollection', features: [] };
 
@@ -51,8 +56,10 @@ function pinElement(className, glyph, label) {
 export function createSocialLayer(map, maplibregl, { onFriend, onMeetup, onEvent, onOption } = {}) {
   const Marker = maplibregl?.Marker;
   const markers = new Map();
-  let accuracy = EMPTY, lines = EMPTY;
+  let accuracy = EMPTY, lines = EMPTY, places = EMPTY, placeList = null;
   let destroyed = false;
+  // While a place is picked on the map, a tap goes here: (place id or null, tapped point).
+  let onPick = null;
 
   function ensureSources() {
     if (destroyed) return false;
@@ -76,10 +83,30 @@ export function createSocialLayer(map, maplibregl, { onFriend, onMeetup, onEvent
       map.addLayer({ id: 'friends-lines', type: 'line', source: 'friends-lines', layout: { 'line-cap': 'round' },
         paint: { 'line-color': ['coalesce', ['get', 'color'], '#1A8CFF'], 'line-width': 3, 'line-dasharray': [1.5, 1.5], 'line-opacity': 0.85 } });
     }
+    if (!map.getSource('friends-places')) {
+      map.addSource('friends-places', { type: 'geojson', data: places });
+      map.addLayer({ id: 'friends-places-dots', type: 'circle', source: 'friends-places', paint: {
+        'circle-color': ['match', ['get', 'category'], ...Object.entries(DOT_COLORS).flatMap(([category, color]) => [category, cssColor(color)]), '#1A8CFF'],
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 13, 4.5, 16, 8],
+        'circle-stroke-color': '#FFFFFF', 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5] } });
+    }
   }
-  const onStyle = () => { if (ensureSources()) { map.getSource('friends-accuracy')?.setData(accuracy); map.getSource('friends-lines')?.setData(lines); } };
+  const onStyle = () => { if (ensureSources()) { map.getSource('friends-accuracy')?.setData(accuracy); map.getSource('friends-lines')?.setData(lines); map.getSource('friends-places')?.setData(places); } };
   map.on?.('styledata', onStyle);
   map.on?.('load', onStyle);
+
+  // A tap picks the nearest place dot within a finger's width; elsewhere it is just a point on the map.
+  function onMapClick(event) {
+    if (!onPick || !event?.point) return;
+    const { x, y } = event.point;
+    const found = map.getLayer?.('friends-places-dots') ? map.queryRenderedFeatures([[x - 16, y - 16], [x + 16, y + 16]], { layers: ['friends-places-dots'] }) : [];
+    const nearest = found.map(feature => {
+      const at = map.project(feature.geometry.coordinates);
+      return { id: feature.properties.id, distance: Math.hypot(at.x - x, at.y - y) };
+    }).sort((a, b) => a.distance - b.distance)[0];
+    onPick(nearest ? nearest.id : null, { lat: event.lngLat.lat, lon: event.lngLat.lng });
+  }
+  map.on?.('click', onMapClick);
 
   function place(key, element, lngLat, onClick) {
     if (!Marker) return;
@@ -167,6 +194,26 @@ export function createSocialLayer(map, maplibregl, { onFriend, onMeetup, onEvent
 
     clearMeeting() { sweep('option:', new Set()); setLines(EMPTY); },
 
+    /** Every place as a dot to tap, or none (list = null). pick(id | null, { lat, lon }) gets the taps. */
+    showPlaces(list, pick = null) {
+      onPick = list ? pick : null;
+      if (list === placeList) return;
+      placeList = list;
+      places = list ? { type: 'FeatureCollection', features: list.map(item => ({ type: 'Feature', properties: { id: item.id, category: item.category },
+        geometry: { type: 'Point', coordinates: [item.lon, item.lat] } })) } : EMPTY;
+      if (ensureSources()) map.getSource('friends-places').setData(places);
+    },
+
+    /** The place chosen for a meetup or an event, as a gold pin; null removes it. */
+    markPlace(chosen) {
+      if (!chosen || !Number.isFinite(chosen.lat)) { sweep('pick:', new Set()); return; }
+      const key = `pick:${chosen.lat},${chosen.lon}`;
+      sweep('pick:', new Set([key]));
+      const element = pinElement('sx-map-pin is-option is-selected', '✓', t('sx.map.picked', { place: chosen.name }));
+      element.style.zIndex = '3';
+      place(key, element, [chosen.lon, chosen.lat]);
+    },
+
     fit(points, padding = 80) {
       const valid = points.filter(point => Number.isFinite(point?.lat) && Number.isFinite(point?.lon));
       if (!valid.length || !map.fitBounds) return;
@@ -181,8 +228,9 @@ export function createSocialLayer(map, maplibregl, { onFriend, onMeetup, onEvent
       markers.clear();
       map.off?.('styledata', onStyle);
       map.off?.('load', onStyle);
-      for (const id of ['friends-accuracy-fill', 'friends-accuracy-line', 'friends-lines']) if (map.getLayer?.(id)) map.removeLayer(id);
-      for (const id of ['friends-accuracy', 'friends-lines']) if (map.getSource?.(id)) map.removeSource(id);
+      map.off?.('click', onMapClick);
+      for (const id of ['friends-accuracy-fill', 'friends-accuracy-line', 'friends-lines', 'friends-places-dots']) if (map.getLayer?.(id)) map.removeLayer(id);
+      for (const id of ['friends-accuracy', 'friends-lines', 'friends-places']) if (map.getSource?.(id)) map.removeSource(id);
     }
   };
 }

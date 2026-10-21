@@ -24,6 +24,7 @@ import { understoodLabel, noteTexts, unconfirmedTexts, warningTexts, whyText } f
 import { dataUsedView } from '../ui/data-used.js';
 import { hoursLabel } from '../ui/trip.js';
 import { MAX_MINUTES } from '../core/time-words.js';
+import { pickPlace } from '../core/picked.js';
 
 const MINUTES = [30, 45, 60, 90, 120];
 // «2+ ч» opens these in a row of their own; 3 hours when it is tapped.
@@ -751,6 +752,7 @@ function aiCard(generation) {
 
 function highlight(index) {
   selected = index;
+  pickPlace(result?.recommendations?.[index]);
   layers.selectPin(index);
   layers.selectRoute(index);
   root.querySelectorAll('.result-row').forEach((row, i) => row.classList.toggle('is-selected', i === index));
@@ -818,6 +820,8 @@ function openResult(index) {
 function renderPlace() {
   const place = result?.recommendations?.[selected];
   if (!place) { view = 'results'; render(); return; }
+  // «Позвать в место» on the «Друзья» tab starts from the place opened here.
+  pickPlace(place);
   const timing = timingOf(place);
   const url = new URL(shareLink());
   const start = origin();

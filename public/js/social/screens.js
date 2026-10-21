@@ -3,7 +3,10 @@
 import * as social from './service.js';
 import { createSocialLayer, CATEGORY_EMOJI } from './map-layer.js';
 import { coarse } from '../core/privacy.js';
-import { t, plural, lang, locale } from '../core/i18n.js';
+import { t, plural, lang, locale, pick, placeName } from '../core/i18n.js';
+import * as store from '../core/store.js';
+import { places as loadPlaces } from '../core/api.js';
+import { pickedPlace } from '../core/picked.js';
 import './strings.js';
 
 const EMOJIS = ['🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐸', '🐵', '🦄', '🐙', '🦉', '🐧', '🐳', '🦋', '🌻', '🌵', '🍀', '⚡', '🔥', '🌙', '⭐', '🎧', '🎨', '⚽', '🚲', '☕', '📚', '🏔'];
@@ -11,7 +14,13 @@ const EMOJIS = ['🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐸', '🐵', 
 const KINDS = ['any', 'coffee', 'food', 'park', 'indoor'];
 const NOTES = ['coffee', 'walk', 'food', 'busy'];
 const EVENT_CATEGORIES = ['walk', 'sport', 'food', 'culture', 'study', 'kids', 'other'];
-const CATEGORY_NAMES = new Set(['cafe', 'restaurant', 'park', 'mall', 'attraction', 'museum', 'culture', 'playground']);
+const CATEGORY_NAMES = new Set(['cafe', 'restaurant', 'park', 'mall', 'attraction', 'museum', 'culture', 'playground', 'nightlife', 'family']);
+// The list of every place («Позвать в место») filters by these groups of the categories in /data/places.json.
+const PLACE_GROUPS = [['all', null], ['cafe', ['cafe']], ['food', ['restaurant']], ['park', ['park']], ['culture', ['museum', 'culture']], ['sight', ['attraction']],
+  ['mall', ['mall']], ['kids', ['playground', 'family']], ['night', ['nightlife']]];
+const PAGE = 8;
+const searchable = text => String(text || '').toLocaleLowerCase().replace(/\u0451/g, '\u0435');
+const round5 = value => Math.round(value * 1e5) / 1e5;
 const known = key => t(key) !== key;
 const statusText = status => (known(`sx.status.${status}`) ? t(`sx.status.${status}`) : status);
 const categoryName = category => t(CATEGORY_NAMES.has(category) ? `sx.place.${category}` : 'sx.place.other');
@@ -150,10 +159,12 @@ export function mountSocial(root, ctx = {}) {
   ensureStyles();
   const maplibregl = ctx.maplibregl || window.maplibregl;
   const view = { tab: 'friends', overlay: null, eventFilter: 'all', meeting: null, busy: false };
+  // While a place is picked on the map, a tap on a friend or a meetup does not leave the picker.
+  const picking = () => view.overlay?.type === 'pickPlace';
   const layer = ctx.map ? createSocialLayer(ctx.map, maplibregl, {
-    onFriend: id => open({ type: 'friend', id }),
-    onMeetup: id => open({ type: 'meetup', id }),
-    onEvent: id => open({ type: 'event', id }),
+    onFriend: id => { if (!picking()) open({ type: 'friend', id }); },
+    onMeetup: id => { if (!picking()) open({ type: 'meetup', id }); },
+    onEvent: id => { if (!picking()) open({ type: 'event', id }); },
     onOption: index => { if (view.meeting) { view.meeting.selected = index; renderMeeting(); } }
   }) : null;
 
@@ -191,19 +202,26 @@ export function mountSocial(root, ctx = {}) {
   const friend = id => friends().find(item => item.id === id);
   const meetup = id => data()?.meetups.find(item => item.id === id);
   const event = id => social.getState().events.find(item => item.id === id);
-  const myPoint = () => {
-    const share = data()?.share;
-    if (share?.hasPoint) return { lat: share.lat, lon: share.lon };
-    const last = social.getState().geo.last;
-    return last && Date.now() - last.at < 5 * 60_000 ? last : null;
+  const myPoint = () => social.knownPosition();
+  // The walk's start point (a preset, a point picked on the map or a recent GPS fix): where the person is, without asking for geolocation.
+  const startPoint = () => {
+    const saved = store.get('start');
+    if (!saved || !Number.isFinite(saved.lat) || !Number.isFinite(saved.lon)) return null;
+    if (saved.kind === 'gps') return Date.now() - (saved.at || 0) < 60 * 60_000 ? { lat: saved.lat, lon: saved.lon, name: t('sx.from.lastFix') } : null;
+    return { lat: saved.lat, lon: saved.lon, name: saved.names ? pick(saved.names) : saved.name || t('sx.from.startName') };
   };
+  // Every place of the database, for the list and the map in «Позвать в место» (the same file as the «Рядом» tab).
+  let allPlaces = null;
+  const loadAll = () => loadPlaces().then(result => { allPlaces = result.items; return allPlaces; });
 
   function open(overlay) {
+    if (view.overlay?.type === 'meet' && overlay?.type !== 'meet') layer?.clearMeeting();
     view.overlay = overlay;
     if (overlay?.type === 'meet') view.meeting = null;
     if (overlay?.type === 'event' || view.tab === 'events') social.loadEvents();
     if (overlay?.type === 'notifications' && data()?.unread) social.act('markRead').catch(() => {});
-    ctx.openSheet?.('half');
+    // Picking a place on the map leaves most of the screen to the map.
+    ctx.openSheet?.(overlay?.type === 'pickPlace' ? 'peek' : 'half');
     view.justOpened = true;
     render(true);
     view.justOpened = false;
@@ -212,6 +230,8 @@ export function mountSocial(root, ctx = {}) {
   }
   function close() {
     if (view.overlay?.type === 'meet') { view.meeting = null; layer?.clearMeeting(); }
+    // A form opened from another screen (a friend, «Где встретиться?») or the map picker goes back to it.
+    if (view.overlay?.back) { open(view.overlay.back); return; }
     view.overlay = null;
     render(true);
     root.scrollTop = 0;
@@ -249,10 +269,15 @@ export function mountSocial(root, ctx = {}) {
       root.scrollTop = 0;
       if (invite) await acceptInvite(invite.code);
       else toast(t('sx.ob.created', { name: me.name }), 'success');
+      // «Позвать друзей» on a place card before there was a profile: the invitation to that place opens now.
+      const waiting = view.pendingPlace;
+      view.pendingPlace = null;
+      if (waiting) open({ type: 'newMeetup', prefill: { place: waiting, title: waiting.name } });
     };
     const code = h('input', { class: 'sx-input sx-code-input', inputmode: 'numeric', maxlength: 6, placeholder: '123456', 'aria-label': t('sx.ob.codeLabel') });
     return h('div', { class: 'sx-onboarding' },
       invite?.inviter ? h('div', { class: 'sx-invite-card' }, avatar(invite.inviter, 'lg'), h('div', {}, h('strong', {}, t('sx.ob.invited', { name: invite.inviter.name })), h('p', {}, t('sx.ob.invitedText')))) : null,
+      view.pendingPlace ? h('p', { class: 'sx-note' }, t('sx.ob.placeNext', { name: view.pendingPlace.name })) : null,
       h('div', { class: 'sx-hero' }, h('div', { class: 'sx-hero-faces', 'aria-hidden': 'true' }, '🦊', '🐻', '🐼'),
         h('h2', {}, t('sx.ob.title')),
         h('p', {}, t('sx.ob.text'))),
@@ -362,7 +387,10 @@ export function mountSocial(root, ctx = {}) {
     const nearby = myPoint() ? sharing.map(item => ({ item, minutes: social.walkMinutes(myPoint(), item.location) })).filter(entry => entry.minutes <= 15).sort((a, b) => a.minutes - b.minutes) : [];
     return h('div', { class: 'sx-stack' },
       shareCard(),
-      list.length ? h('button', { type: 'button', class: 'sx-hero-action', onclick: () => open({ type: 'meet' }) },
+      list.length ? h('button', { type: 'button', class: 'sx-hero-action sx-invite-place', onclick: () => open({ type: 'newMeetup' }) },
+        h('span', { class: 'sx-hero-action-icon', 'aria-hidden': 'true' }, '📍'),
+        h('span', {}, h('strong', {}, t('sx.inv.title')), h('span', {}, pickedPlace() ? t('sx.inv.subPicked', { name: pickedPlace().name }) : t('sx.inv.sub')))) : null,
+      list.length ? h('button', { type: 'button', class: 'sx-hero-action is-light', onclick: () => open({ type: 'meet' }) },
         h('span', { class: 'sx-hero-action-icon', 'aria-hidden': 'true' }, '🤝'),
         h('span', {}, h('strong', {}, t('sx.meet.title')), h('span', {}, t('sx.meet.sub')))) : null,
       nearby.length ? h('p', { class: 'sx-nearby' }, t('sx.nearby', { list: nearby.slice(0, 3).map(entry => t('sx.nearbyItem', { name: entry.item.name, n: entry.minutes })).join(', ') })) : null,
@@ -388,7 +416,8 @@ export function mountSocial(root, ctx = {}) {
         h('p', { class: 'sx-hint' }, t(item.iShareWith ? 'sx.friend.iShare' : 'sx.friend.iDontShare'))),
       h('div', { class: 'sx-actions' },
         location?.lat !== undefined ? button(t('sx.showOnMap'), () => { layer?.fit([location]); ctx.openSheet?.('peek'); }, 'ghost') : null,
-        button(t('sx.friend.meet'), () => open({ type: 'meet', preselect: [item.id] }), 'primary'),
+        button(t('sx.inv.title'), () => open({ type: 'newMeetup', prefill: { invitees: [item.id] }, back: view.overlay }), 'primary'),
+        button(t('sx.friend.meet'), () => open({ type: 'meet', preselect: [item.id], back: view.overlay }), 'ghost'),
         !location ? button(t('sx.friend.ask'), () => run(() => social.act('pingFriend', { userId: item.id }), t('sx.friend.asked', { name: item.name })), 'ghost') : null),
       h('details', { class: 'sx-details' }, h('summary', {}, t('sx.more')),
         h('div', { class: 'sx-actions' },
@@ -424,9 +453,41 @@ export function mountSocial(root, ctx = {}) {
 
   // ---------- where to meet ----------
 
-  function meetView(preselect = []) {
-    const selected = new Set(preselect.length ? preselect : friends().filter(item => item.location?.lat !== undefined).map(item => item.id).slice(0, 3));
-    let kind = 'any';
+  // Where the person walks from in «Где встретиться?». Geolocation is asked only for «Определить, где я».
+  function fromOptions() {
+    const options = [];
+    if (myPoint()) options.push(['here', t('sx.from.here')]);
+    const start = startPoint();
+    if (start) options.push(['start', start.name]);
+    if (ctx.map) options.push(['map', t('sx.from.map')]);
+    if (!myPoint()) options.push(['gps', t('sx.from.gps')]);
+    // A running share always counts on the server, so «без меня» is offered only without one.
+    if (!data()?.share?.hasPoint) options.push(['none', t('sx.from.none')]);
+    return options;
+  }
+
+  async function fromPoint(from) {
+    if (from === 'here') return myPoint();
+    if (from === 'start') return startPoint();
+    if (from === 'map' && ctx.map) { const center = ctx.map.getCenter(); return { lat: center.lat, lon: center.lng }; }
+    if (from === 'gps') {
+      const point = await social.currentPosition();
+      if (!point) toast(t('sx.pp.noGeo'), 'error');
+      return point;
+    }
+    return null;
+  }
+
+  function meetView(overlay) {
+    const preselect = overlay.preselect || [];
+    const located = friends().filter(item => item.location?.lat !== undefined).map(item => item.id);
+    // One friend is enough: the only friend, or the one this screen was opened for, is picked from the start.
+    overlay.selected ??= new Set(preselect.length ? preselect : located.length ? located.slice(0, 3) : friends().length === 1 ? [friends()[0].id] : []);
+    const selected = overlay.selected;
+    const options = fromOptions();
+    // By default the person counts only from a point the page already knows; nothing is assumed and nothing is asked.
+    if (!options.some(([value]) => value === overlay.from)) overlay.from = options.find(([value]) => value === 'here' || value === 'start')?.[0] ?? 'none';
+    let kind = overlay.kind || 'any';
     const wrap = h('div', { class: 'sx-stack' });
     const results = h('div', { class: 'sx-meet-results', 'aria-live': 'polite' });
     const drawChooser = () => {
@@ -438,15 +499,27 @@ export function mountSocial(root, ctx = {}) {
         h('div', { class: 'sx-chips sx-friend-chips' }, list.map(item => chip([avatar(item, 'xs'), item.name, item.location?.lat === undefined ? h('span', { class: 'sx-muted' }, t('sx.meet.noPoint')) : ''], selected.has(item.id), () => {
           selected.has(item.id) ? selected.delete(item.id) : selected.add(item.id); drawChooser();
         }))),
+        h('span', { class: 'sx-label' }, t('sx.from.label')),
+        h('div', { class: 'sx-chips sx-from-chips' }, options.map(([value, label]) => chip(label, overlay.from === value, () => { overlay.from = value; drawChooser(); }))),
         h('span', { class: 'sx-label' }, t('sx.meet.what')),
-        h('div', { class: 'sx-chips' }, KINDS.map(value => chip(t(`sx.kind.${value}`), kind === value, () => { kind = value; drawChooser(); }))),
+        h('div', { class: 'sx-chips' }, KINDS.map(value => chip(t(`sx.kind.${value}`), kind === value, () => { kind = overlay.kind = value; drawChooser(); }))),
         button(t('sx.meet.find'), find, 'primary', { class: 'btn btn-primary sx-btn sx-wide', disabled: !selected.size }),
+        button(t('sx.meet.pickOwn'), () => open({ type: 'newMeetup', prefill: { invitees: [...selected], place: chosenOption() }, back: overlay }), 'ghost', { class: 'btn btn-ghost sx-btn sx-wide sx-pick-own' }),
         results);
       if (view.meeting) renderMeeting();
     };
+    const chosenOption = () => {
+      const option = view.meeting?.result.options[view.meeting.selected];
+      return option ? { id: option.place.id, name: option.place.name, category: option.place.category, lat: option.place.lat, lon: option.place.lon } : null;
+    };
     async function find() {
       results.replaceChildren(h('p', { class: 'sx-hint' }, t('sx.meet.counting')));
-      const here = data().share?.hasPoint ? null : await social.currentPosition();
+      const here = await fromPoint(overlay.from);
+      // Nobody's point is known: say so here, next to «откуда вы идёте» and «выбрать место самому», instead of an error.
+      if (!here && !data()?.share?.hasPoint && ![...selected].some(id => friend(id)?.location?.lat !== undefined)) {
+        results.replaceChildren(h('p', { class: 'sx-warning' }, t('sx.meet.noPoints')));
+        return;
+      }
       const result = await run(() => social.api('meeting-point', { userIds: [...selected], kind, ...(here ? { me: { lat: coarse(here.lat), lon: coarse(here.lon) } } : {}) }));
       if (!result) { results.replaceChildren(); return; }
       const people = result.participants.map(person => {
@@ -454,7 +527,8 @@ export function mountSocial(root, ctx = {}) {
         const known = friend(person.id);
         return { ...person, lat: known?.location?.lat, lon: known?.location?.lon };
       });
-      view.meeting = { result, people, selected: 0, invitees: [...selected].filter(id => result.participants.some(person => person.id === id)) };
+      // Friends without a known point are invited too: the calculation is made without them, the invitation is not.
+      view.meeting = { result, people, selected: 0, invitees: [...selected] };
       renderMeeting();
       layer?.fit([...people, ...result.options.map(option => option.place)], 100);
     }
@@ -472,6 +546,7 @@ export function mountSocial(root, ctx = {}) {
     const longest = Math.max(1, ...result.options.flatMap(option => option.walks.map(walk => walk.minutes)));
     fill(results,
       result.missing.length ? h('p', { class: 'sx-warning' }, t('sx.meet.missing', { names: result.missing.map(item => item.name).join(', ') })) : null,
+      result.participants.some(person => person.self) ? null : h('p', { class: 'sx-hint' }, t('sx.meet.withoutYou')),
       result.options.length ? null : h('p', { class: 'sx-empty' }, t('sx.meet.none')),
       ...result.options.map((option, index) => h('article', { class: `sx-option${index === meeting.selected ? ' is-selected' : ''}`, onclick: () => { meeting.selected = index; renderMeeting(); } },
         h('div', { class: 'sx-option-head' }, h('span', { class: 'sx-option-number' }, index + 1),
@@ -496,6 +571,7 @@ export function mountSocial(root, ctx = {}) {
     if (lang() === 'ru') return option.why;
     const minutes = option.walks.map(walk => walk.minutes);
     const shortest = Math.min(...minutes), longest = Math.max(...minutes);
+    if (minutes.length === 1) return t('sx.meet.whyOne', { n: longest });
     return shortest === longest ? t('sx.meet.whySame', { n: longest }) : t('sx.meet.whyRange', { from: shortest, to: longest });
   }
 
@@ -521,41 +597,118 @@ export function mountSocial(root, ctx = {}) {
 
   // ---------- place picker ----------
 
-  function placePicker(initial, onPick) {
-    let chosen = initial || null;
-    const input = h('input', { class: 'sx-input', placeholder: t('sx.pp.placeholder'), autocomplete: 'off', 'aria-label': t('sx.pp.label') });
-    const list = h('ul', { class: 'sx-suggestions' });
-    const current = h('p', { class: 'sx-picked' });
-    const show = () => { current.textContent = chosen ? `📍 ${chosen.name}` : t('sx.pp.none'); current.classList.toggle('is-empty', !chosen); };
+  // The place of a meetup or an event: tapped on the map, chosen from the list of every place (search and groups),
+  // the map centre, or «где я» (geolocation only on that tap). The choice lives in overlay.form, so it survives the map picker.
+  const placeOf = item => ({ id: item.id ?? null, name: item.name, category: item.category ?? null, lat: item.lat, lon: item.lon });
+
+  // Distances in the list count from the person when that is known, otherwise from the walk's start point or the map.
+  function reference() {
+    const mine = myPoint();
+    if (mine) return { lat: mine.lat, lon: mine.lon, label: t('sx.pp.nearYou') };
+    const start = startPoint();
+    if (start) return { lat: start.lat, lon: start.lon, label: t('sx.pp.nearStart', { name: start.name }) };
+    const center = ctx.map?.getCenter?.();
+    return center ? { lat: center.lat, lon: center.lng, label: t('sx.pp.nearCenter') } : { lat: 51.1283, lon: 71.4304, label: t('sx.pp.nearCity') };
+  }
+
+  function placePicker(overlay) {
+    const form = overlay.form;
+    const state = overlay.picker ??= { open: !form.place, query: '', group: 'all', shown: PAGE };
+    const box = h('div', { class: 'sx-place-picker' });
+    const choose = chosen => {
+      form.place = chosen; form.fromMap = false; state.open = false;
+      layer?.markPlace(chosen);
+      if (chosen) layer?.fit([chosen]);
+      draw();
+    };
+    const input = h('input', { class: 'sx-input', type: 'search', value: state.query, placeholder: t('sx.pp.placeholder'), autocomplete: 'off', enterkeyhint: 'search', 'aria-label': t('sx.pp.label') });
     let timer;
-    input.addEventListener('input', () => {
-      clearTimeout(timer);
-      timer = setTimeout(async () => {
-        const query = input.value.trim();
-        if (query.length < 2) { list.replaceChildren(); return; }
-        const center = ctx.map?.getCenter?.();
-        try {
-          const result = await social.api(`places?q=${encodeURIComponent(query)}${center ? `&lat=${center.lat}&lon=${center.lng}` : ''}`);
-          list.replaceChildren(...result.places.map(item => h('li', {}, h('button', { type: 'button', class: 'sx-suggestion', onclick: () => {
-            chosen = { id: item.id, name: item.name, lat: item.lat, lon: item.lon }; onPick(chosen); show(); list.replaceChildren(); input.value = '';
-          } }, h('strong', {}, item.name), h('span', {}, `${categoryName(item.category)}${item.distanceMeters !== undefined ? ` · ${t('sx.pp.fromCenter', { d: km(item.distanceMeters) })}` : ''}`)))));
-          if (!result.places.length) list.replaceChildren(h('li', { class: 'sx-hint' }, t('sx.pp.empty')));
-        } catch (error) { list.replaceChildren(h('li', { class: 'sx-warning' }, error.message)); }
-      }, 250);
-    });
+    input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { state.query = input.value; state.shown = PAGE; drawList(); }, 150); });
+    const groups = h('div', { class: 'sx-chips sx-place-groups', role: 'group', 'aria-label': t('sx.pp.groups') });
+    const drawGroups = () => groups.replaceChildren(...PLACE_GROUPS.map(([id]) => chip(t(`sx.pp.g.${id}`), state.group === id, () => { state.group = id; state.shown = PAGE; drawGroups(); drawList(); })));
+    const listHost = h('div', { class: 'sx-place-list', 'aria-live': 'polite' });
+
+    function drawList() {
+      if (!allPlaces) {
+        listHost.replaceChildren(h('p', { class: 'sx-hint' }, t('sx.pp.loading')));
+        loadAll().then(() => { if (box.isConnected) drawList(); }).catch(() => listHost.replaceChildren(h('p', { class: 'sx-warning' }, t('sx.pp.failed'))));
+        return;
+      }
+      const from = reference();
+      const query = searchable(state.query.trim());
+      const categories = PLACE_GROUPS.find(([id]) => id === state.group)?.[1];
+      // «кофе» finds every café, not only the ones with the word in their name; name matches come first.
+      const kinds = new Set(query ? PLACE_GROUPS.filter(([id, group]) => group && searchable(t(`sx.pp.g.${id}`)).includes(query)).flatMap(([, group]) => group) : []);
+      const matches = [];
+      for (const item of allPlaces) {
+        if (categories && !categories.includes(item.category)) continue;
+        const named = !query || searchable(`${item.name} ${placeName(item.name)} ${categoryName(item.category)}`).includes(query);
+        if (!named && !kinds.has(item.category)) continue;
+        matches.push({ item, named, meters: social.distanceMeters(from, item) });
+      }
+      matches.sort((a, b) => b.named - a.named || a.meters - b.meters);
+      fill(listHost,
+        h('p', { class: 'sx-hint' }, t('sx.pp.count', { n: new Intl.NumberFormat(locale()).format(matches.length), from: from.label })),
+        matches.length ? h('ul', { class: 'sx-suggestions' }, matches.slice(0, state.shown).map(({ item, meters }) => h('li', {},
+          h('button', { type: 'button', class: 'sx-suggestion', onclick: () => choose(placeOf(item)) }, h('strong', {}, placeName(item.name)), h('span', {}, `${categoryName(item.category)} · ${km(meters)}`)))))
+          : h('p', { class: 'sx-hint' }, t('sx.pp.empty')),
+        matches.length > state.shown ? button(t('sx.pp.more'), () => { state.shown += 20; drawList(); }, 'ghost', { class: 'btn btn-ghost sx-btn sx-wide' }) : null);
+    }
+
+    const onMap = ctx.map ? button(t('sx.pp.onMap'), () => open({ type: 'pickPlace', back: overlay }), 'gold', { class: 'btn btn-gold sx-btn sx-pick-map' }) : null;
     const mapCenter = ctx.map ? button(t('sx.pp.center'), () => {
       const center = ctx.map.getCenter();
-      chosen = { id: null, name: t('sx.pp.point'), lat: Math.round(center.lat * 1e5) / 1e5, lon: Math.round(center.lng * 1e5) / 1e5 };
-      onPick(chosen); show();
+      choose({ id: null, name: t('sx.pp.point'), category: null, lat: round5(center.lat), lon: round5(center.lng) });
     }, 'ghost') : null;
     const here = button(t('sx.pp.here'), async () => {
       const point = await social.currentPosition();
       if (!point) { toast(t('sx.pp.noGeo'), 'error'); return; }
-      chosen = { id: null, name: t('sx.pp.nearMe'), lat: Math.round(point.lat * 1e5) / 1e5, lon: Math.round(point.lon * 1e5) / 1e5 };
-      onPick(chosen); show();
+      choose({ id: null, name: t('sx.pp.nearMe'), category: null, lat: round5(point.lat), lon: round5(point.lon) });
     }, 'ghost');
-    show();
-    return h('div', { class: 'sx-place-picker' }, current, input, list, h('div', { class: 'sx-actions' }, mapCenter, here));
+
+    function draw() {
+      const chosen = form.place;
+      fill(box,
+        chosen ? h('div', { class: 'sx-picked-card' }, h('span', { class: 'sx-picked-pin', 'aria-hidden': 'true' }, '📍'),
+          h('span', { class: 'sx-row-text' }, h('strong', { class: 'sx-picked-name' }, placeName(chosen.name)),
+            h('span', {}, [chosen.category ? categoryName(chosen.category) : null, form.fromMap ? t('sx.pp.fromMap') : null].filter(Boolean).join(' · ') || t('sx.pp.point'))),
+          button(t(state.open ? 'sx.pp.collapse' : 'sx.pp.change'), () => { state.open = !state.open; draw(); }, 'ghost', { class: 'btn btn-ghost sx-btn sx-small' }))
+          : h('p', { class: 'sx-picked is-empty' }, t('sx.pp.none')),
+        state.open ? [h('div', { class: 'sx-actions' }, onMap, mapCenter, here), input, groups, listHost] : null);
+      if (state.open) { drawGroups(); drawList(); }
+    }
+    draw();
+    return box;
+  }
+
+  // Map picker: every place is a dot; a tap shows it here, «Выбрать» returns it to the form it came from.
+  function pickPlaceView(overlay) {
+    const panel = h('div', { class: 'sx-pick' });
+    const choose = () => {
+      const back = overlay.back;
+      back.form.place = overlay.candidate;
+      back.form.fromMap = true;
+      if (back.picker) back.picker.open = false;
+      open(back);
+      layer?.fit([overlay.candidate]);
+    };
+    const draw = () => fill(panel,
+      h('div', { class: 'sx-pick-head' }, h('strong', {}, t('sx.pick.title')),
+        button(t('sx.pick.cancel'), () => open(overlay.back), 'ghost', { class: 'btn btn-ghost sx-btn sx-small' })),
+      overlay.candidate ? h('div', { class: 'sx-pick-choice' },
+        h('span', { class: 'sx-row-text' }, h('strong', {}, placeName(overlay.candidate.name)), h('span', {}, overlay.candidate.category ? categoryName(overlay.candidate.category) : t('sx.pick.point'))),
+        button(t('sx.pick.choose'), choose, 'primary', { class: 'btn btn-primary sx-btn sx-pick-confirm' }))
+        : h('p', { class: 'sx-hint' }, allPlaces ? t('sx.pick.hint') : t('sx.pp.loading')));
+    const tap = (id, point) => {
+      const item = id ? allPlaces?.find(entry => entry.id === id) : null;
+      overlay.candidate = item ? placeOf(item) : { id: null, name: t('sx.pp.point'), category: null, lat: round5(point.lat), lon: round5(point.lon) };
+      layer?.markPlace(overlay.candidate);
+      draw();
+    };
+    if (allPlaces) layer?.showPlaces(allPlaces, tap);
+    else loadAll().then(() => { if (view.overlay === overlay) { layer?.showPlaces(allPlaces, tap); draw(); } }).catch(() => toast(t('sx.pp.failed'), 'error'));
+    draw();
+    return panel;
   }
 
   function timePicker(initial, onPick) {
@@ -591,26 +744,35 @@ export function mountSocial(root, ctx = {}) {
       h('span', { class: 'sx-chevron', 'aria-hidden': 'true' }, '›'));
   }
 
-  function newMeetupView(prefill = {}) {
-    const form = { place: prefill.place || null, startsAt: prefill.startsAt || roundTo5(Date.now() + 30 * 60000), invitees: new Set(prefill.invitees || []) };
-    const title = h('input', { class: 'sx-input', maxlength: 60, placeholder: t('sx.mu.titlePlaceholder'), value: prefill.title || '' });
-    const note = h('input', { class: 'sx-input', maxlength: 200, placeholder: t('sx.mu.notePlaceholder') });
+  // «Позвать в место»: one friend or several, a place from the map or the list (the one picked on the map is there already), a time.
+  function newMeetupView(overlay) {
+    const prefill = overlay.prefill || {};
+    const list = friends();
+    const picked = prefill.place ? null : pickedPlace();
+    const form = overlay.form ??= { place: prefill.place || (picked && placeOf(picked)), fromMap: Boolean(picked), startsAt: prefill.startsAt || roundTo5(Date.now() + 30 * 60000),
+      invitees: new Set(prefill.invitees || (list.length === 1 ? [list[0].id] : [])), title: prefill.title || '', note: '' };
+    const title = h('input', { class: 'sx-input', maxlength: 60, placeholder: t('sx.mu.titlePlaceholder'), value: form.title, oninput: () => { form.title = title.value; } });
+    const note = h('input', { class: 'sx-input', maxlength: 200, placeholder: t('sx.mu.notePlaceholder'), value: form.note, oninput: () => { form.note = note.value; } });
     const people = h('div', { class: 'sx-chips sx-friend-chips' });
-    const drawPeople = () => people.replaceChildren(...friends().map(item => chip([avatar(item, 'xs'), item.name], form.invitees.has(item.id), () => { form.invitees.has(item.id) ? form.invitees.delete(item.id) : form.invitees.add(item.id); drawPeople(); })));
+    const drawPeople = () => people.replaceChildren(...list.map(item => chip([avatar(item, 'xs'), item.name], form.invitees.has(item.id), () => { form.invitees.has(item.id) ? form.invitees.delete(item.id) : form.invitees.add(item.id); drawPeople(); })));
     drawPeople();
     return h('form', { class: 'sx-form', onsubmit: async event => {
       event.preventDefault();
-      if (!form.place) { toast(t('sx.pickPlace'), 'error'); return; }
       if (!form.invitees.size) { toast(t('sx.mu.pickFriend'), 'error'); return; }
-      const created = await run(() => social.act('createMeetup', { title: title.value, note: note.value, place: form.place, startsAt: form.startsAt, invitees: [...form.invitees] }), t('sx.inviteSent'));
+      if (!form.place) { toast(t('sx.pickPlace'), 'error'); return; }
+      const { id, name, lat, lon } = form.place;
+      const created = await run(() => social.act('createMeetup', { title: form.title.trim() || t('sx.mtitle.meet'), note: form.note, place: { id, name, lat, lon }, startsAt: form.startsAt, invitees: [...form.invitees] }), t('sx.inviteSent'));
       if (created) { view.tab = 'meetups'; open({ type: 'meetup', id: created.meetup.id }); }
     } },
-      h('h3', { class: 'sx-section-title' }, t('sx.mu.newTitle')),
-      h('span', { class: 'sx-label' }, t('sx.mu.whom')), people,
-      h('span', { class: 'sx-label' }, t('sx.where')), placePicker(form.place, value => { form.place = value; }),
+      h('h3', { class: 'sx-section-title' }, t('sx.inv.title')),
+      h('span', { class: 'sx-label' }, t('sx.mu.whom')),
+      list.length ? [people, h('p', { class: 'sx-hint' }, t('sx.inv.oneIsEnough'))]
+        : h('div', { class: 'sx-empty' }, h('p', {}, t('sx.mu.noFriends')), button(t('sx.invite.title'), () => open({ type: 'invite', back: overlay }), 'primary')),
+      h('span', { class: 'sx-label' }, t('sx.where')), placePicker(overlay),
       h('span', { class: 'sx-label' }, t('sx.mu.when')), timePicker(form.startsAt, value => { form.startsAt = value; }),
       h('span', { class: 'sx-label' }, t('sx.titleLabel')), title, note,
-      h('button', { type: 'submit', class: 'btn btn-primary sx-btn sx-wide' }, t('sx.invite.send')));
+      h('button', { type: 'submit', class: 'btn btn-primary sx-btn sx-wide', disabled: !list.length }, t('sx.invite.send')),
+      h('p', { class: 'sx-hint' }, t('sx.inv.noGeo')));
   }
 
   function meetupDetail(id) {
@@ -771,11 +933,13 @@ export function mountSocial(root, ctx = {}) {
       button(t('sx.invite.send'), async () => { if (chosen.size && await run(() => social.act('inviteToEvent', { id, userIds: [...chosen] }), t('sx.ev.invited'))) open({ type: 'event', id }); }, 'primary', { class: 'btn btn-primary sx-btn sx-wide' }));
   }
 
-  function newEventView(prefill = {}) {
-    const form = { category: 'walk', place: prefill.place || null, startsAt: roundTo5(Date.now() + 2 * 3600000), hours: 2, visibility: 'public' };
-    const title = h('input', { class: 'sx-input', maxlength: 80, minlength: 3, required: true, placeholder: t('sx.ev.titlePlaceholder') });
-    const description = h('textarea', { class: 'sx-input', maxlength: 600, rows: 3, placeholder: t('sx.ev.descPlaceholder') });
-    const capacity = h('input', { class: 'sx-input', type: 'number', min: 2, max: 500, inputmode: 'numeric', placeholder: t('sx.ev.noLimit') });
+  function newEventView(overlay) {
+    const prefill = overlay.prefill || {};
+    const form = overlay.form ??= { category: 'walk', place: prefill.place || null, startsAt: roundTo5(Date.now() + 2 * 3600000), hours: 2, visibility: 'public', title: '', description: '', capacity: '' };
+    const title = h('input', { class: 'sx-input', maxlength: 80, minlength: 3, required: true, placeholder: t('sx.ev.titlePlaceholder'), value: form.title, oninput: () => { form.title = title.value; } });
+    const description = h('textarea', { class: 'sx-input', maxlength: 600, rows: 3, placeholder: t('sx.ev.descPlaceholder'), oninput: () => { form.description = description.value; } });
+    description.value = form.description;
+    const capacity = h('input', { class: 'sx-input', type: 'number', min: 2, max: 500, inputmode: 'numeric', placeholder: t('sx.ev.noLimit'), value: form.capacity, oninput: () => { form.capacity = capacity.value; } });
     const group = (options, key) => {
       const row = h('div', { class: 'sx-chips' });
       const draw = () => row.replaceChildren(...options.map(([value, label]) => chip(label, form[key] === value, () => { form[key] = value; draw(); })));
@@ -785,14 +949,15 @@ export function mountSocial(root, ctx = {}) {
     return h('form', { class: 'sx-form', onsubmit: async submitEvent => {
       submitEvent.preventDefault();
       if (!form.place) { toast(t('sx.pickPlace'), 'error'); return; }
-      const created = await run(() => social.act('createEvent', { title: title.value, description: description.value, category: form.category, place: form.place,
+      const { id, name, lat, lon } = form.place;
+      const created = await run(() => social.act('createEvent', { title: title.value, description: description.value, category: form.category, place: { id, name, lat, lon },
         startsAt: form.startsAt, endsAt: form.startsAt + form.hours * 3600000, capacity: capacity.value ? Number(capacity.value) : null, visibility: form.visibility }), t('sx.ev.published'));
       if (created) { view.tab = 'events'; open({ type: 'event', id: created.event.id }); }
     } },
       h('h3', { class: 'sx-section-title' }, t('sx.ev.newTitle')),
       h('span', { class: 'sx-label' }, t('sx.titleLabel')), title,
       h('span', { class: 'sx-label' }, t('sx.ev.type')), group(EVENT_CATEGORIES.map(id => [id, t(`sx.cat.${id}`)]), 'category'),
-      h('span', { class: 'sx-label' }, t('sx.where')), placePicker(form.place, value => { form.place = value; }),
+      h('span', { class: 'sx-label' }, t('sx.where')), placePicker(overlay),
       h('span', { class: 'sx-label' }, t('sx.ev.start')), timePicker(form.startsAt, value => { form.startsAt = value; }),
       h('span', { class: 'sx-label' }, t('sx.ev.duration')), group([1, 2, 3, 5].map(hours => [hours, t(`sx.dur.${hours}`)]), 'hours'),
       h('span', { class: 'sx-label' }, t('sx.ev.capacity')), capacity,
@@ -851,7 +1016,7 @@ export function mountSocial(root, ctx = {}) {
 
   // ---------- render ----------
 
-  const STATIC = new Set(['share', 'invite', 'meet', 'newMeetup', 'newEvent', 'profile', 'addToMeetup', 'inviteEvent']);
+  const STATIC = new Set(['share', 'invite', 'meet', 'newMeetup', 'newEvent', 'profile', 'addToMeetup', 'inviteEvent', 'pickPlace']);
   let body = null;
 
   function overlayView(overlay) {
@@ -859,11 +1024,12 @@ export function mountSocial(root, ctx = {}) {
       case 'share': return shareForm();
       case 'invite': return inviteView();
       case 'friend': return friendDetail(overlay.id);
-      case 'meet': return meetView(overlay.preselect);
-      case 'newMeetup': return newMeetupView(overlay.prefill);
+      case 'meet': return meetView(overlay);
+      case 'newMeetup': return newMeetupView(overlay);
+      case 'pickPlace': return pickPlaceView(overlay);
       case 'meetup': return meetupDetail(overlay.id);
       case 'addToMeetup': return addToMeetupView(overlay.id);
-      case 'newEvent': return newEventView(overlay.prefill);
+      case 'newEvent': return newEventView(overlay);
       case 'event': return eventDetail(overlay.id);
       case 'inviteEvent': return inviteEventView(overlay.id);
       case 'notifications': return notificationsView();
@@ -885,6 +1051,8 @@ export function mountSocial(root, ctx = {}) {
     if (!force && overlay && STATIC.has(overlay.type) && body) { updateMap(); return; }
     // An open «Управление встречей» holds a time picker: refresh it only after the host acts.
     if (!force && body && container.querySelector('details[open][data-pause-refresh]')) { updateMap(); return; }
+    // Place dots are on the map only while a place is picked there.
+    if (overlay?.type !== 'pickPlace') layer?.showPlaces(null);
     let content;
     if (!state.token) content = overlay?.type === 'event' ? overlayView(overlay) : onboarding();
     else if (!state.data) content = h('p', { class: 'sx-hint' }, state.error || t('sx.loading'));
@@ -893,7 +1061,10 @@ export function mountSocial(root, ctx = {}) {
     const typed = [...container.querySelectorAll('[data-keep]')].map(field => ({ key: field.dataset.keep, value: field.value, focused: field === document.activeElement,
       start: field.selectionStart, end: field.selectionEnd }));
     body = h('div', { class: 'sx-body' }, content);
-    container.replaceChildren(...[state.token && state.data ? header() : overlay ? h('header', { class: 'sx-header' }, backButton()) : null, body].filter(Boolean));
+    // The map picker keeps the sheet low, so it has its own one-line head instead of the tab's.
+    const head = overlay?.type === 'pickPlace' ? null : state.token && state.data ? header() : overlay ? h('header', { class: 'sx-header' }, backButton()) : null;
+    container.replaceChildren(...[head, body].filter(Boolean));
+    layer?.markPlace(overlay?.type === 'pickPlace' ? overlay.candidate : ['newMeetup', 'newEvent'].includes(overlay?.type) ? overlay.form?.place : null);
     // Polling re-renders details every few seconds; what the person is typing survives it, with focus and caret.
     for (const entry of typed) {
       const field = container.querySelector(`[data-keep="${entry.key}"]`);
@@ -948,8 +1119,10 @@ export function mountSocial(root, ctx = {}) {
       if (after.length === before.length) after.forEach((field, i) => { if (ticked(field)) field.checked = before[i]; else field.value = before[i]; });
     },
     planMeetup(placeInfo) {
-      if (!social.signedIn()) { toast(t('sx.needProfile'), 'info'); view.overlay = null; render(true); return; }
-      open({ type: 'newMeetup', prefill: { place: { id: placeInfo.id ?? null, name: placeInfo.name, lat: placeInfo.lat, lon: placeInfo.lon }, title: placeInfo.name } });
+      const chosen = placeOf(placeInfo);
+      // Without a profile the place waits for it: the invitation opens right after the profile is created.
+      if (!social.signedIn()) { view.pendingPlace = chosen; toast(t('sx.needProfile'), 'info'); view.overlay = null; render(true); return; }
+      open({ type: 'newMeetup', prefill: { place: chosen, title: placeInfo.name } });
     },
     async openInvite(code) {
       try {

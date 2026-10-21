@@ -18,6 +18,7 @@ import { readyView } from '../ui/ready.js';
 import { askPhoto } from '../ui/vision.js';
 import { identify } from '../core/media.js';
 import { outbound } from '../core/privacy.js';
+import { pickPlace } from '../core/picked.js';
 
 const FILTERS = [['all', null], ['cafe', ['cafe']], ['restaurant', ['restaurant']], ['park', ['park', 'playground']], ['family', ['family', 'playground']], ['culture', ['museum', 'culture']], ['attraction', ['attraction']], ['nightlife', ['nightlife']], ['mall', ['mall']]];
 const PAGE = 40;
@@ -202,6 +203,8 @@ function openPlace(place) {
   const start = startPoint();
   const timing = estimate(start, place);
   current = { place, timing };
+  // «Позвать в место» on the «Друзья» tab starts from the place opened here.
+  pickPlace(place);
   const url = new URL(location.origin);
   url.searchParams.set('tab', 'explore');
   url.searchParams.set('place', place.id);

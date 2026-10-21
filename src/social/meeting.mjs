@@ -19,7 +19,7 @@ const minutesFor = meters => Math.max(1, Math.round(meters * DETOUR / METERS_PER
 
 /**
  * Places that are fair for everyone: the longest walk is as short as possible, then the walks are as even as possible.
- * participants: [{ id, lat, lon }] with at least two people. Returns up to three options backed by POI records.
+ * participants: [{ id, lat, lon }], one or more people (for one, the nearest places). Returns up to three options backed by POI records.
  */
 export function fairMeetingPoints(dataset, participants, { kind = 'any', at = new Date(), stayMinutes = STAY_MINUTES } = {}) {
   const categories = new Set(MEETING_KINDS[kind] ?? MEETING_KINDS.any);
@@ -58,7 +58,7 @@ export function fairMeetingPoints(dataset, participants, { kind = 'any', at = ne
         sourceUrl: candidate.poi.sourceUrl, source: { label: candidate.poi.source?.label || 'OpenStreetMap' }, openingHours: candidate.poi.openingHours ?? null },
       walks, maxMinutes: longest, spreadMinutes: longest - shortest,
       hours: hours.status === 'open' ? { status: 'open', closesAt: hours.closesAt ?? null } : { status: 'unknown' },
-      why: shortest === longest ? `Всем идти примерно ${longest} мин` : `Всем идти от ${shortest} до ${longest} мин`
+      why: participants.length === 1 ? `Идти примерно ${longest} мин` : shortest === longest ? `Всем идти примерно ${longest} мин` : `Всем идти от ${shortest} до ${longest} мин`
     });
   }
   return {
