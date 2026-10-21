@@ -397,15 +397,25 @@ test('agent latency: minimal thinking, tools in one turn, then only route, card 
   assert.deepEqual(globalThis.__requests[1].toolConfig.functionCallingConfig.allowedFunctionNames, ['build_route', 'place_details', 'give_answer']);
 }));
 
-test('agent latency: a model that rejects the thinking setting is asked again without it', withFetch(async (url, init) => {
+test('agent latency: a model that rejects the thinking level is asked one level up, then without it; another 400 keeps thinking', withFetch(async (url, init) => {
   if (String(url).includes('open-meteo')) return jsonResponse(weatherBody);
   const body = JSON.parse(init.body);
-  if (body.generationConfig.thinkingConfig) return new Response('{"error":{"code":400}}', { status: 400 });
+  const level = body.generationConfig.thinkingConfig?.thinkingLevel ?? 'off';
+  globalThis.__levels.push(level);
+  if (globalThis.__badTurn) return new Response('{"error":{"code":400,"message":"Function call is missing a thought_signature."}}', { status: 400 });
+  if (level !== 'off') return new Response('{"error":{"code":400,"message":"Thinking level is not supported for this model."}}', { status: 400 });
   return jsonResponse(body.contents.some(content => content.role === 'model') ? answerTurn : toolsTurn);
 }, async () => {
-  resetAgentState();
+  resetAgentState(); globalThis.__levels = []; globalThis.__badTurn = false;
   const data = await runAgent({ query: 'кофе', ...START, minutes: 60 }, agentDeps());
   assert.equal(data.mode, 'agent');
+  assert.deepEqual(globalThis.__levels, ['minimal', 'low', 'off', 'off']);
+  // A 400 about something else is not read as a refusal: the next run still asks for minimal thinking.
+  resetAgentState(); globalThis.__levels = []; globalThis.__badTurn = true;
+  const bad = await runAgent({ query: 'кофе', ...START, minutes: 60 }, agentDeps());
+  assert.equal(bad.reason, 'provider_400');
+  assert.deepEqual(globalThis.__levels, ['minimal']);
+  resetAgentState();
 }));
 
 test('agent latency: a timed-out call is not retried and the tools already run still answer', withFetch(async (url, init) => {
@@ -445,6 +455,39 @@ test('agent latency: out of quota or busy on the first call, the spare model ans
     await runAgent({ query: 'кофе', ...START, minutes: 60 }, agentDeps());
     assert.notEqual(globalThis.__models[0], SPARE_AGENT_MODEL);
   }
+  resetAgentState();
+}));
+
+test('agent race: with GEMINI_AGENT_RACE the run starts on both fast models and the first Gemini answer is shown', withFetch(async (url, init) => {
+  if (String(url).includes('open-meteo')) return jsonResponse(weatherBody);
+  const model = modelOf(url);
+  const body = JSON.parse(init.body);
+  if (globalThis.__race[model] === 'hang') return new Promise((resolve, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
+  if (globalThis.__race[model] === 'busy') return new Response('{"error":{"code":503}}', { status: 503 });
+  return jsonResponse(body.contents.some(content => content.role === 'model') ? answerTurn : toolsTurn);
+}, async () => {
+  const raced = extra => agentDeps({ env: { GEMINI_API_KEY: 'test', GEMINI_AGENT_RACE: '1' }, ...extra });
+  // 3.1 hangs: 3.5's run answers and the 3.1 run is cancelled, not waited for.
+  resetAgentState(); globalThis.__race = { 'gemini-3.1-flash-lite': 'hang' };
+  const began = Date.now();
+  let data = await runAgent({ query: 'кофе', ...START, minutes: 60 }, raced());
+  assert.equal(data.mode, 'agent');
+  assert.equal(data.model, 'gemini-3.5-flash-lite');
+  assert.ok(Date.now() - began < 3000);
+  assert.deepEqual(data.diagnostics.raced, ['gemini-3.1-flash-lite', 'gemini-3.5-flash-lite']);
+  assert.deepEqual(data.diagnostics.attempts.map(item => [item.model, item.turn, item.error]), [['gemini-3.5-flash-lite', 1, null], ['gemini-3.5-flash-lite', 2, null]]);
+  assert.ok(data.steps.filter(step => step.tool === 'plan_walk').length === 1, 'the steps of the shown run only');
+  // Both well: one answer, from whichever run finished first.
+  globalThis.__race = {};
+  data = await runAgent({ query: 'кофе', ...START, minutes: 60 }, raced());
+  assert.equal(data.mode, 'agent');
+  // Both busy: the main model's answer from the tools.
+  globalThis.__race = { 'gemini-3.1-flash-lite': 'busy', 'gemini-3.5-flash-lite': 'busy' };
+  data = await runAgent({ query: 'кофе', ...START, minutes: 60 }, raced());
+  assert.equal(data.mode, 'fallback');
+  assert.equal(data.reason, 'provider_503');
+  assert.equal(data.model, 'gemini-3.1-flash-lite');
+  assert.ok(data.places.length >= 1);
   resetAgentState();
 }));
 

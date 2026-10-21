@@ -105,41 +105,54 @@ function describe(name, args, result) {
   }
 }
 
-// Gemini 3 thinks by default; minimal thinking keeps each call short. If a model rejects the setting, it is dropped for this isolate.
-let thinkingAccepted = true;
-const THINKING = { thinkingLevel: 'minimal' };
+// Gemini 3 thinks by default; minimal thinking keeps each call short. A model that refuses a level (HTTP 400 naming thinking)
+// is asked again at once one level up, then without it, remembered per model for this isolate. Any other 400 (a bad turn)
+// is returned as it is: dropping thinking for every model after one bad request made all later answers slow.
+const THINKING_LEVELS = ['minimal', 'low', null];
+const thinkingIndex = new Map();
+const thinkingOf = model => THINKING_LEVELS[thinkingIndex.get(model) ?? 0] || 'off';
 
 async function callGemini(body, model, env, signal, limitedJson) {
-  if (thinkingAccepted) {
-    const reply = await post({ ...body, generationConfig: { ...body.generationConfig, thinkingConfig: THINKING } }, model, env, signal, limitedJson);
-    if (reply.error !== 'provider_400') return reply;
-    thinkingAccepted = false;
+  for (;;) {
+    const index = thinkingIndex.get(model) ?? 0;
+    const level = THINKING_LEVELS[index];
+    const reply = await post(level ? { ...body, generationConfig: { ...body.generationConfig, thinkingConfig: { thinkingLevel: level } } } : body, model, env, signal, limitedJson);
+    if (!reply.thinkingRefused || index >= THINKING_LEVELS.length - 1) return reply;
+    thinkingIndex.set(model, index + 1);
   }
-  return post(body, model, env, signal, limitedJson);
 }
 
 async function post(body, model, env, signal, limitedJson) {
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST', signal, headers: { 'x-goog-api-key': env.GEMINI_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
   });
-  if (!response.ok) return { error: `provider_${response.status}` };
+  if (!response.ok) {
+    let message = '';
+    if (response.status === 400 && body.generationConfig?.thinkingConfig) { try { message = String((await limitedJson(response, 16384))?.error?.message || ''); } catch { /* no details */ } }
+    return { error: `provider_${response.status}`, ...(/think/i.test(message) ? { thinkingRefused: true } : {}) };
+  }
   return { body: await limitedJson(response, 262144) };
 }
 
-async function callWithRetry(body, model, env, deadline, limitedJson, attemptMs = Infinity, log = []) {
+async function callWithRetry(body, model, env, deadline, limitedJson, attemptMs = Infinity, log = [], { turn = 1, signal } = {}) {
   let reply = { error: 'provider_unavailable' };
   for (let attempt = 1; attempt <= 2; attempt++) {
+    if (signal?.aborted) return { error: 'provider_cancelled' };
     const left = deadline - Date.now();
     if (left < 2500) return { error: 'provider_timeout' };
     const controller = new AbortController();
     const began = Date.now();
     const timer = setTimeout(() => controller.abort(), Math.min(attemptMs, left - 250));
+    // A run whose twin on the other model already answered is cancelled.
+    const cancel = () => controller.abort();
+    signal?.addEventListener('abort', cancel);
     // A timed-out call is not retried: waiting a second time is what made answers take 20+ seconds.
     try { reply = await callGemini(body, model, env, controller.signal, limitedJson); }
     catch { reply = { error: controller.signal.aborted ? 'provider_timeout' : 'provider_unavailable' }; }
-    finally { clearTimeout(timer); }
-    // What happened, safe to show: model, thinking, time and error type; never the key, prompt or text.
-    log.push({ model, thinking: thinkingAccepted ? THINKING.thinkingLevel : 'off', ms: Date.now() - began, error: reply.error || null });
+    finally { clearTimeout(timer); signal?.removeEventListener('abort', cancel); }
+    if (signal?.aborted) return { error: 'provider_cancelled' };
+    // What happened, safe to show: model, turn, thinking, time and error type; never the key, prompt or text.
+    log.push({ model, turn, thinking: thinkingOf(model), ms: Date.now() - began, error: reply.error || null });
     if (!reply.error || !/^provider_(500|502|503|504|unavailable)$/.test(reply.error) || deadline - Date.now() < 4000) return reply;
     await new Promise(resolve => setTimeout(resolve, 400));
   }
@@ -158,14 +171,46 @@ function astanaNow(now) {
  * cannot tell; previous = the last turn of a spoken conversation; reserveMinutes and the hidden places are the visitor's settings, filled in by the server).
  * deps: { env, dataset, limitedJson, answerLanguage, unsupported (RegExp), now?, fetchImpl? (weather only), attemptMs?, totalMs? }.
  */
-export function resetAgentState() { thinkingAccepted = true; }
+export function resetAgentState() { thinkingIndex.clear(); }
 
+// With GEMINI_AGENT_RACE=1 (the live site) the same run starts on both fast models at once, each with its own tools and turns
+// (thought signatures do not cross models), and the first one that answers through Gemini is shown; the other is cancelled.
+// On the live site one of the two was often busy or slow, and a run that switched models only after a failure had too little time.
 export async function runAgent(input, deps) {
+  const primary = deps.env.GEMINI_AGENT_MODEL || DEFAULT_AGENT_MODEL;
+  const spare = primary === SPARE_AGENT_MODEL ? DEFAULT_AGENT_MODEL : SPARE_AGENT_MODEL;
+  if (deps.env.GEMINI_AGENT_RACE !== '1' || !deps.env.GEMINI_API_KEY || deps.model) return runOnce(input, deps);
+  const startedAt = deps.startedAt ?? Date.now();
+  const attempts = [];
+  const runs = [primary, spare].map(model => ({ model, controller: new AbortController() }));
+  return new Promise(resolve => {
+    const results = [];
+    runs.forEach((run, index) => {
+      runOnce(input, { ...deps, startedAt, model: run.model, attempts, signal: run.controller.signal })
+        .catch(() => null)
+        .then(result => {
+          if (run.controller.signal.aborted) return;
+          results[index] = result;
+          if (result?.mode === 'agent') {
+            runs.forEach((other, j) => { if (j !== index && results[j] === undefined) other.controller.abort(); });
+            resolve({ ...result, diagnostics: { ...result.diagnostics, attempts: [...attempts], raced: runs.map(item => item.model) } });
+          } else if (results.filter(item => item !== undefined).length === runs.length) {
+            // Neither answered through Gemini: the main model's answer from the tools.
+            const shown = results[0] || results[1];
+            resolve(shown && { ...shown, diagnostics: { ...shown.diagnostics, attempts: [...attempts], raced: runs.map(item => item.model) } });
+          }
+        });
+    });
+  });
+}
+
+async function runOnce(input, deps) {
   const { env, dataset, limitedJson, answerLanguage, unsupported } = deps;
   const now = deps.now || new Date();
   const startedAt = Date.now();
   const requestStartedAt = deps.startedAt ?? startedAt;
-  const attempts = [];
+  const attempts = deps.attempts || [];
+  const signal = deps.signal;
   const start = { lat: input.lat, lon: input.lon };
   const steps = [];
   const seen = new Map();
@@ -209,7 +254,7 @@ export async function runAgent(input, deps) {
     return { mode, summary, places, route, ...(lastPlanBeyond ? { beyondWalk: lastPlanBeyond } : {}), steps, modelCalls, toolCalls, elapsedMs: Date.now() - startedAt,
       privacy: 'Gemini не получал ваши координаты: сервер округлил точку старта примерно до 100 м и сам подставлял её в инструменты, а из ответов инструментов координаты убраны.',
       ...(extra.reason ? { reason: extra.reason } : {}), ...(extra.model ? { provider: 'gemini', model: extra.model } : {}),
-      diagnostics: { totalMs: Date.now() - requestStartedAt, startedAfterMs: startedAt - requestStartedAt, attempts } };
+      diagnostics: { totalMs: Date.now() - requestStartedAt, startedAfterMs: startedAt - requestStartedAt, attempts: [...attempts] } };
   };
 
   // Without Gemini the same tools still answer, in a fixed order.
@@ -230,7 +275,7 @@ export async function runAgent(input, deps) {
     return fallback('no_gemini_key');
   }
   // The agent always runs on a fast model: GEMINI_MODEL may name a slower one for the walk summary.
-  const primary = env.GEMINI_AGENT_MODEL || DEFAULT_AGENT_MODEL;
+  const primary = deps.model || env.GEMINI_AGENT_MODEL || DEFAULT_AGENT_MODEL;
   let model = primary;
   const language = ['ru', 'kk', 'en'].includes(input.lang) ? input.lang : answerLanguage(input.query, input.uiLang);
   const previousTurn = input.previous ? { query: input.previous.query, answer: input.previous.summary } : undefined;
@@ -251,12 +296,14 @@ export async function runAgent(input, deps) {
     const body = { systemInstruction: { parts: [{ text: SYSTEM }] }, contents, tools: [{ functionDeclarations: DECLARATIONS }],
       toolConfig: { functionCallingConfig: { mode: 'ANY', ...(allowed ? { allowedFunctionNames: allowed } : {}) } },
       generationConfig: { temperature: 0.2, maxOutputTokens: 1024 } };
-    let reply = await callWithRetry(body, model, env, deadline, limitedJson, cap, attempts);
+    let reply = await callWithRetry(body, model, env, deadline, limitedJson, cap, attempts, { turn, signal });
     modelCalls++;
+    if (signal?.aborted) return null;
     // Out of quota or busy before any model turn: the spare model takes the whole run (thought signatures don't cross models).
-    if (/^provider_(429|5\d\d)$/.test(reply.error || '') && turn === 1 && model === primary && primary !== SPARE_AGENT_MODEL) {
+    // A raced run leaves that to its twin, which already runs on the other model.
+    if (!deps.model && /^provider_(429|5\d\d)$/.test(reply.error || '') && turn === 1 && model === primary && primary !== SPARE_AGENT_MODEL) {
       model = SPARE_AGENT_MODEL;
-      reply = await callWithRetry(body, model, env, deadline, limitedJson, Math.min(attemptMs, deadline - Date.now() - ANSWER_MS), attempts);
+      reply = await callWithRetry(body, model, env, deadline, limitedJson, Math.min(attemptMs, deadline - Date.now() - ANSWER_MS), attempts, { turn });
       modelCalls++;
     }
     if (reply.error) return fallback(reply.error, model);
