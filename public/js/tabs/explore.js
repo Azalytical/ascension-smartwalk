@@ -1,7 +1,7 @@
 // "Nearby": every place in the database on the map and in a list, nearest first, with search and filters.
 import { registerTab, openTab } from '../shell.js';
 import { h, icon, clear } from '../core/dom.js';
-import { t, pick, number } from '../core/i18n.js';
+import { t, pick, number, placeName } from '../core/i18n.js';
 import * as store from '../core/store.js';
 import * as api from '../core/api.js';
 import { PRESETS, estimate, formatDistance } from '../core/geo.js';
@@ -167,7 +167,7 @@ function renderList() {
   if (!items.length) { clear(listHost, summary, h('p', { class: 'empty-note', text: t('explore.empty') })); return; }
   clear(listHost, summary, h('div', { class: 'list' }, items.slice(0, shown).map(({ place, timing }) => h('button', { class: 'list-row place-row', type: 'button', onclick: () => openPlace(place) },
     categoryArt(place.category, 36, 'art'),
-    h('span', { class: 'row-text' }, h('strong', { text: place.name }),
+    h('span', { class: 'row-text' }, h('strong', { text: placeName(place.name) }),
       h('small', {}, categoryName(place.category), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }), t('explore.walk', { n: timing.walkMinutes })),
       hoursChip(hoursStatus(place, timing.walkMinutes, timing.visitMinutes))), icon('chevron', 'row-chevron')))),
   items.length > shown ? h('button', { class: 'btn btn-quiet btn-block', type: 'button', text: t('explore.more'), onclick: () => { shown += PAGE; renderList(); } }) : null);
@@ -260,7 +260,7 @@ function renderVision() {
     if (data.nearby?.length) {
       body.push(h('h3', { class: 'block-title', text: t('vision.nearby') }), h('div', { class: 'list' }, data.nearby.map((item) => h('button', { class: 'list-row', type: 'button',
         onclick: () => { const known = (data?.items || []).find((p) => p.id === item.id); if (known) { vision = null; openPlace(known); } } },
-      categoryArt(item.category, 32, 'art'), h('span', { class: 'row-text' }, h('strong', { text: item.name }), h('small', { text: formatDistance(item.distanceMeters, lang()) })), icon('chevron', 'row-chevron')))));
+      categoryArt(item.category, 32, 'art'), h('span', { class: 'row-text' }, h('strong', { text: placeName(item.name) }), h('small', { text: formatDistance(item.distanceMeters, lang()) })), icon('chevron', 'row-chevron')))));
     }
     body.push(again);
     body.push(h('p', { class: 'fine', text: t('vision.private') }));

@@ -2,7 +2,7 @@
 // a single turnaround alert, and the screen kept awake. The walk survives reloads (store key "walk").
 // «Только туда» (walk.oneWay): no way back, so the walk ends on site and the countdown is to «закончите к».
 import { h, icon, clear } from '../core/dom.js';
-import { t, time } from '../core/i18n.js';
+import { t, time, placeName } from '../core/i18n.js';
 import { haversine } from '../core/geo.js';
 import * as store from '../core/store.js';
 import { timeRing } from './ring.js';
@@ -180,7 +180,7 @@ export function mountLive(container, { onFinished }) {
         h('div', { class: `done-badge${late ? ' is-late' : ''}` }, icon(late ? 'clock' : 'check')),
         h('h2', { class: 'title-1', text: late ? t(walk.oneWay ? 'live.finished.lateOne' : 'live.finished.late', { n: late }) : t(walk.oneWay ? 'live.finished.titleOne' : 'live.finished.title') }),
         h('p', { class: 'lead', text: t('live.finished.text', { n: finished.minutes, plan: walk.plan.total }) }),
-        h('div', { class: 'done-place' }, categoryArt(walk.place.category, 40), h('strong', { text: walk.place.name })),
+        h('div', { class: 'done-place' }, categoryArt(walk.place.category, 40), h('strong', { text: placeName(walk.place.name) })),
         ratingBlock(walk.place, { prompt: true }),
         h('button', { class: 'btn btn-primary btn-xl', type: 'button', text: t('live.close'), onclick: () => onFinished?.('done') })));
       return;
@@ -189,7 +189,7 @@ export function mountLive(container, { onFinished }) {
       h('div', { class: 'view-bar' }, h('h2', { id: 'live-title', class: 'title-3' }, h('span', { class: 'rec-dot', 'aria-hidden': 'true' }), t('live.title')),
         h('button', { class: 'btn btn-quiet btn-sm', type: 'button', onclick: stop }, icon('stop'), t('live.finish'))),
       h('div', { class: 'live-hero' }, ringHost,
-        h('div', { class: 'live-side' }, h('div', { class: 'live-place' }, categoryArt(walk.place.category, 28), h('strong', { text: walk.place.name })), returnLine, spareLine, phaseLine)),
+        h('div', { class: 'live-side' }, h('div', { class: 'live-place' }, categoryArt(walk.place.category, 28), h('strong', { text: placeName(walk.place.name) })), returnLine, spareLine, phaseLine)),
       alertBox, action, stepper, replan.element, navHost,
       watchButton({ place: walk.place, start: walk.start, walk: walk.plan.there, visit: walk.plan.visit, back: walk.plan.back, minutes: walk.plan.total }),
       h('p', { class: 'fine center', text: t('live.screenOn') })));

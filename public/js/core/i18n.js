@@ -105,6 +105,7 @@ const ru = {
   'weather.rain': 'Сейчас осадки. Подобрать места под крышей?', 'weather.cold': 'На улице {t}°. Подобрать места под крышей?',
   'weather.wind': 'Сильный ветер. Подобрать места под крышей?', 'weather.yes': 'Под крышу', 'weather.now': 'Сейчас {t}°',
   'sheet.expand': 'Развернуть панель', 'sheet.collapse': 'Свернуть панель',
+  'app.title': 'Aidem: прогулка по Астане ровно на ваше время', 'map.controls': 'Карта', 'nav.sections': 'Разделы',
   'common.back': 'Назад', 'common.close': 'Закрыть', 'common.cancel': 'Отмена',
   'w.minute': 'минута|минуты|минут', 'w.place': 'место|места|мест',
   'rating.title': 'Оценки пользователей Aidem', 'rating.summary': '{avg} · {n} {word}', 'rating.few': 'Мало оценок ({n}), среднее покажем от 3',
@@ -207,6 +208,7 @@ const en = {
   'toast.online': 'Back online', 'toast.locationShared': 'Start: your location',
   'weather.rain': 'It is raining or snowing. Find places indoors?', 'weather.cold': 'It is {t}° outside. Find places indoors?',
   'weather.wind': 'Strong wind. Find places indoors?', 'weather.yes': 'Indoors', 'weather.now': 'Now {t}°',
+  'app.title': 'Aidem: a walk in Astana that fits your time', 'map.controls': 'Map', 'nav.sections': 'Sections',
   'sheet.expand': 'Expand panel', 'sheet.collapse': 'Collapse panel', 'common.back': 'Back', 'common.close': 'Close', 'common.cancel': 'Cancel',
   'w.minute': 'minute|minutes', 'w.place': 'place|places',
   'rating.title': 'Aidem user ratings', 'rating.summary': '{avg} · {n} {word}', 'rating.few': 'Too few ratings ({n}); the average shows from 3',
@@ -219,7 +221,8 @@ const en = {
 };
 
 const dictionaries = { ru, kk: { ...kk, ...server.kk }, en: { ...en, ...server.en } };
-export const LANGS = [['ru', 'RU'], ['kk', 'ҚАЗ'], ['en', 'EN']];
+// [code, short label, the language's own name]: the header switch and «Моё» show the short label.
+export const LANGS = [['ru', 'РУС', 'Русский'], ['kk', 'ҚАЗ', 'Қазақша'], ['en', 'ENG', 'English']];
 const locales = { ru: 'ru-RU', kk: 'kk-KZ', en: 'en-GB' };
 
 function detect() {
@@ -258,10 +261,22 @@ export const time = (value) => {
   const shifted = astana(value);
   return `${String(shifted.getUTCHours()).padStart(2, '0')}:${String(shifted.getUTCMinutes()).padStart(2, '0')}`;
 };
+// Some browsers ship without Kazakh dates and would print «21 октября»; the months are spelled here then.
+const KK_MONTHS = ['қаңтар', 'ақпан', 'наурыз', 'сәуір', 'мамыр', 'маусым', 'шілде', 'тамыз', 'қыркүйек', 'қазан', 'қараша', 'желтоқсан'];
+const kkDates = () => Intl.DateTimeFormat.supportedLocalesOf(['kk']).length > 0;
 export const date = (value) => {
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(astana(parsed));
+  if (Number.isNaN(parsed.getTime())) return null;
+  if (current === 'kk' && !kkDates()) { const shifted = astana(parsed); return `${shifted.getUTCDate()} ${KK_MONTHS[shifted.getUTCMonth()]}`; }
+  return new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(astana(parsed));
 };
+
+// Places without a name of their own come from the data as «Детская площадка» or «Фонтан»; other languages get the same words.
+const GENERIC_NAMES = {
+  'Детская площадка': { kk: 'Балалар алаңы', en: 'Playground' }, 'Фонтан': { kk: 'Субұрқақ', en: 'Fountain' },
+  'Парк': { kk: 'Саябақ', en: 'Park' }, 'Сквер': { kk: 'Сквер', en: 'Square' }, 'Кафе': { kk: 'Кафе', en: 'Café' },
+};
+export const placeName = (name) => GENERIC_NAMES[name]?.[current] ?? name;
 export const number = (n) => new Intl.NumberFormat(locale()).format(n);
 
 /** Adds a feature's own strings ({ ru, kk, en }) to the dictionaries, e.g. the «Друзья» tab in social/strings.js. */

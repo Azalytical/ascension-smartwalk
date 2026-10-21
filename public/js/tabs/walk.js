@@ -1,7 +1,7 @@
 // The main tab: plan a walk, see the options, open a place, walk with the return countdown.
 import { registerTab } from '../shell.js';
 import { h, icon, clear, isDesktop, safeUrl } from '../core/dom.js';
-import { t, pick, plural, lang, time } from '../core/i18n.js';
+import { t, pick, plural, lang, time, placeName } from '../core/i18n.js';
 import * as store from '../core/store.js';
 import { PRESETS, inAstana, reachMeters, estimate, startFrom } from '../core/geo.js';
 import * as api from '../core/api.js';
@@ -497,6 +497,7 @@ async function submit(options) {
     if (isFallback()) { askForStart(); return; }
   }
   inflight?.abort();
+  relanging?.abort(); relanging = null;
   const controller = new AbortController();
   inflight = controller;
   const surprise = options?.surprise === true;
@@ -584,7 +585,7 @@ function renderResults() {
       onmouseenter: () => highlight(index), onfocus: () => highlight(index) },
     h('span', { class: 'result-num num', 'aria-hidden': 'true', text: index + 1 }),
     categoryArt(place.category, 44, 'art'),
-    h('span', { class: 'result-text' }, h('strong', { class: 'result-name', text: place.name }),
+    h('span', { class: 'result-text' }, h('strong', { class: 'result-name', text: placeName(place.name) }),
       h('span', { class: 'meta' }, categoryName(place.category), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }), t('explore.walk', { n: place.walkMinutes })),
       h('span', { class: 'result-badges' }, hoursChip(status), confidenceChip(place.confidence), ratingChip(place)),
       versus ? h('span', { class: 'result-versus', text: versus }) : null),
@@ -712,7 +713,7 @@ function eventsCard(events) {
     h('ul', { class: 'event-list' }, items.map((event) => h('li', {},
       h('a', { class: 'event-row', href: safeUrl(event.url), target: '_blank', rel: 'noopener noreferrer', 'aria-label': `${event.title}. ${t('events.open')}` },
         h('span', { class: 'row-text' }, h('strong', { text: event.title }),
-          h('small', { text: [eventWhen(event), event.venue, t('explore.walk', { n: event.walkMinutes }), event.price].filter(Boolean).join(' · ') })),
+          h('small', { text: [eventWhen(event), event.venue, t('explore.walk', { n: event.walkMinutes }), lang() === 'en' ? event.price?.replace(/теңге/gi, 'tenge') : event.price].filter(Boolean).join(' · ') })),
         icon('external', 'icon-xs'))))));
 }
 // Where the listing comes from and when it was read: collected by the server this morning, or the saved copy.
@@ -735,7 +736,7 @@ function eventWhen(event) {
 function aiCard(generation) {
   const note = h('p', { class: 'fine', text: t('results.aiNote'), hidden: true });
   const more = h('button', { class: 'ai-more', type: 'button', 'aria-expanded': 'false', text: t('results.aiMore') });
-  const card = h('div', { class: 'ai-card' }, h('p', { class: 'ai-label' }, icon('sparkle'), t(generation.provider === 'gemini' ? 'results.aiGemini' : 'results.ai')),
+  const card = h('div', { class: `ai-card${relanging ? ' is-updating' : ''}`, 'aria-busy': relanging ? 'true' : null }, h('p', { class: 'ai-label' }, icon('sparkle'), t(generation.provider === 'gemini' ? 'results.aiGemini' : 'results.ai')),
     h('p', { class: 'ai-text', text: generation.summary }), note,
     h('div', { class: 'ai-actions' }, more, listenButton(generation.summary)));
   more.addEventListener('click', () => {
@@ -877,6 +878,43 @@ function renderLive() {
   } });
 }
 
+// ---------- language ----------
+// A quick idea's query is the idea's own text, so it follows the language; a typed query stays as typed.
+// Gemini's tip and the server's words come in the request's language: after a switch the shown answer is asked for again in the new one,
+// and the old one stays on screen until it arrives.
+let relanging = null;
+function followLang() {
+  if (plan.mood && plan.query !== t(`moodQuery.${plan.mood}`)) { plan.query = t(`moodQuery.${plan.mood}`); savePlan(); }
+  if (!result || result.demo || !request || request.lang === lang() || inflight || relanging) return;
+  const next = { ...request, lang: lang() };
+  const controller = new AbortController();
+  relanging = controller;
+  const shownId = result.recommendations[selected]?.id;
+  api.recommend(next, controller.signal).then((data) => {
+    if (relanging !== controller) return;
+    data.recommendations = data.recommendations.filter((place) => !store.isHidden(place.id));
+    // A surprise is the one place already shown: the new answer only gives its words.
+    if (request.surprise) {
+      data.recommendations = data.recommendations.filter((place) => place.id === shownId);
+      if (!data.recommendations.length) return;
+      data.surprise = result.surprise;
+    }
+    request = next;
+    result = data;
+    const index = data.recommendations.findIndex((place) => place.id === shownId);
+    selected = Math.max(0, index);
+    if (view === 'place' && index < 0) view = 'results';
+  }).catch(() => { /* the answer on screen stays in the language it came in */ })
+    .finally(() => {
+      if (relanging !== controller) return;
+      relanging = null;
+      if (!root || !['results', 'place'].includes(view)) return;
+      const top = root.scrollTop;
+      render();
+      root.scrollTop = top;
+    });
+}
+
 // ---------- deep links ----------
 function applyUrl() {
   const params = new URLSearchParams(location.search);
@@ -905,6 +943,7 @@ registerTab({
     if (applyUrl() && view !== 'live') { submit(); return; }
     autoLocate();
     if (view === 'loading' && !inflight) view = result ? 'results' : 'plan';
+    followLang();
     render();
     mapReady.then(() => { if (root === container && root.isConnected) render(); });
   },

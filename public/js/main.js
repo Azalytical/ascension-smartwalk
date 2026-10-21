@@ -5,7 +5,8 @@ import * as store from './core/store.js';
 import { on } from './core/store.js';
 import { applyTheme, isDark } from './core/theme.js';
 import { initShell, openTab, allTabs } from './shell.js';
-import { initSheet, setSnap } from './ui/sheet.js';
+import { initSheet, setSnap, getSnap } from './ui/sheet.js';
+import { langSwitch } from './ui/lang-switch.js';
 import { askPhoto } from './ui/vision.js';
 import { initMap, setDark, setPadding, refreshOverlays, toggleTilt, getMap, mapReady, marker, flyTo, userDot } from './map/map.js';
 import { toast } from './ui/toast.js';
@@ -59,9 +60,16 @@ function labelControls() {
   $('#map').setAttribute('aria-label', t('map.label'));
   $('#sheet').setAttribute('aria-label', t('app.tagline'));
   $('.brand-city').textContent = t('app.city');
+  $('.map-fabs').setAttribute('aria-label', t('map.controls'));
+  $('#tabbar').setAttribute('aria-label', t('nav.sections'));
+  $('#sheet-handle').setAttribute('aria-label', t(getSnap() === 'full' ? 'sheet.collapse' : 'sheet.expand'));
+  document.title = t('app.title');
 }
 labelControls();
 on('lang', labelControls);
+// РУС · ҚАЗ · ENG over the map on phones, in the panel's header on desktop.
+$('.topbar').append(langSwitch());
+$('.sheet-brand').append(langSwitch());
 
 document.addEventListener('seruen:map-unavailable', () => {
   document.body.classList.add('no-map');

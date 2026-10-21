@@ -1,7 +1,7 @@
 // «Перед выходом»: a short checklist between the place card and the walk: when you will be back, the weather now,
 // opening hours the source does not confirm. A reminder, not a safety promise: the screen says so.
 import { h, icon } from '../core/dom.js';
-import { t } from '../core/i18n.js';
+import { t, placeName } from '../core/i18n.js';
 import * as api from '../core/api.js';
 import { categoryArt, hoursStatus, backButton } from './common.js';
 import './trip.js';
@@ -41,7 +41,7 @@ export function readyView({ place, timing, backAt, serverHours = null, onGo, onB
   return h('section', { class: 'view ready-view', 'aria-labelledby': 'ready-title' },
     h('div', { class: 'view-bar' }, backButton(t('common.back'), onBack)),
     h('h2', { id: 'ready-title', class: 'title-2', text: t('ready.title') }),
-    h('div', { class: 'ready-place' }, categoryArt(place.category, 36, 'art'), h('strong', { text: place.name })),
+    h('div', { class: 'ready-place' }, categoryArt(place.category, 36, 'art'), h('strong', { text: placeName(place.name) })),
     h('ul', { class: 'ready-list' },
       item(oneWay ? 'flag' : 'return', 'good', t(oneWay ? 'ready.done' : 'ready.back', { time: backAt }),
         t(oneWay ? 'ready.oneWayText' : 'ready.backText', { walk: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, reserve })),

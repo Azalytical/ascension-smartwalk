@@ -1385,6 +1385,17 @@
     });
     $('error-home').addEventListener('click', () => { renderHome(); show('home'); });
     document.querySelectorAll('[data-shape]').forEach((button) => button.addEventListener('click', () => { state.shape = button.dataset.shape; save(); applyShape(); }));
+    // Language: the same choice as in Aidem on the phone (seruen:v1); the page opens again in it.
+    document.querySelectorAll('[data-lang]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.lang === LANG));
+      button.addEventListener('click', () => {
+        if (button.dataset.lang === LANG) return;
+        try { localStorage.setItem('seruen:v1', JSON.stringify({ ...JSON.parse(localStorage.getItem('seruen:v1') || '{}'), lang: button.dataset.lang })); } catch { /* private mode */ }
+        const url = new URL(location.href);
+        url.searchParams.set('lang', button.dataset.lang);
+        location.replace(url);
+      });
+    });
     $('demo-toggle').addEventListener('change', (event) => { state.demo = event.target.checked; });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.walk && !state.wakeLock) keepAwake(); });
     addEventListener('resize', layout);

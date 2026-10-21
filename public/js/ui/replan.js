@@ -1,7 +1,7 @@
 // «Что-то пошло не так?» on the walk screen: the place is closed, it is raining or cold, or the person is running late.
 // The new plan keeps the promised «вернётесь к» (core/replan.js); it is worked out on the phone and nothing is sent.
 import { h, icon, clear } from '../core/dom.js';
-import { t, time, addStrings } from '../core/i18n.js';
+import { t, time, addStrings, placeName } from '../core/i18n.js';
 import { places } from '../core/api.js';
 import { checkVisit } from '../lib/hours.mjs';
 import { alternatives, switchTo, turnBack, runLate, whereNow } from '../core/replan.js';
@@ -97,7 +97,7 @@ export function replanBlock({ getWalk, getFix, apply }) {
           apply(next, say(next, 'replan.switched', { name: option.place.name, time: backClock(next) }));
         } },
       categoryArt(option.place.category, 36, 'art'),
-      h('span', { class: 'row-text' }, h('strong', { text: option.place.name }),
+      h('span', { class: 'row-text' }, h('strong', { text: placeName(option.place.name) }),
         h('small', { text: say(walk, 'replan.row', option) }),
         hoursChip(hoursStatus(option.place, option.there, option.visit))),
       icon('chevron', 'row-chevron')))),

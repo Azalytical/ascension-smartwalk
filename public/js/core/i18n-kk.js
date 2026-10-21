@@ -101,6 +101,7 @@ export default {
   'weather.rain': 'Қазір жауын-шашын. Жабық орындарды ұсынайық па?', 'weather.cold': 'Далада {t}°. Жабық орындарды ұсынайық па?',
   'weather.wind': 'Қатты жел. Жабық орындарды ұсынайық па?', 'weather.yes': 'Жабық жерге', 'weather.now': 'Қазір {t}°',
   'sheet.expand': 'Панельді жаю', 'sheet.collapse': 'Панельді жию',
+  'app.title': 'Aidem: Астана бойынша серуен, дәл сіздің уақытыңызға сай', 'map.controls': 'Карта', 'nav.sections': 'Бөлімдер',
   'common.back': 'Артқа', 'common.close': 'Жабу', 'common.cancel': 'Бас тарту',
   'w.minute': 'минут', 'w.place': 'орын',
   'rating.title': 'Aidem пайдаланушыларының бағалары', 'rating.summary': '{avg} · {n} {word}', 'rating.few': 'Баға аз ({n}), орташасын 3 бағадан көрсетеміз',

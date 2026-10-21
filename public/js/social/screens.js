@@ -938,6 +938,15 @@ export function mountSocial(root, ctx = {}) {
 
   return {
     unmount() { social.setFocused(false); unsubscribe(); layer?.destroy(); container.remove(); },
+    /** Draws the open screen again in the new language; an open form keeps what was typed and ticked. */
+    relang() {
+      const fields = () => [...container.querySelectorAll('input, textarea, select')];
+      const ticked = field => field.type === 'checkbox' || field.type === 'radio';
+      const before = fields().map(field => (ticked(field) ? field.checked : field.value));
+      render(true);
+      const after = fields();
+      if (after.length === before.length) after.forEach((field, i) => { if (ticked(field)) field.checked = before[i]; else field.value = before[i]; });
+    },
     planMeetup(placeInfo) {
       if (!social.signedIn()) { toast(t('sx.needProfile'), 'info'); view.overlay = null; render(true); return; }
       open({ type: 'newMeetup', prefill: { place: { id: placeInfo.id ?? null, name: placeInfo.name, lat: placeInfo.lat, lon: placeInfo.lon }, title: placeInfo.name } });
