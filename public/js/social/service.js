@@ -231,15 +231,26 @@ export async function stopShare() {
   await refresh();
 }
 
-/** One-off position for "where should we meet" without starting a share. */
+/** A recent position this page already has (a running share or an earlier one-off fix), without asking the browser. */
+export function knownPosition(maxAge = 5 * 60_000) {
+  const share = state.data?.share;
+  if (share?.hasPoint) return { lat: share.lat, lon: share.lon };
+  const last = state.geo.last;
+  return last && Date.now() - last.at < maxAge ? last : null;
+}
+
+// One-off position, asked only when the person taps a "where am I" button; null when there is none.
 export function currentPosition() {
   if (state.geo.last && Date.now() - state.geo.last.at < 60_000) return Promise.resolve(state.geo.last);
   return new Promise(resolve => {
     if (!('geolocation' in navigator)) { resolve(null); return; }
+    // The browser's timeout starts after the permission prompt, and an unanswered prompt never calls back.
+    const giveUp = setTimeout(() => resolve(null), 15_000);
     navigator.geolocation.getCurrentPosition(position => {
+      clearTimeout(giveUp);
       state.geo.last = { lat: position.coords.latitude, lon: position.coords.longitude, accuracy: position.coords.accuracy, at: Date.now() };
       resolve(state.geo.last);
-    }, () => resolve(null), { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 });
+    }, () => { clearTimeout(giveUp); resolve(null); }, { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 });
   });
 }
 

@@ -78,7 +78,7 @@ const ru = {
   'sx.mtitle.coffee': 'Кофе', 'sx.mtitle.food': 'Поесть вместе', 'sx.mtitle.park': 'Прогулка', 'sx.mtitle.meet': 'Встреча',
 
   'sx.pp.placeholder': 'Название места, например «Байтерек» или «кофе»', 'sx.pp.label': 'Поиск места', 'sx.pp.none': 'Место не выбрано', 'sx.pp.fromCenter': '{d} от центра карты',
-  'sx.pp.empty': 'Ничего не нашли. Можно взять центр карты.', 'sx.pp.center': 'Центр карты', 'sx.pp.point': 'Точка на карте', 'sx.pp.here': 'Где я сейчас',
+  'sx.pp.empty': 'Ничего не нашли. Попробуйте другое слово или выберите на карте.', 'sx.pp.center': 'Центр карты', 'sx.pp.point': 'Точка на карте', 'sx.pp.here': 'Где я сейчас',
   'sx.pp.noGeo': 'Не удалось определить местоположение', 'sx.pp.nearMe': 'Рядом со мной',
   'sx.tp.label': 'Дата и время', 'sx.tp.m15': 'Через 15 мин', 'sx.tp.m30': 'Через 30 мин', 'sx.tp.h1': 'Через час', 'sx.tp.tonight': 'Вечером в 19:00', 'sx.tp.tomorrow': 'Завтра в 19:00',
 
@@ -126,7 +126,24 @@ const ru = {
   'sx.err.generic': 'Не получилось. Попробуйте ещё раз.', 'sx.err.offline': 'Нет связи с сервером. Проверьте интернет.',
   'sx.geo.unsupported': 'Браузер не умеет определять местоположение', 'sx.geo.denied': 'Браузер не дал доступ к геопозиции. Разрешите его в настройках сайта.',
   'sx.geo.failed': 'Не удаётся определить местоположение. Выйдите на открытое место или проверьте GPS.',
-  'sx.map.meetup': 'Встреча: {title}, {place}', 'sx.map.event': 'Событие: {title}', 'sx.map.option': 'Вариант {n}: {place}'
+  'sx.map.meetup': 'Встреча: {title}, {place}', 'sx.map.event': 'Событие: {title}', 'sx.map.option': 'Вариант {n}: {place}',
+
+  'sx.place.nightlife': 'бар', 'sx.place.family': 'для семьи',
+  'sx.inv.title': 'Позвать в место', 'sx.inv.sub': 'Выберите место на карте или из списка, можно позвать и одного друга', 'sx.inv.subPicked': 'Выбрано на карте: {name}',
+  'sx.inv.oneIsEnough': 'Можно позвать одного друга или нескольких.', 'sx.inv.noGeo': 'Геолокация не нужна: место выбираете вы, друзья получат приглашение.',
+  'sx.ob.placeNext': 'Сразу после профиля откроем приглашение в «{name}».',
+  'sx.from.label': 'Откуда вы идёте', 'sx.from.here': 'Где я сейчас', 'sx.from.map': 'Центр карты', 'sx.from.gps': '📍 Определить, где я', 'sx.from.none': 'Без меня',
+  'sx.from.lastFix': 'Последняя геоточка', 'sx.from.startName': 'Точка старта',
+  'sx.meet.pickOwn': 'Выбрать место самому: на карте или из списка', 'sx.meet.noPoints': 'Ни у кого из выбранных нет точки на карте. Укажите выше, откуда вы идёте, или выберите место самому.', 'sx.meet.whyOne': 'Идти примерно {n} мин',
+  'sx.meet.withoutYou': 'Вашу точку не учли: места подобраны по друзьям. Чтобы учесть себя, выберите выше, откуда вы идёте.',
+  'sx.pp.onMap': '🗺 Выбрать на карте', 'sx.pp.fromMap': 'выбрано на карте', 'sx.pp.change': 'Изменить', 'sx.pp.collapse': 'Свернуть', 'sx.pp.more': 'Показать ещё',
+  'sx.pp.groups': 'Тип места', 'sx.pp.loading': 'Загружаем места…', 'sx.pp.failed': 'Не удалось загрузить список мест. Выберите место на карте или возьмите центр карты.',
+  'sx.pp.count': 'Мест: {n}, {from}', 'sx.pp.nearYou': 'сначала ближайшие к вам', 'sx.pp.nearStart': 'сначала ближайшие к «{name}»',
+  'sx.pp.nearCenter': 'сначала ближайшие к центру карты', 'sx.pp.nearCity': 'сначала ближайшие к центру Астаны',
+  'sx.pp.g.all': 'Все', 'sx.pp.g.cafe': '☕ Кофейни', 'sx.pp.g.food': '🍽 Еда', 'sx.pp.g.park': '🌳 Парки', 'sx.pp.g.culture': '🎭 Музеи и театры',
+  'sx.pp.g.sight': '🏛 Достопримечательности', 'sx.pp.g.mall': '🛍 ТРЦ', 'sx.pp.g.kids': '🧸 Детям', 'sx.pp.g.night': '🍸 Бары',
+  'sx.pick.title': 'Нажмите на место на карте', 'sx.pick.cancel': 'Отмена', 'sx.pick.choose': 'Выбрать', 'sx.pick.point': 'точка на карте',
+  'sx.pick.hint': 'Цветные точки: места из базы. Приблизьте карту и нажмите на нужное.', 'sx.map.picked': 'Выбранное место: {place}'
 };
 
 const kk = {
@@ -204,7 +221,7 @@ const kk = {
   'sx.mtitle.coffee': 'Кофе', 'sx.mtitle.food': 'Бірге тамақтану', 'sx.mtitle.park': 'Серуен', 'sx.mtitle.meet': 'Кездесу',
 
   'sx.pp.placeholder': 'Орын атауы, мысалы «Бәйтерек» немесе «кофе»', 'sx.pp.label': 'Орын іздеу', 'sx.pp.none': 'Орын таңдалмады', 'sx.pp.fromCenter': 'карта ортасынан {d}',
-  'sx.pp.empty': 'Ештеңе табылмады. Карта ортасын алуға болады.', 'sx.pp.center': 'Карта ортасы', 'sx.pp.point': 'Картадағы нүкте', 'sx.pp.here': 'Қазір қайдамын',
+  'sx.pp.empty': 'Ештеңе табылмады. Басқа сөзді байқап көріңіз немесе картадан таңдаңыз.', 'sx.pp.center': 'Карта ортасы', 'sx.pp.point': 'Картадағы нүкте', 'sx.pp.here': 'Қазір қайдамын',
   'sx.pp.noGeo': 'Орынды анықтау мүмкін болмады', 'sx.pp.nearMe': 'Менің жанымда',
   'sx.tp.label': 'Күні мен уақыты', 'sx.tp.m15': '15 минуттан соң', 'sx.tp.m30': '30 минуттан соң', 'sx.tp.h1': 'Бір сағаттан соң', 'sx.tp.tonight': 'Кешке 19:00-де', 'sx.tp.tomorrow': 'Ертең 19:00-де',
 
@@ -264,11 +281,28 @@ const kk = {
   'sx.err.OWN_INVITE': 'Бұл сіздің өз сілтемеңіз. Оны досыңызға жіберіңіз.', 'sx.err.BLOCKED': 'Бұл адамды қосу мүмкін емес', 'sx.err.TOO_MANY_FRIENDS': '500 дос шегіне жеттіңіз',
   'sx.err.CONSENT_REQUIRED': 'Достарыңызға нүктеңізді көрсетуге келісетініңізді растаңыз', 'sx.err.SHARE_INACTIVE': 'Орынды көрсету өшірулі немесе мерзімі біткен',
   'sx.err.POLL_CLOSED': 'Орын әлдеқашан таңдалған', 'sx.err.TOO_MANY': 'Белсенді кездесулер немесе іс-шаралар шегіне жеттіңіз', 'sx.err.CLOSED': 'Іс-шара тоқтатылған немесе аяқталған',
-  'sx.err.HOST': 'Ұйымдастырушы мұны жасай алмайды', 'sx.err.NOT_ENOUGH_PEOPLE': 'Кемінде екі адамның нүктесі керек: сіз және орнын көрсетіп тұрған дос.',
+  'sx.err.HOST': 'Ұйымдастырушы мұны жасай алмайды', 'sx.err.NOT_ENOUGH_PEOPLE': 'Кемінде бір белгілі нүкте керек: сіздікі немесе орнын көрсетіп тұрған достікі.',
   'sx.err.SOCIAL_DISABLED': 'Достар мен кездесулер бұл серверде өшірулі',
   'sx.geo.unsupported': 'Браузер орынды анықтай алмайды', 'sx.geo.denied': 'Браузер геоорынға рұқсат бермеді. Сайт баптауларында рұқсат беріңіз.',
   'sx.geo.failed': 'Орынды анықтау мүмкін емес. Ашық жерге шығыңыз немесе GPS-ті тексеріңіз.',
-  'sx.map.meetup': 'Кездесу: {title}, {place}', 'sx.map.event': 'Іс-шара: {title}', 'sx.map.option': '{n}-нұсқа: {place}'
+  'sx.map.meetup': 'Кездесу: {title}, {place}', 'sx.map.event': 'Іс-шара: {title}', 'sx.map.option': '{n}-нұсқа: {place}',
+
+  'sx.place.nightlife': 'бар', 'sx.place.family': 'отбасыға',
+  'sx.inv.title': 'Орынға шақыру', 'sx.inv.sub': 'Орынды картадан не тізімнен таңдаңыз, бір досты да шақыруға болады', 'sx.inv.subPicked': 'Картада таңдалған: {name}',
+  'sx.inv.oneIsEnough': 'Бір досты немесе бірнешеуін шақыруға болады.', 'sx.inv.noGeo': 'Геоорын керек емес: орынды өзіңіз таңдайсыз, достар шақыру алады.',
+  'sx.ob.placeNext': 'Профильден кейін бірден «{name}» орнына шақыру ашылады.',
+  'sx.from.label': 'Қайдан шығасыз', 'sx.from.here': 'Қазір қайдамын', 'sx.from.map': 'Карта ортасы', 'sx.from.gps': '📍 Қайда екенімді анықтау', 'sx.from.none': 'Менсіз',
+  'sx.from.lastFix': 'Соңғы геонүкте', 'sx.from.startName': 'Бастау нүктесі',
+  'sx.meet.pickOwn': 'Орынды өзім таңдаймын: картадан не тізімнен', 'sx.meet.noPoints': 'Таңдалғандардың ешқайсысының картада нүктесі жоқ. Жоғарыда қайдан шығатыныңызды көрсетіңіз немесе орынды өзіңіз таңдаңыз.', 'sx.meet.whyOne': 'Шамамен {n} мин жүру керек',
+  'sx.meet.withoutYou': 'Сіздің нүктеңіз есептелмеді: орындар достар бойынша таңдалды. Өзіңізді қосу үшін жоғарыда қайдан шығатыныңызды таңдаңыз.',
+  'sx.pp.onMap': '🗺 Картадан таңдау', 'sx.pp.fromMap': 'картада таңдалды', 'sx.pp.change': 'Өзгерту', 'sx.pp.collapse': 'Жию', 'sx.pp.more': 'Тағы көрсету',
+  'sx.pp.groups': 'Орын түрі', 'sx.pp.loading': 'Орындар жүктелуде…', 'sx.pp.failed': 'Орындар тізімі жүктелмеді. Орынды картадан таңдаңыз немесе карта ортасын алыңыз.',
+  'sx.pp.count': 'Орындар: {n}, {from}', 'sx.pp.nearYou': 'алдымен сізге жақындары', 'sx.pp.nearStart': 'алдымен «{name}» маңындағылары',
+  'sx.pp.nearCenter': 'алдымен карта ортасына жақындары', 'sx.pp.nearCity': 'алдымен Астана орталығына жақындары',
+  'sx.pp.g.all': 'Барлығы', 'sx.pp.g.cafe': '☕ Кофеханалар', 'sx.pp.g.food': '🍽 Тамақ', 'sx.pp.g.park': '🌳 Саябақтар', 'sx.pp.g.culture': '🎭 Мұражай мен театр',
+  'sx.pp.g.sight': '🏛 Көрікті жерлер', 'sx.pp.g.mall': '🛍 СОО', 'sx.pp.g.kids': '🧸 Балаларға', 'sx.pp.g.night': '🍸 Барлар',
+  'sx.pick.title': 'Картадағы орынды басыңыз', 'sx.pick.cancel': 'Болдырмау', 'sx.pick.choose': 'Таңдау', 'sx.pick.point': 'картадағы нүкте',
+  'sx.pick.hint': 'Түрлі түсті нүктелер: базадағы орындар. Картаны жақындатып, керегін басыңыз.', 'sx.map.picked': 'Таңдалған орын: {place}'
 };
 
 const en = {
@@ -346,7 +380,7 @@ const en = {
   'sx.mtitle.coffee': 'Coffee', 'sx.mtitle.food': 'Eat together', 'sx.mtitle.park': 'Walk', 'sx.mtitle.meet': 'Meetup',
 
   'sx.pp.placeholder': 'Place name, e.g. “Bayterek” or “coffee”', 'sx.pp.label': 'Search for a place', 'sx.pp.none': 'No place chosen', 'sx.pp.fromCenter': '{d} from the map centre',
-  'sx.pp.empty': 'Nothing found. You can use the map centre.', 'sx.pp.center': 'Map centre', 'sx.pp.point': 'Point on the map', 'sx.pp.here': 'Where I am now',
+  'sx.pp.empty': 'Nothing found. Try another word or pick on the map.', 'sx.pp.center': 'Map centre', 'sx.pp.point': 'Point on the map', 'sx.pp.here': 'Where I am now',
   'sx.pp.noGeo': 'Couldn’t find your location', 'sx.pp.nearMe': 'Near me',
   'sx.tp.label': 'Date and time', 'sx.tp.m15': 'In 15 min', 'sx.tp.m30': 'In 30 min', 'sx.tp.h1': 'In an hour', 'sx.tp.tonight': 'Tonight at 19:00', 'sx.tp.tomorrow': 'Tomorrow at 19:00',
 
@@ -406,11 +440,28 @@ const en = {
   'sx.err.OWN_INVITE': 'This is your own link. Send it to a friend.', 'sx.err.BLOCKED': 'You can’t add this person', 'sx.err.TOO_MANY_FRIENDS': 'You’ve reached the limit of 500 friends',
   'sx.err.CONSENT_REQUIRED': 'Confirm that you agree to show friends your location', 'sx.err.SHARE_INACTIVE': 'Location sharing is off or has expired',
   'sx.err.POLL_CLOSED': 'The place has already been chosen', 'sx.err.TOO_MANY': 'You’ve reached the limit of active meetups or events', 'sx.err.CLOSED': 'The event is cancelled or over',
-  'sx.err.HOST': 'The host can’t do this', 'sx.err.NOT_ENOUGH_PEOPLE': 'At least two people with a known location are needed: you and a friend who is sharing theirs.',
+  'sx.err.HOST': 'The host can’t do this', 'sx.err.NOT_ENOUGH_PEOPLE': 'At least one known location is needed: yours or that of a friend who is sharing it.',
   'sx.err.SOCIAL_DISABLED': 'Friends and meetups are turned off on this server',
   'sx.geo.unsupported': 'This browser can’t detect your location', 'sx.geo.denied': 'The browser blocked location access. Allow it in the site settings.',
   'sx.geo.failed': 'Can’t find your location. Step outside or check GPS.',
-  'sx.map.meetup': 'Meetup: {title}, {place}', 'sx.map.event': 'Event: {title}', 'sx.map.option': 'Option {n}: {place}'
+  'sx.map.meetup': 'Meetup: {title}, {place}', 'sx.map.event': 'Event: {title}', 'sx.map.option': 'Option {n}: {place}',
+
+  'sx.place.nightlife': 'bar', 'sx.place.family': 'family',
+  'sx.inv.title': 'Invite to a place', 'sx.inv.sub': 'Pick a place on the map or from the list; one friend is enough', 'sx.inv.subPicked': 'Picked on the map: {name}',
+  'sx.inv.oneIsEnough': 'You can invite one friend or several.', 'sx.inv.noGeo': 'No location needed: you choose the place, your friends get the invitation.',
+  'sx.ob.placeNext': 'Right after the profile, the invitation to “{name}” opens.',
+  'sx.from.label': 'Where are you coming from', 'sx.from.here': 'Where I am now', 'sx.from.map': 'Map centre', 'sx.from.gps': '📍 Find my location', 'sx.from.none': 'Without me',
+  'sx.from.lastFix': 'Last GPS fix', 'sx.from.startName': 'Start point',
+  'sx.meet.pickOwn': 'Choose the place yourself: on the map or from the list', 'sx.meet.noPoints': 'None of the people you picked has a location on the map. Choose above where you’re coming from, or pick the place yourself.', 'sx.meet.whyOne': 'About {n} min walk',
+  'sx.meet.withoutYou': 'Your location isn’t counted: the places are picked for your friends. To count yourself, choose above where you’re coming from.',
+  'sx.pp.onMap': '🗺 Pick on the map', 'sx.pp.fromMap': 'picked on the map', 'sx.pp.change': 'Change', 'sx.pp.collapse': 'Hide', 'sx.pp.more': 'Show more',
+  'sx.pp.groups': 'Type of place', 'sx.pp.loading': 'Loading places…', 'sx.pp.failed': 'Couldn’t load the list of places. Pick a place on the map or use the map centre.',
+  'sx.pp.count': 'Places: {n}, {from}', 'sx.pp.nearYou': 'nearest to you first', 'sx.pp.nearStart': 'nearest to “{name}” first',
+  'sx.pp.nearCenter': 'nearest to the map centre first', 'sx.pp.nearCity': 'nearest to central Astana first',
+  'sx.pp.g.all': 'All', 'sx.pp.g.cafe': '☕ Cafés', 'sx.pp.g.food': '🍽 Food', 'sx.pp.g.park': '🌳 Parks', 'sx.pp.g.culture': '🎭 Museums & theatres',
+  'sx.pp.g.sight': '🏛 Landmarks', 'sx.pp.g.mall': '🛍 Malls', 'sx.pp.g.kids': '🧸 For kids', 'sx.pp.g.night': '🍸 Bars',
+  'sx.pick.title': 'Tap a place on the map', 'sx.pick.cancel': 'Cancel', 'sx.pick.choose': 'Choose', 'sx.pick.point': 'point on the map',
+  'sx.pick.hint': 'Coloured dots are places from the database. Zoom in and tap the one you want.', 'sx.map.picked': 'Chosen place: {place}'
 };
 
 addStrings({ ru, kk, en });

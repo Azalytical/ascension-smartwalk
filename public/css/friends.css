@@ -42,6 +42,9 @@
 .sx-warning { font-size: 13px; color: var(--sx-amber); font-weight: 550; }
 .sx-note { padding: 12px 14px; border-radius: 14px; background: var(--sx-soft); white-space: pre-wrap; }
 .sx-wide { width: 100%; }
+/* Long button labels wrap instead of widening the sheet. */
+.sx-root .sx-wide { white-space: normal; text-align: center; }
+.sx-stack > *, .sx-form > * { min-width: 0; }
 .sx-btn { min-height: 44px; }
 .sx-root .btn:not(.btn-primary):not(.btn-gold):not(.btn-ghost) { border: 1px solid var(--sx-line); }
 /* Fallbacks so the tab still looks right before the shell's components load. */
@@ -189,6 +192,22 @@ textarea.sx-input { resize: vertical; min-height: 88px; }
 .sx-suggestions { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .sx-suggestion { display: grid; width: 100%; text-align: left; padding: 10px 12px; border: 0; border-radius: 12px; background: var(--sx-soft); cursor: pointer; }
 .sx-suggestion span { font-size: 13px; color: var(--sx-muted); }
+.sx-picked-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 10px 10px 14px; border-radius: 14px; background: var(--sx-soft); }
+.sx-picked-pin { font-size: 20px; }
+.sx-place-groups { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding-bottom: 2px; }
+.sx-place-groups::-webkit-scrollbar { display: none; }
+.sx-place-groups .chip { flex: none; }
+/* With a mouse a sideways-scrolling row is awkward, so the groups wrap. */
+@media (hover: hover) and (pointer: fine) { .sx-place-groups { flex-wrap: wrap; overflow-x: visible; } }
+.sx-place-list { display: grid; gap: 8px; }
+.sx-suggestion strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sx-root .sx-small { min-height: 36px; padding: 6px 12px; font-size: 14px; }
+/* map picker: the sheet stays low, so one line of title and one line for the tapped place */
+.sx-pick { display: grid; gap: 8px; }
+.sx-pick-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sx-pick-head strong { font-size: 16px; }
+.sx-pick-choice { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--sx-soft); }
+.sx-hero-action.is-light { background: var(--sx-soft); color: var(--sx-ink) !important; }
 .sx-link-box { display: grid; gap: 4px; }
 
 /* toast fallback when the shell has none */
