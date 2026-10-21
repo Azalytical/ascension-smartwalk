@@ -65,6 +65,7 @@ export function director(page, ctl, o = {}) {
     },
     async moveXY(x, y, dur) { await gate(); await Promise.all([ad('cursorTo', x, y, dur ?? null), page.mouse.move(x, y, { steps: 6 }).catch(() => {})]); },
     async tap(target, opt = {}) {
+      if (typeof target === 'string' || target?.evaluate) await d.reveal(target, 250, { fx: opt.fx, fy: opt.fy });
       const p = await d.move(target, opt);
       await sleepRaw(opt.hover ?? 160);
       await gate();
@@ -138,24 +139,41 @@ export function director(page, ctl, o = {}) {
         requestAnimationFrame(step);
       }), opt), 6000);
     },
-    // Brings an element of a sideways chip row (or a long list) into view before pointing at it.
-    async reveal(target, ms = 300) {
+    // Brings an element into the visible part of its own scroll box (the side panel, a sideways chip row) before
+    // pointing at it: a click aimed at a row hidden below the panel's edge would land on the tab bar or the map.
+    async reveal(target, ms = 300, opt = {}) {
       await gate();
-      // Smooth scroll, then wait until the element stops moving: a click aimed during the scroll would miss it.
-      await capped('показ элемента', loc(target).evaluate((el) => new Promise((resolve) => {
-        const r0 = el.getBoundingClientRect();
-        const off = r0.top < 60 || r0.bottom > innerHeight - 90;
-        el.scrollIntoView({ block: off ? 'center' : 'nearest', inline: 'center', behavior: 'smooth' });
+      const moved = await capped('показ элемента', loc(target).evaluate((el, o) => new Promise((resolve) => {
+        const scrollBox = (node) => {
+          for (let p = node.parentElement; p && p !== document.body; p = p.parentElement) {
+            const cs = getComputedStyle(p);
+            if ((/(auto|scroll)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight + 2) || (/(auto|scroll)/.test(cs.overflowX) && p.scrollWidth > p.clientWidth + 2)) return p;
+          }
+          return null;
+        };
+        const visible = () => {
+          const r = el.getBoundingClientRect();
+          let top = 0, bottom = innerHeight, left = 0, right = innerWidth;
+          for (let p = scrollBox(el); p; p = scrollBox(p)) {
+            const b = p.getBoundingClientRect();
+            top = Math.max(top, b.top); bottom = Math.min(bottom, b.bottom); left = Math.max(left, b.left); right = Math.min(right, b.right);
+          }
+          const y = r.top + r.height * (o.fy ?? 0.5), x = r.left + r.width * (o.fx ?? 0.5);
+          return y > top + 24 && y < bottom - 24 && x > left + 8 && x < right - 8;
+        };
+        if (visible() && !o.force) { resolve(false); return; }
+        el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
         let last = '', same = 0;
         const t0 = performance.now();
         const step = () => {
           const r = el.getBoundingClientRect(), key = `${Math.round(r.left)},${Math.round(r.top)}`;
           same = key === last ? same + 1 : 0; last = key;
-          if (same >= 4 || performance.now() - t0 > 2000) resolve(); else requestAnimationFrame(step);
+          if (same >= 4 || performance.now() - t0 > 2000) resolve(true); else requestAnimationFrame(step);
         };
         requestAnimationFrame(step);
-      })), 4000).catch(() => {});
-      await d.sleep(ms);
+      }), opt), 4000).catch(() => null);
+      if (moved) await d.sleep(ms);
+      return moved;
     },
     // Scroll the panel to the top (a new view keeps the old scroll position on some screens).
     async scrollTop(selector = '#sheet-body') {

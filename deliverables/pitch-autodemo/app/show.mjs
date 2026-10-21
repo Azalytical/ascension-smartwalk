@@ -276,7 +276,8 @@ async function onScreens(list) {
     laptop: pick.laptop && { w: pick.laptop.width, h: pick.laptop.height, label: pick.laptop.label } };
   if (TEST) {
     // The cloud check: one wide virtual screen, the show on the left half and the prompter on the right.
-    const a = await place(deckCdp, { left: 0, top: 0, width: 1920, height: 1080 }, 'normal');
+    const [tw, th] = String(argv['test-size'] || '1920x1080').split('x').map(Number);
+    const a = await place(deckCdp, { left: 0, top: 0, width: tw || 1920, height: th || 1080 }, 'normal');
     const b = await place(pultCdp, { left: 1920, top: 0, width: 1440, height: 900 }, 'normal');
     say('окна', JSON.stringify(a.bounds), JSON.stringify(b.bounds));
     S.placement = 'проверка: показ слева, суфлёр справа'; push(); return;
