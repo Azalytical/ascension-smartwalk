@@ -79,7 +79,7 @@ export function placeView({ place, timing, start, serverHours, why, activities =
     routeLine,
     versus ? h('p', { class: 'versus-line' }, icon('check', 'icon-xs'), h('span', {}, h('strong', { text: `${t('place.versus')} ` }), versus)) : null,
     h('button', { class: 'btn btn-gold btn-xl', type: 'button', onclick: onStart }, icon('play'), t('place.start')),
-    h('div', { class: 'place-actions' }, watchButton({ place, start, walk: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, minutes: timing.totalMinutes }), friends,
+    h('div', { class: 'place-actions' }, watchButton({ place, start, walk: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, minutes: timing.totalMinutes, oneWay }), friends,
       safeUrl(place.links?.googleCalendar) ? h('a', { class: 'btn btn-quiet btn-sm', href: safeUrl(place.links.googleCalendar), target: '_blank', rel: 'noopener noreferrer' }, icon('calendar'), t('place.calendar')) : null,
       // «Больше не предлагать»: the place leaves these results and the next searches; «Моё» can bring it back.
       onHide ? h('button', { class: 'btn btn-quiet btn-sm place-hide', type: 'button', onclick: onHide }, icon('close'), t('place.hide')) : null),

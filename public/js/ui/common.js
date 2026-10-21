@@ -56,11 +56,13 @@ export async function share({ title, text, url }) {
 }
 
 // Hand-off to the watch client (/watch, see docs/watch.md): the place card opens ready on the watch.
-export function watchUrl({ place, start, walk, visit, back, minutes }) {
+// «Только туда» goes as one=1, so the watch counts no way back and says «закончите к».
+export function watchUrl({ place, start, walk, visit, back, minutes, oneWay = false }) {
   const fixed = (value) => Number(value).toFixed(5);
   const params = new URLSearchParams({ to: `${fixed(place.lat)},${fixed(place.lon)}`, name: place.name || '', cat: place.category || 'attraction' });
   if (start) { params.set('from', `${fixed(start.lat)},${fixed(start.lon)}`); if (start.name) params.set('fromName', start.name); }
-  for (const [key, value] of Object.entries({ min: minutes, walk, visit, back })) if (Number.isFinite(value)) params.set(key, String(Math.ceil(value)));
+  for (const [key, value] of Object.entries({ min: minutes, walk, visit, back: oneWay ? 0 : back })) if (Number.isFinite(value)) params.set(key, String(Math.ceil(value)));
+  if (oneWay) params.set('one', '1');
   return `${location.origin}/watch#${params.toString().replace(/%2C/g, ',')}`;
 }
 

@@ -77,23 +77,28 @@ export function spokenPlan(plan, now = new Date(), lang = 'ru') {
   // «Вернётесь к» as in the app: the way there, the visit and the way back; the reserve is spare time on top.
   const busy = first.totalMinutes - (first.safetyReserveMinutes ?? 5);
   const back = astanaTime(new Date(now.getTime() + busy * 60000));
+  // «Только туда» (one=1, or the assistant heard it): no way back, so the walk ends on site, «закончите к».
+  const oneWay = first.returnMinutes === 0;
   if (lang === 'kk') {
     // Kazakh numerals take no plural: «8 минут».
     let kazakh = `${first.name}, ${KK_LABELS[first.category] || 'орын'}. Жаяу шамамен ${first.walkMinutes} минут, `
-      + `барып-қайтқанда бүкіл серуен шамамен ${busy} минут алады, сағат ${back} шамасында ораласыз.`;
+      + (oneWay ? `қайту жолынсыз бүкіл серуен шамамен ${busy} минут алады, сағат ${back} шамасында аяқтайсыз.`
+        : `барып-қайтқанда бүкіл серуен шамамен ${busy} минут алады, сағат ${back} шамасында ораласыз.`);
     if (first.hours?.status === 'open' && first.hours.closesAt) kazakh += ` ${first.source?.label || 'Дереккөз'} деректері бойынша ${first.hours.closesAt} дейін ашық.`;
     if (rest.length) kazakh += ` Тағы: ${rest.map(place => `${place.name}, жаяу ${place.walkMinutes} минут`).join('; ')}.`;
     return kazakh;
   }
   if (lang === 'en') {
     let english = `${first.name}, ${EN_LABELS[first.category] || 'a place'}. About ${enMinutes(first.walkMinutes)} on foot; `
-      + `the whole walk there and back takes about ${enMinutes(busy)}, so you are back by ${back}.`;
+      + (oneWay ? `one way, with no walk back, it all takes about ${enMinutes(busy)}, so you are done by ${back}.`
+        : `the whole walk there and back takes about ${enMinutes(busy)}, so you are back by ${back}.`);
     if (first.hours?.status === 'open' && first.hours.closesAt) english += ` ${first.source?.label || 'The source'} lists it as open until ${first.hours.closesAt}.`;
     if (rest.length) english += ` Also: ${rest.map(place => `${place.name}, ${enMinutes(place.walkMinutes)} on foot`).join('; ')}.`;
     return english;
   }
   let text = `${first.name}, ${LABELS[first.category] || 'место'}. Идти примерно ${minutes(first.walkMinutes)}, `
-    + `вся прогулка с дорогой обратно займёт примерно ${minutes(busy)}, вернётесь к ${back}.`;
+    + (oneWay ? `вся прогулка без дороги обратно займёт примерно ${minutes(busy)}, закончите к ${back}.`
+      : `вся прогулка с дорогой обратно займёт примерно ${minutes(busy)}, вернётесь к ${back}.`);
   if (first.hours?.status === 'open' && first.hours.closesAt) text += ` По данным ${first.source?.label || 'источника'} работает до ${first.hours.closesAt}.`;
   if (rest.length) text += ` Ещё: ${rest.map(place => `${place.name}, ${minutes(place.walkMinutes)} пешком`).join('; ')}.`;
   return text;
@@ -162,9 +167,11 @@ export async function handleWatch(request, env, pois) {
   const mood = url.searchParams.get('mood') || 'any';
   if (!Object.hasOwn(MOODS, mood)) return failure(say('mood', lang), 400, text);
   const query = [MOODS[mood].query, (url.searchParams.get('q') || '').slice(0, 200)].filter(Boolean).join(' ');
+  // Up to four hours (MAX_MINUTES in retrieval.mjs); one=1 is a walk «только туда», with no way back.
   const total = url.searchParams.has('minutes') ? number('minutes') : 45;
+  const oneWay = url.searchParams.get('one') === '1';
   // The reserve and «Больше не предлагать» from the phone's settings: reserve=10, exclude=id1,id2.
-  const input = { lat: point('lat'), lon: point('lon'), minutes: total, query, category: MOODS[mood].category || 'any', returnToStart: true,
+  const input = { lat: point('lat'), lon: point('lon'), minutes: total, query, category: MOODS[mood].category || 'any', returnToStart: !oneWay,
     maxWalkMinutes: Number.isFinite(total) ? Math.min(30, Math.max(5, Math.round(total / 3))) : 15,
     withChild: Boolean(MOODS[mood].withChild) || url.searchParams.get('child') === '1',
     ...(url.searchParams.has('reserve') ? { reserveMinutes: number('reserve') } : {}),
@@ -178,7 +185,7 @@ export async function handleWatch(request, env, pois) {
     return failure(outside ? say('outside', lang) : error.message, 400, text);
   }
   const plan = {
-    start: { lat: input.lat, lon: input.lon }, minutes: total, mood, query,
+    start: { lat: input.lat, lon: input.lon }, minutes: total, mood, query, ...(oneWay ? { oneWay } : {}),
     places: result.recommendations.map(place => ({
       id: place.id, name: place.name, category: place.category, lat: place.lat, lon: place.lon,
       distanceMeters: place.distanceMeters, walkMinutes: place.walkMinutes, visitMinutes: place.visitMinutes,

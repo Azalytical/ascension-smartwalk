@@ -21,7 +21,8 @@
     { key: 'mega', label: t('start.mega'), name: 'Mega Silk Way', lat: 51.0880152, lon: 71.4097489 },
     { key: 'embankment', label: t('start.embankment'), name: { ru: 'Набережная Есиля', kk: 'Есіл жағалауы', en: 'Yesil embankment' }[LANG], lat: 51.161, lon: 71.423 }
   ];
-  const TIMES = [30, 45, 60, 90, 120];
+  // Up to four hours, as on the phone; two hours and more are shown in hours («2,5 ч»).
+  const TIMES = [30, 45, 60, 90, 120, 150, 180, 240];
   const CATEGORIES = { cafe: 'coffee', restaurant: 'food', park: 'park', playground: 'family', museum: 'museum', attraction: 'landmark', mall: 'indoor',
     culture: 'museum', family: 'family' };
   // Same estimate as the server: straight line × 1.35 at 4.2 km/h, plus a 5-minute reserve.
@@ -31,6 +32,8 @@
   const MIN_VISIT_MINUTES = 5;
   // «Обратно к» as on the phone: the way there, the visit and the way back; the reserve is spare time on top.
   const backIn = (place) => place.walkMinutes + place.visitMinutes + place.returnMinutes;
+  // A walk «только туда» from the phone (or the assistant) has no way back: it ends at the place, «закончите к».
+  const oneWay = (place) => place.returnMinutes === 0;
   const ASTANA = { minLat: 51, maxLat: 51.35, minLon: 71.25, maxLon: 71.65 };
   // Watch screens in CSS pixels: a 44 mm round Wear OS watch and a 45 mm Apple Watch.
   const SHAPES = { round: { w: 230, h: 230 }, square: { w: 198, h: 242 } };
@@ -148,7 +151,9 @@
   }
 
   function renderHome() {
-    $('time-value').textContent = state.minutes;
+    const hours = state.minutes >= 120;
+    $('time-value').textContent = hours ? String(state.minutes / 60).replace('.', LANG === 'en' ? '.' : ',') : String(state.minutes);
+    $('time-unit').textContent = t(hours ? 'hour' : 'min');
     $('start-value').textContent = STARTS[state.startIndex].label;
     $('clock').textContent = time(Date.now());
     refreshMeetCount();
@@ -406,7 +411,7 @@
       card.append(element('p', 'card-name', t('results.none')), element('p', 'card-hours', t('results.noneHint', { minutes: state.plan.minutes })));
       const more = element('button', 'action', t('results.more'));
       more.type = 'button';
-      more.addEventListener('click', () => { state.minutes = TIMES.find((value) => value >= state.plan.minutes + 30) || 120; save(); findPlaces(state.mood); });
+      more.addEventListener('click', () => { state.minutes = TIMES.find((value) => value >= state.plan.minutes + 30) || TIMES[TIMES.length - 1]; save(); findPlaces(state.mood); });
       card.append(more);
       list.append(card);
       $('ask-gemini').hidden = true;
@@ -423,9 +428,10 @@
       const caption = element('span');
       caption.append(t('card.walk1'), document.createElement('br'), t('card.walk2'));
       walk.append(element('b', '', String(place.walkMinutes)), caption);
-      const back = element('p', 'card-back', t('card.back'));
+      const back = element('p', 'card-back', oneWay(place) ? t('card.done') : t('card.back'));
       back.append(element('b', '', time(Date.now() + backIn(place) * 60000)));
       const facts = [distanceText(place.distanceMeters)];
+      if (oneWay(place)) facts.push(t('card.oneWay'));
       facts.push(place.hours?.status === 'open' && place.hours.closesAt ? t('card.open', { time: place.hours.closesAt }) : t('card.hoursUnknown'));
       const go = element('button', 'action', t('card.go'));
       go.type = 'button';
@@ -541,7 +547,7 @@
       // Without Gemini the agent's summary is a generic line; the watch says what it found instead, and says Gemini was not there.
       const first = places[0];
       const summary = data.mode === 'agent' ? String(data.summary || '').trim()
-        : first ? t('ask.noModel', { name: first.name, walk: first.walkMinutes, time: time(Date.now() + backIn(first) * 60000) })
+        : first ? t(oneWay(first) ? 'ask.noModelOne' : 'ask.noModel', { name: first.name, walk: first.walkMinutes, time: time(Date.now() + backIn(first) * 60000) })
           : t('ask.noModelNothing');
       state.chat = { question, summary };
       state.plan = { places, query: '', start, minutes: state.minutes, at: Date.now(),
@@ -740,10 +746,11 @@
     // The walk keeps the card's plan, so «обратно к» on the wrist is the time the card showed.
     const there = place.walkMinutes, stay = Math.max(1, place.visitMinutes), back = place.returnMinutes;
     const reserve = Math.max(0, place.totalMinutes - there - stay - back);
-    const walk = newWalk({ kind: 'place', place, start: state.plan.start, minutes: there + stay + back + reserve, reserve });
+    const walk = newWalk({ kind: 'place', place, start: state.plan.start, minutes: there + stay + back + reserve, reserve, oneWay: oneWay(place) });
     walk.deadline = walk.t0 + walk.minutes * 60000;
+    // One way, backAt is the end of the walk: the time on site runs out there, and nobody walks back.
     walk.backAt = walk.deadline - reserve * 60000;
-    beginWalk(walk, [['there', there], ['stay', stay], ['back', back], ['reserve', reserve]]);
+    beginWalk(walk, walk.oneWay ? [['there', there], ['stay', stay], ['reserve', reserve]] : [['there', there], ['stay', stay], ['back', back], ['reserve', reserve]]);
     if (window.SeruenRemind?.supported()) remindOnWrist(walk);
   }
 
@@ -813,17 +820,24 @@
     const name = walk.place.name.slice(0, 60);
     const reminders = [];
     if (walk.leaveAt - 5 * 60000 > Date.now() + 60000) {
-      reminders.push({ at: walk.leaveAt - 5 * 60000, tag: 'seruen-soon', title: t('remind.soonTitle'),
-        body: t('remind.soonBody', { name, leave: time(walk.leaveAt), back: time(walk.backAt) }) });
+      reminders.push(walk.oneWay
+        ? { at: walk.leaveAt - 5 * 60000, tag: 'seruen-soon', title: t('remind.soonTitleOne'), body: t('remind.soonBodyOne', { name, back: time(walk.backAt) }) }
+        : { at: walk.leaveAt - 5 * 60000, tag: 'seruen-soon', title: t('remind.soonTitle'),
+          body: t('remind.soonBody', { name, leave: time(walk.leaveAt), back: time(walk.backAt) }) });
     }
-    reminders.push({ at: Math.max(Date.now(), walk.leaveAt), tag: 'seruen-back', title: t('remind.backTitle'),
-      body: t('remind.backBody', { n: walk.place.returnMinutes, back: time(walk.backAt) }) });
+    reminders.push(backReminder(walk, Math.max(Date.now(), walk.leaveAt)));
     window.SeruenRemind.schedule(reminders).then((result) => {
       if (!result.ok) return;
       if (state.walk !== walk) { window.SeruenRemind.cancel(result.id); return; }
       walk.reminderId = result.id;
       setNote(t('go.remind', { time: time(walk.leaveAt) }));
     });
+  }
+
+  // «Пора обратно», or one way «Время вышло».
+  function backReminder(walk, at) {
+    return walk.oneWay ? { at, tag: 'seruen-back', title: t('remind.endTitle'), body: t('remind.endBody', { back: time(walk.backAt) }) }
+      : { at, tag: 'seruen-back', title: t('remind.backTitle'), body: t('remind.backBody', { n: walk.place.returnMinutes, back: time(walk.backAt) }) };
   }
 
   function cancelReminders(walk) {
@@ -878,16 +892,16 @@
     const walk = state.walk;
     if (walk.alerted) return;
     walk.alerted = true;
+    if (walk.demo && window.SeruenRemind?.supported() && Notification.permission === 'granted') window.SeruenRemind.schedule([backReminder(walk, Date.now())]);
+    // One way there is no way back: on site the walk simply ends; still on the way there, the arrow keeps leading to the place.
+    if (walk.oneWay && walk.phase === 'stay') { finish(); buzz([400, 150, 400, 150, 400]); return true; }
     const view = $('view-go');
     view.classList.remove('alert');
     void view.offsetWidth;
     view.classList.add('alert');
     buzz([400, 150, 400, 150, 400]);
-    if (walk.demo && window.SeruenRemind?.supported() && Notification.permission === 'granted') {
-      window.SeruenRemind.schedule([{ at: Date.now(), tag: 'seruen-back', title: t('remind.backTitle'),
-        body: t('remind.backBody', { n: walk.place.returnMinutes, back: time(walk.backAt) }) }]);
-    }
-    setPhase('back');
+    if (!walk.oneWay) setPhase('back');
+    return false;
   }
 
   function finish() {
@@ -895,7 +909,7 @@
     stopWalk();
     const spent = Math.max(1, Math.round((clock() - walk.t0) / 60000));
     const late = Math.round((clock() - walk.deadline) / 60000);
-    $('done-title').textContent = t(late > 0 ? 'done.almost' : 'done.back');
+    $('done-title').textContent = late > 0 ? t('done.almost') : walk.oneWay ? t('done.ended') : t('done.back');
     $('done-text').textContent = late > 0 ? t('done.late', { spent, late }) : t('done.onTime', { spent, minutes: walk.minutes });
     $('done-home').textContent = t('done.more');
     state.doneTo = 'home';
@@ -914,7 +928,7 @@
     const now = clock();
     const distance = haversine(walk.pos, target);
     const toTarget = bearing(walk.pos, target);
-    const backMinutes = Math.ceil(haversine(walk.pos, walk.start) / METERS_PER_MINUTE);
+    const backMinutes = walk.oneWay ? 0 : Math.ceil(haversine(walk.pos, walk.start) / METERS_PER_MINUTE);
     const leaveBy = walk.deadline - (backMinutes + walk.reserve) * 60000;
     const arrivalRadius = walk.demo ? 12 : Math.max(25, Math.min(walk.accuracy || 25, 60));
 
@@ -922,10 +936,10 @@
     // The walk ends itself only after the walker has really left the start, so trying it at a desk does not finish it.
     if (haversine(walk.pos, walk.start) > away) walk.leftStart = true;
     if (walk.phase === 'to' && distance <= arrivalRadius) setPhase('stay');
-    // Walking away from where the visit began means it is over.
-    else if (walk.phase === 'stay' && !walk.demo && haversine(walk.pos, walk.stayAt || walk.place) > away) setPhase('back');
+    // Walking away from where the visit began means it is over; one way, that is the end of the walk.
+    else if (walk.phase === 'stay' && !walk.demo && haversine(walk.pos, walk.stayAt || walk.place) > away) { if (walk.oneWay) { finish(); return; } setPhase('back'); }
     else if (walk.phase === 'back' && distance <= arrivalRadius && (walk.demo || walk.leftStart)) { finish(); return; }
-    if (walk.phase !== 'back' && now >= leaveBy) { timeToReturn(); return tick(); }
+    if (walk.phase !== 'back' && now >= leaveBy && !walk.alerted) { if (timeToReturn()) return; return tick(); }
 
     const view = $('view-go');
     updateRing(walk, Math.min(1, Math.max(0, (now - walk.t0) / (walk.ringMinutes * 60000))));
@@ -941,14 +955,14 @@
       $('go-phase').textContent = t('go.stay');
       $('go-minutes').textContent = String(Math.max(0, Math.floor((leaveBy - now) / 60000)));
       $('go-unit').textContent = t('go.minLeft');
-      $('go-back').replaceChildren(t('go.leaveBy'), element('b', '', time(leaveBy)));
+      $('go-back').replaceChildren(walk.oneWay ? t('go.doneBy') : t('go.leaveBy'), element('b', '', time(leaveBy)));
     } else {
       $('go-phase').textContent = `${t(walk.phase === 'back' ? (walk.alerted ? 'go.headBack' : 'go.back') : 'go.there')} · ${distanceText(distance)}`;
       $('go-minutes').textContent = String(walkMinutes);
       $('go-unit').textContent = t('min');
-      $('go-back').replaceChildren(t(walk.phase === 'back' ? 'go.makeIt' : 'go.backBy'), element('b', '', time(walk.backAt)));
+      $('go-back').replaceChildren(walk.oneWay ? t('go.doneBy') : t(walk.phase === 'back' ? 'go.makeIt' : 'go.backBy'), element('b', '', time(walk.backAt)));
     }
-    $('go-next').textContent = t({ to: 'go.here', stay: 'go.return', back: 'go.returned' }[walk.phase]);
+    $('go-next').textContent = walk.oneWay && walk.phase === 'stay' ? t('go.finish') : t({ to: 'go.here', stay: 'go.return', back: 'go.returned' }[walk.phase]);
   }
 
   function pointArrow(toTarget) {
@@ -966,7 +980,7 @@
     if (!walk) return;
     if (walk.kind !== 'place') { arriveAtTarget(); return; }
     if (walk.phase === 'to') setPhase('stay');
-    else if (walk.phase === 'stay') setPhase('back');
+    else if (walk.phase === 'stay' && !walk.oneWay) setPhase('back');
     else { finish(); return; }
     tick();
   }
@@ -1300,6 +1314,7 @@
   }
 
   // Phone hand-off: /watch#to=51.1,71.4&name=…&cat=cafe&from=51.12,71.43&fromName=…&min=45&walk=4&visit=20&back=4
+  // A walk «только туда» adds one=1 (and back=0): the watch then counts no way back.
   async function handoff() {
     const hash = new URLSearchParams(location.hash.slice(1));
     if (!hash.has('to')) return false;
@@ -1319,7 +1334,7 @@
     // Times in the link were counted from the phone's start; from a real position they are counted again.
     const walkMinutes = start.here ? Math.max(1, Math.ceil(meters / METERS_PER_MINUTE)) : whole('walk', Math.max(1, Math.ceil(meters / METERS_PER_MINUTE)));
     const visitMinutes = whole('visit', 20);
-    const returnMinutes = start.here ? walkMinutes : whole('back', walkMinutes);
+    const returnMinutes = hash.get('one') === '1' || hash.get('back') === '0' ? 0 : start.here ? walkMinutes : whole('back', walkMinutes);
     const total = walkMinutes + visitMinutes + returnMinutes + RESERVE_MINUTES;
     const minutes = Math.max(whole('min', total), total);
     state.mood = 'any';
