@@ -170,7 +170,7 @@ async function generate(result, query, env, preferred, requestStartedAt = Date.n
   // finishReason and error type. Never the key, the prompt or the model's text.
   const attempts = [];
   const diagnose = value => ({ ...value, diagnostics: { totalMs: Date.now() - startedAt, budgetMs: deadline - startedAt,
-    startedAfterMs: startedAt - requestStartedAt, attempts } });
+    startedAfterMs: startedAt - requestStartedAt, attempts: [...attempts] } });
   const fallback = { mode: 'fallback', summary: safeSummary(result, query, preferred), references: [], origin: 'template', label: 'Текст без модели, по данным POI' };
   const provider = activeProvider(env);
   if (!result.recommendations.length || !provider) return diagnose({ ...fallback, reason: provider ? 'no_places' : 'no_provider' });
@@ -214,35 +214,51 @@ async function generate(result, query, env, preferred, requestStartedAt = Date.n
     : (Array.isArray(answer.places) ? answer.places : []).some(p => [p?.why, p?.todo].some(text => typeof text === 'string' && languageProblem(text, language, names))) ? 'places' : null;
   const left = () => deadline - Date.now();
   const parse = text => { try { return JSON.parse(text); } catch { return null; } };
+  // Several models asked at once; the first answer that parses and passes the checks is used, the others are cancelled.
+  // Resolves to { answer, used } or, when every one failed, { error } with the first model's reason and each one's.
+  const race = providers => new Promise(resolve => {
+    const controllers = providers.map(() => new AbortController());
+    const done = providers.map(() => false), failures = [];
+    const began = Date.now();
+    providers.forEach((candidate, index) => {
+      callWithRetry(candidate, input, env, { deadline, log: attempts, maxAttempts: 1, signal: controllers[index].signal })
+        .catch(() => ({ error: 'provider_unavailable' })).then(reply => {
+        done[index] = true;
+        if (controllers[index].signal.aborted) return;
+        const answer = reply.error ? null : parse(reply.text);
+        const why = reply.error || (answer ? problem(answer) : 'invalid_json');
+        if (!why) {
+          providers.forEach((other, j) => { if (!done[j]) { controllers[j].abort(); attempts.push(attemptNote(other, { error: 'provider_cancelled' }, Date.now() - began)); } });
+          resolve({ answer, used: candidate });
+          return;
+        }
+        failures[index] = why;
+        if (done.every(Boolean)) resolve({ error: failures[0], failures });
+      });
+    });
+  });
   try {
-    let used = provider;
     // The spare is the other of the two fast models (each has its own quota and load), or GEMINI_SPARE_MODEL.
     const spare = provider.name === 'gemini'
       ? { name: 'gemini', model: env.GEMINI_SPARE_MODEL || (provider.model === SPARE_AGENT_MODEL ? DEFAULT_AGENT_MODEL : SPARE_AGENT_MODEL) } : null;
-    // The main model always goes first, with all the time there is: skipping it for minutes after one 503 or 429 left the
-    // live answers to the slower spare and cut 3.1 to 5 s.
-    let reply = await callWithRetry(provider, input, env, { deadline, log: attempts, maxAttempts: 1 });
-    // Busy, out of quota or unreachable: the other Gemini model answers with all the time that is left (quotas and load are per model).
-    if (reply.error && RETRYABLE.test(reply.error) && spare && spare.model !== provider.model && left() >= SECOND_CALL_MS) {
-      const second = await callWithRetry(spare, input, env, { deadline, log: attempts, maxAttempts: 1 });
-      if (!second.error) { reply = second; used = spare; }
-    }
-    // Both busy with an error that may pass: one more try on the primary while time is left.
-    if (reply.error && RETRYABLE.test(reply.error) && left() >= SECOND_CALL_MS + 1000) {
-      const third = await callWithRetry(provider, input, env, { deadline, log: attempts, maxAttempts: 1 });
-      if (!third.error) { reply = third; used = provider; }
+    // Both fast models are asked at once, each with all the time there is: on the live site one of them was often busy (503)
+    // or slow, and a model asked only after the other had failed was left with too little time.
+    const models = spare && spare.model !== provider.model ? [provider, spare] : [provider];
+    let outcome = await race(models);
+    // Busy with an error that may pass: those models once more while time is left.
+    const busy = outcome.answer ? [] : models.filter((model, index) => RETRYABLE.test(outcome.failures[index] || ''));
+    if (busy.length && left() >= SECOND_CALL_MS + 1000) {
+      const again = await race(busy);
+      if (again.answer) outcome = again;
     }
     // A busy or failing Gemini hands over to OpenAI once when that key is set and time is left, so the answer still has a text.
-    if (reply.error && used.name === 'gemini' && env.OPENAI_API_KEY && left() >= SECOND_CALL_MS) {
-      const backup = { name: 'openai', model: env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL };
-      const second = await callWithRetry(backup, input, env, { deadline, log: attempts, maxAttempts: 1 });
-      if (!second.error) { reply = second; used = backup; }
+    if (!outcome.answer && provider.name === 'gemini' && env.OPENAI_API_KEY && left() >= SECOND_CALL_MS) {
+      const backup = await race([{ name: 'openai', model: env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL }]);
+      if (backup.answer) outcome = backup;
     }
-    if (reply.error) return diagnose({ ...fallback, reason: reply.error });
-    let answer = parse(reply.text);
-    if (!answer) return diagnose({ ...fallback, reason: 'invalid_json' });
-    const reason = problem(answer);
-    if (reason) return diagnose({ ...fallback, reason });
+    if (!outcome.answer) return diagnose({ ...fallback, reason: outcome.error });
+    let { answer } = outcome;
+    const { used } = outcome;
     // Russian slipping into a Kazakh or English answer gets one rewrite with the reason. A summary that slips again
     // means the template in the right language; a slipped «почему» leaves that card with its computed text.
     let slipped = leak(answer);
@@ -287,7 +303,8 @@ function placeTexts(places, context, query, language = answerLanguage(query), na
 // Free-tier Gemini often answers 503 under load; a short retry usually succeeds. A call that ran out of time is not
 // asked again: waiting a second time is what made the live answer take 17 seconds.
 const RETRYABLE = /^provider_(429|500|502|503|504|unavailable)$/;
-const ERROR_TYPES = { provider_timeout: 'timeout', provider_unavailable: 'network', provider_too_large: 'too_large', provider_truncated: 'max_tokens', provider_empty: 'empty' };
+const ERROR_TYPES = { provider_timeout: 'timeout', provider_unavailable: 'network', provider_too_large: 'too_large', provider_truncated: 'max_tokens', provider_empty: 'empty',
+  provider_cancelled: 'cancelled' };
 
 /** One safe line per attempt for generation.diagnostics. */
 function attemptNote(provider, reply, ms) {
@@ -296,7 +313,7 @@ function attemptNote(provider, reply, ms) {
     error: reply.error ? ERROR_TYPES[reply.error] || (/^provider_\d+$/.test(reply.error) ? 'http' : 'other') : null };
 }
 
-async function callWithRetry(provider, input, env, { deadline = Date.now() + GENERATION_MS, maxAttempts = 2, log = [] } = {}) {
+async function callWithRetry(provider, input, env, { deadline = Date.now() + GENERATION_MS, maxAttempts = 2, log = [], signal } = {}) {
   const call = provider.name === 'gemini' ? callGemini : callOpenAI;
   const pause = Number.isFinite(Number(env.RETRY_DELAY_MS)) ? Number(env.RETRY_DELAY_MS) : 600;
   // ATTEMPT_MS caps a single call (tests); otherwise a call gets everything left in the budget.
@@ -308,12 +325,16 @@ async function callWithRetry(provider, input, env, { deadline = Date.now() + GEN
     const controller = new AbortController();
     const began = Date.now();
     const timer = setTimeout(() => controller.abort(), Math.min(attemptMs, left - SEND_MARGIN_MS));
+    // A call another model already answered for is cancelled; the race notes it.
+    const cancel = () => controller.abort();
+    signal?.addEventListener('abort', cancel);
     try { reply = await call(input, provider, env, controller.signal); }
     catch (error) {
       reply = { error: controller.signal.aborted ? 'provider_timeout' : error?.message === 'RESPONSE_TOO_LARGE' ? 'provider_too_large' : 'provider_unavailable',
         // A call cut short still shows the thinking level it asked for.
         ...(provider.name === 'gemini' ? { thinking: THINKING_LEVELS[thinkingIndex.get(provider.model) ?? 0] || 'off' } : {}) };
-    } finally { clearTimeout(timer); }
+    } finally { clearTimeout(timer); signal?.removeEventListener('abort', cancel); }
+    if (signal?.aborted) return { error: 'provider_cancelled' };
     log.push(attemptNote(provider, reply, Date.now() - began));
     if (!reply.error || !RETRYABLE.test(reply.error) || attempt === maxAttempts) break;
     if (deadline - Date.now() < pause + 4000) break;

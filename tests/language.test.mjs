@@ -37,7 +37,8 @@ async function withGemini(replies, run) {
   };
   try { await run(sent); } finally { globalThis.fetch = original; }
 }
-const recommend = async query => (await handleApi(walk(query), { GEMINI_API_KEY: 'g', LOCAL_DEVELOPMENT: true }, [park])).json();
+// One model (the spare is the same), so the replies come in order.
+const recommend = async query => (await handleApi(walk(query), { GEMINI_API_KEY: 'g', GEMINI_SPARE_MODEL: 'gemini-3.8-flash', LOCAL_DEVELOPMENT: true }, [park])).json();
 
 test('/api/recommend sends a mixed-language answer back once and keeps the rewrite', () => withGemini([mixed, clean], async sent => {
   const data = await recommend('I want a walk in a park');

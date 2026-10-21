@@ -75,7 +75,8 @@ const geminiReply = payload => new Response(JSON.stringify({ candidates: [{ cont
 test('Gemini is preferred, receives no coordinates, and keeps the key out of the URL', async () => {
   const original = globalThis.fetch;
   let url, options;
-  globalThis.fetch = async (u, o) => { url = String(u); options = o; return geminiReply({ summary: 'Можно выбрать Парк: примерно 20 минут вместе с возвращением и запасом.', references: [poi.id] }); };
+  // The main model is asked first (the spare is asked at the same moment).
+  globalThis.fetch = async (u, o) => { url ??= String(u); options ??= o; return geminiReply({ summary: 'Можно выбрать Парк: примерно 20 минут вместе с возвращением и запасом.', references: [poi.id] }); };
   try {
     const response = await handleApi(request(valid), { GEMINI_API_KEY: 'g-secret', OPENAI_API_KEY: 'o-secret', LOCAL_DEVELOPMENT: true }, [poi]);
     const data = await response.json();
@@ -158,14 +159,15 @@ test('a busy Gemini is retried, and client errors are not', async () => {
     globalThis.fetch = async () => { calls++; throw new TypeError('network'); };
     data = await (await handleApi(request(valid), env, [poi])).json();
     assert.equal(data.generation.mode, 'fallback');
-    assert.equal(calls, 3);
-    assert.deepEqual(data.generation.diagnostics.attempts.map(item => item.error), ['network', 'network', 'network']);
+    // Both models at once, then both once more.
+    assert.equal(calls, 4);
+    assert.deepEqual(data.generation.diagnostics.attempts.map(item => item.error), ['network', 'network', 'network', 'network']);
 
     calls = 0;
     globalThis.fetch = async () => { calls++; return new Response('{}', { status: 400 }); };
     data = await (await handleApi(request(valid), env, [poi])).json();
     assert.equal(data.generation.reason, 'provider_400');
-    assert.equal(calls, 1);
+    assert.equal(calls, 2, 'one call per model, a client error is not asked again');
   } finally { globalThis.fetch = original; }
 });
 
@@ -240,6 +242,6 @@ test('a failing Gemini hands over to OpenAI once when its key is set', async () 
     };
     const data = await (await handleApi(request(valid), env, [poi])).json();
     assert.equal(data.generation.mode, 'llm'); assert.equal(data.generation.provider, 'openai');
-    assert.deepEqual(hosts, ['generativelanguage.googleapis.com', 'generativelanguage.googleapis.com', 'generativelanguage.googleapis.com', 'api.openai.com']);
+    assert.deepEqual(hosts, [...Array(4).fill('generativelanguage.googleapis.com'), 'api.openai.com']);
   } finally { globalThis.fetch = original; }
 });
