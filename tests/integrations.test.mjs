@@ -204,6 +204,18 @@ test('vision: Gemini picks a nearby place from the photo, without the visitor co
   assert.match(sent, /справа|впереди/);
 }));
 
+test('vision: both fast models look at the photo at once; a hanging one does not hold the answer', withFetch(async (url, init) => {
+  if (String(url).includes('gemini-3.1-flash-lite')) return new Promise((resolve, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
+  return jsonResponse({ candidates: [{ content: { parts: [{ text: JSON.stringify({ placeId: 'node/3', confidence: 'high', seen: 'Здание музея у воды.', facts: [] }) }] } }] });
+}, async () => {
+  const began = Date.now();
+  const response = await handleApi(new Request('https://demo.example/api/vision', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: PHOTO, ...START }) }), { ...env, GEMINI_API_KEY: 'test', GEMINI_MODEL: 'gemini-3.1-flash-lite' }, pois);
+  const data = await response.json();
+  assert.equal(data.place.name, 'Музей у воды');
+  assert.ok(Date.now() - began < 2000);
+}));
+
 test('vision: unknown or low-confidence matches give no place and no facts; bad photos are refused', withFetch(async () =>
   jsonResponse({ candidates: [{ content: { parts: [{ text: JSON.stringify({ placeId: 'node/42', confidence: 'high', seen: 'Улица.', facts: ['Выдумка.'] }) }] } }] }), async () => {
   const response = await handleApi(new Request('https://demo.example/api/vision', { method: 'POST', headers: { 'Content-Type': 'application/json' },

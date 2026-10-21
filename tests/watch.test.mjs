@@ -81,6 +81,13 @@ test('an English question gets an English spoken answer', async () => {
   assert.match(await (await plan('format=text&lat=43.2&lon=76.9&mood=coffee&q=coffee')).text(), /only in Astana/);
   const ask = await handleApi(new Request('https://demo.example/api/watch/ask?format=text&lat=51.1283&lon=71.4304&q=where%20can%20I%20get%20coffee%3F'), {}, pois);
   assert.match(await ask.text(), /^Кофейня у Байтерека, a cafe\. About/);
+  // Opened in a browser, the Siri link reads as text, not raw JSON; format=json still gives JSON.
+  const browser = { headers: { Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' } };
+  const opened = await handleApi(new Request('https://demo.example/api/watch/ask?lat=51.1283&lon=71.4304&q=coffee', browser), {}, pois);
+  assert.match(opened.headers.get('Content-Type'), /^text\/plain/);
+  assert.match(await opened.text(), /^Кофейня у Байтерека, a cafe\./);
+  const forced = await handleApi(new Request('https://demo.example/api/watch/ask?format=json&lat=51.1283&lon=71.4304&q=coffee', browser), {}, pois);
+  assert.equal((await forced.json()).mode, 'fallback');
   assert.match(spokenPlan({ places: [] }, new Date(), 'en'), /^Nothing nearby/);
   // A Russian question stays Russian.
   assert.match(await (await plan('format=text&lat=51.1283&lon=71.4304&mood=coffee&q=кофе')).text(), /Идти примерно/);

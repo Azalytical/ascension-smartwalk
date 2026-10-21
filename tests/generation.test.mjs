@@ -181,7 +181,7 @@ test('the embedding call reports what happened next to the model line', async ()
   resetSemanticCache();
 });
 
-test('speech and photo answers ask for low thinking; speech synthesis is left as it is', async () => {
+test('speech and photo answers ask both fast models with minimal thinking; speech synthesis is left as it is', async () => {
   resetMediaState();
   const configs = [];
   const data = await withFetch(async (url, init) => {
@@ -197,6 +197,6 @@ test('speech and photo answers ask for low thinking; speech synthesis is left as
     return heard;
   });
   assert.equal(data.text, 'час, кофе и парк');
-  assert.deepEqual(configs[0][1], 'low');
-  assert.ok(configs.slice(1).every(([, level]) => level === 'off'), 'the voice model gets no thinking setting');
+  assert.deepEqual(configs.slice(0, 2), [['gemini-3.5-flash-lite', 'minimal'], ['gemini-3.1-flash-lite', 'minimal']]);
+  assert.ok(configs.slice(2).length && configs.slice(2).every(([, level]) => level === 'off'), 'the voice model gets no thinking setting');
 });
