@@ -7,10 +7,11 @@
 // B = black screen, 4 on slide 07 = the agent bonus. Close the black console window (or Ctrl+C) to stop.
 import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
-import { readFileSync, existsSync, statSync, createReadStream } from 'node:fs';
+import { readFileSync, existsSync, statSync, createReadStream, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import { join, extname, resolve, dirname } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { networkInterfaces, platform } from 'node:os';
+import { networkInterfaces, platform, tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { parseSpeech } from './lib/speech.mjs';
 import { director } from './lib/director.mjs';
@@ -97,7 +98,69 @@ function snapshot() {
     t0: S.t0, now: Date.now(), captions: S.captions, blackout: S.blackout, screens: S.screens, placement: S.placement, mirrored: S.mirrored,
     tabs: Object.fromEntries(Object.entries(S.tabs).map(([k, t]) => [k, { state: t.state, at: t.loadedAt, lang: t.lang }])), phone: S.phone, note: S.note,
     tour: S.tour, messages: S.messages, ui: S.ui, site: SITE_LABEL, offlineVideo: Boolean(OFFLINE_VIDEO),
+    overlay: overlay.state === 'off' ? null : { on: S.overlayOn, state: overlay.state },
   };
+}
+
+// ---------- the prompter window on Windows (app/win): always on top, hidden from screen capture ----------
+// It reads what to say from a small JSON file that the show rewrites with every change.
+const OVERLAY_FILE = String(argv['overlay-file'] || join(tmpdir(), 'aidem-pitch-prompter.json'));
+const overlay = { state: 'off', proc: null };
+const two = (n) => String(n).padStart(2, '0');
+const mmss = (s) => `${Math.floor(s / 60)}:${two(s % 60)}`;
+function overlayBody() {
+  if (S.mode === 'tour') {
+    const i = S.tour?.step || 0, step = TOUR[i] || {}, nx = TOUR[i + 1];
+    return { head: `Тур ${i + 1}/${TOUR.length} · ${step.title || ''}`, body: { speaker: 'тур, своими словами', screen: 'Сайт показывает себя сам, подписи на проекторе.', now: [step.say || ''],
+      next: nx ? `пропустить к: ${nx.title} · Esc остановить тур` : 'Esc: вернуться к колоде', notes: S.note ? [S.note] : [] } };
+  }
+  const s = plan[S.slide];
+  if (!s) return { head: '', body: null };
+  const bonus = S.inBonus && s.bonus;
+  const segs = (bonus ? s.bonus.segs : s.segs) || [];
+  const seg = segs[S.seg] || segs[0] || { texts: [], notes: [] };
+  const prev = segs[S.seg - 1];
+  const b = S.beat;
+  const beat = b && S.mode === 'pitch' && (b.state === 'run' || ((b.state === 'fail' || b.state === 'skipped') && Date.now() - b.at < 60000))
+    ? (b.state === 'run' ? `Сейчас на проекторе: ${b.label}` : b.state === 'fail' ? `Шаг не получился, на проекторе слайд: ${b.label}` : `Шаг пропущен: ${b.label}`) : '';
+  const nx = segs[S.seg + 1];
+  let next;
+  if (nx) next = nx.beat ? `${BEATS[nx.beat]?.label || nx.dir}` : 'дальше по тексту';
+  else {
+    const ns = plan[S.slide + 1];
+    next = ns ? `слайд ${two(ns.n)} · ${ns.title} · ${ns.speaker}${ns.speaker !== s.speaker ? ' (передача слова)' : ''}` : 'Последний слайд. Дальше вопросы жюри: клавиша Q.';
+  }
+  const now = [...(S.carry || []), ...seg.texts];
+  const head = (S.mode === 'idle' ? 'Питч не начат: первое → или «Начать питч» · ' : '') + `${two(s.n)} · ${(bonus ? s.bonus.title : s.title).trim()}`;
+  return { head, body: { speaker: s.speaker || '', screen: s.screen ? `На экране: ${s.screen.replace(/\*/g, '')}` : '', beat,
+    prev: prev && prev.texts.length ? prev.texts[prev.texts.length - 1] : '', now: now.length ? now : [seg.dir ? `[${seg.dir}]` : '(пауза, без текста)'],
+    next, notes: [S.note, S.mode === 'pitch' && S.online === false ? 'Сайт недоступен: на проекторе слайды со скриншотами того же сайта. Говорите тот же текст.' : '', ...seg.notes].filter(Boolean) } };
+}
+function writeOverlay() {
+  if (overlay.state === 'off' && !argv['overlay-file']) return;
+  const s = plan[S.slide];
+  const { head, body } = overlayBody();
+  const data = { pid: process.pid, visible: S.overlayOn !== false, head, t0: S.mode === 'pitch' ? S.t0 : null, plan: s && S.mode === 'pitch' ? ` · по плану ${mmss(s.from)}–${mmss(s.to)}` : '',
+    paused: S.paused, screens: S.screens.count, body };
+  try { writeFileSync(OVERLAY_FILE, JSON.stringify(data)); } catch { /* the window keeps the last text */ }
+}
+function startOverlay() {
+  if (platform() !== 'win32' || TEST || argv['no-overlay']) return;
+  overlay.state = 'starting';
+  S.overlayOn = true;
+  writeOverlay();
+  try {
+    overlay.proc = spawn('powershell.exe', ['-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', join(HERE, 'win', 'prompter.ps1'), '-State', OVERLAY_FILE],
+      { stdio: 'ignore', windowsHide: true });
+    overlay.proc.on('spawn', () => { overlay.state = 'on'; push(); });
+    overlay.proc.on('error', () => { overlay.state = 'failed'; push(); });
+    overlay.proc.on('exit', (code) => {
+      overlay.proc = null;
+      if (closing) return;
+      overlay.state = 'failed';
+      log(code === 0 ? 'Окно-суфлёр закрыто (Ctrl+Alt+Q). Суфлёр в этом окне работает как обычно.' : `Окно-суфлёр не запустилось: подробности в ${join(tmpdir(), 'aidem-pitch-prompter.log')}. Суфлёр в этом окне работает как обычно.`, code === 0 ? 'ok' : 'bad');
+    });
+  } catch (e) { overlay.state = 'failed'; }
 }
 let pushTimer = null;
 function push() {
@@ -106,6 +169,7 @@ function push() {
     pushTimer = null;
     const data = `data: ${JSON.stringify(snapshot())}\n\n`;
     for (const res of clients) res.write(data);
+    writeOverlay();
   }, 30);
 }
 setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 15000).unref();
@@ -324,6 +388,7 @@ async function peekPult() {
 }
 await onScreens();
 await pult.bringToFront();
+startOverlay();
 // If the prompter's window got lost: the same prompter opens from this address in any Chrome or Edge on the laptop.
 say(`Суфлёр вручную, если его окна не видно: ${SHOW}/pult?k=${TOKEN} (скопируйте адрес в Chrome или Edge на этом ноутбуке). Клавиша T показывает суфлёр поверх показа.`);
 
@@ -630,6 +695,7 @@ async function command(cmd) {
     case 'screens': return onScreens();
     case 'swapScreens': S.swapScreens = !S.swapScreens; return onScreens();
     case 'side': return sideBySide();
+    case 'overlay': S.overlayOn = !S.overlayOn; push(); return;
     case 'recheck': await checkSite(); if (S.online) await loadSiteTabs(true); return;
     case 'reloadTabs': return loadSiteTabs(true);
     case 'reloadSpeech': speech = parseSpeech(SPEECH_FILE); plan = buildPlan(); log('Речь перечитана из файла', 'ok'); push(); return;
@@ -659,6 +725,7 @@ async function shutdown() {
   if (closing) return;
   closing = true;
   say('Выключаю показ…');
+  try { overlay.proc?.kill(); } catch { /* it closes by itself when the show is gone */ }
   await context.close().catch(() => {});
   process.exit(0);
 }
