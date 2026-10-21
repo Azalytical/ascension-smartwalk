@@ -719,6 +719,9 @@ function versusFor(cards, { weather, surprise, intents }) {
       if (closer >= 2) add('closer', `ближе остальных на ${closer} мин пешком`, { minutes: closer });
       const shorter = Math.min(...others.map(other => other.totalMinutes)) - card.totalMinutes;
       if (closer < 2 && shorter >= 5) add('shorter', `вся прогулка на ${shorter} мин короче`, { minutes: shorter });
+      // Less than two minutes closer on foot can still be clearly nearer as the crow flies (minutes are rounded).
+      const nearer = Math.floor((Math.min(...others.map(other => other.distanceMeters)) - card.distanceMeters) / 10) * 10;
+      if (closer < 2 && shorter < 5 && nearer >= 60) add('nearer', `ближе остальных на ${nearer} м по прямой`, { meters: nearer });
       if (card.hoursCheck?.status === 'open' && others.some(other => other.hoursCheck?.status !== 'open')) {
         add('hoursConfirmed', `по часам из источника открыто на всё время визита${card.hoursCheck.closesAt ? ` (до ${card.hoursCheck.closesAt})` : ', круглосуточно'}`,
           { closesAt: card.hoursCheck.closesAt ?? null });
@@ -742,6 +745,7 @@ function versusFor(cards, { weather, surprise, intents }) {
         add('rated', `оценки пользователей Aidem: ${String(average).replace('.', ',')} из 5`, { average });
       }
       if (card.notability?.level === 'high' && others.every(other => other.notability?.level !== 'high')) add('notable', 'известное место по открытым данным');
+      else if (card.notability?.level === 'medium' && others.every(other => other.notability?.level === 'low')) add('listed', 'есть в открытых справочниках, в отличие от остальных');
       // A fact from the record (Wi-Fi, a terrace, a cuisine) that none of the other cards has.
       const theirs = new Set(others.flatMap(other => factsFor(other)));
       const own = factsFor(card).find(fact => !theirs.has(fact));
@@ -752,6 +756,21 @@ function versusFor(cards, { weather, surprise, intents }) {
       if (longer >= 15) add('longerVisit', `больше времени на месте: ${card.visitMinutes} мин`, { minutes: card.visitMinutes });
       if (!card.nameIsGenerated && others.some(other => other.nameIsGenerated)) add('named', 'есть название в источнике, проще найти на месте');
       if (!reasons.length && others.every(other => other.category !== card.category)) add('otherKind', `другой формат: ${CATEGORY_NAMES[card.category]}`, { category: card.category });
+      // Nothing sets it apart from all the others at once: then what it has over one of them, by name.
+      if (reasons.length < 2 && !reasons.some(reason => reason.key === 'closer')) {
+        const [than] = others.filter(other => other.walkMinutes - card.walkMinutes >= 2).sort((a, b) => b.walkMinutes - a.walkMinutes);
+        if (than) add('closerThan', `на ${than.walkMinutes - card.walkMinutes} мин пешком ближе, чем «${than.name}»`, { minutes: than.walkMinutes - card.walkMinutes, name: than.name });
+      }
+      // Or, said plainly, that it is the farther one: «похоже на остальные» would hide that.
+      const [nearest] = [...others].sort((a, b) => a.walkMinutes - b.walkMinutes);
+      if (!reasons.length && card.walkMinutes - nearest.walkMinutes >= 2) {
+        add('farther', `на ${card.walkMinutes - nearest.walkMinutes} мин дальше, чем «${nearest.name}», но тоже успеваете`,
+          { minutes: card.walkMinutes - nearest.walkMinutes, name: nearest.name });
+      }
+      // Or that it is as near as the others but, unlike them, its hours are not confirmed.
+      if (!reasons.length && ['no_data', 'unknown'].includes(card.hoursCheck?.status) && others.some(other => other.hoursCheck?.status === 'open')) {
+        add('hoursUnconfirmed', 'часы работы не подтверждены, в отличие от остальных');
+      }
       if (!reasons.length) add('similar', 'по времени и условиям похоже на остальные варианты');
     }
     const text = reasons.slice(0, 2).map(reason => reason.text).join('; ');
