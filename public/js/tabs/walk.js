@@ -3,7 +3,7 @@ import { registerTab } from '../shell.js';
 import { h, icon, clear, isDesktop, safeUrl } from '../core/dom.js';
 import { t, pick, plural, lang, time } from '../core/i18n.js';
 import * as store from '../core/store.js';
-import { PRESETS, inAstana, reachMeters, estimate } from '../core/geo.js';
+import { PRESETS, inAstana, reachMeters, estimate, startFrom } from '../core/geo.js';
 import * as api from '../core/api.js';
 import { mapReady, getMap, flyTo, fitPoints } from '../map/map.js';
 import * as layers from '../map/layers.js';
@@ -447,6 +447,13 @@ async function submit(options) {
   if (!speakNext) voiceTurns = 0;
   const said = understand(plan.query);
   if (said.minutes) { plan.minutes = said.minutes; plan.query = said.query; plan.mood = null; savePlan(); }
+  // «час у меги», «от Байтерека»: a start named in the request becomes the start, and the rest stays the request.
+  const named = startFrom(plan.query);
+  if (named) {
+    setStart(presetStart(named.id));
+    plan.query = named.query; savePlan();
+    toast(t('start.fromWords', { name: startName() }), { iconName: 'locate' });
+  }
   // Plan only from a real start: a fresh fix, or a point the person chose. Without one, ask on the start screen.
   if (!isManual() && fixAge() >= FRESH_MS) {
     await autoLocate(true);
