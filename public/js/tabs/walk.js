@@ -16,11 +16,12 @@ import { ratingChip } from '../ui/rating.js';
 import { understand, canListen, startListening } from '../core/voice.js';
 import { speakText, stopSpeaking, unlockAudio } from '../core/media.js';
 import { locateMe } from '../core/where.js';
-import { outbound, personal } from '../core/privacy.js';
+import { outbound, personal, cellBox } from '../core/privacy.js';
 import { mountLive, startWalk } from '../ui/live.js';
 import { readyView } from '../ui/ready.js';
 import { applyTheme } from '../core/theme.js';
 import { understoodLabel, noteTexts, unconfirmedTexts, warningTexts, whyText } from '../ui/server-text.js';
+import { dataUsedView } from '../ui/data-used.js';
 
 const MINUTES = [30, 45, 60, 90, 120];
 const MAX_WALK = [10, 15, 20, 30];
@@ -354,7 +355,7 @@ function startPlace(place, spoken) {
 }
 
 function drawPlanMap() {
-  layers.hidePins(); layers.hideRoutes();
+  layers.hidePins(); layers.hideRoutes(); layers.hidePrivacyCell();
   layers.showStart(start, startName(), { tag: true });
   layers.showReach(start, reachMeters(plan.minutes, plan.maxWalk, plan.reserve));
   const radius = reachMeters(plan.minutes, plan.maxWalk, plan.reserve);
@@ -562,6 +563,7 @@ function renderResults() {
     understoodRow(surpriseMode ? ownHidden(result.understood) : result.understood),
     routeCard(result.route),
     eventsCard(result.cityEvents),
+    dataUsedView({ request, result, start, startLabel: startName(), shown: recs, onShowCell: showCell }),
     notes.unchecked));
   drawResultsMap(recs);
   if (speakNext) {
@@ -646,6 +648,13 @@ function routeCard(route) {
     h('button', { class: 'btn btn-quiet btn-sm', type: 'button', onclick: show }, icon('map'), t('results.routeShow')));
 }
 const ensureAtLeastHalf = () => { if (getSnap() === 'full') setSnap('half'); };
+// «Клетка на карте»: the box the person's point was rounded to before it left the phone.
+function showCell() {
+  layers.showPrivacyCell(start);
+  fitPoints(cellBox(start), { maxZoom: 18 });
+  ensureAtLeastHalf();
+  toast(t('du.point.shown'), { iconName: 'locate' });
+}
 
 // «Сегодня в городе»: today's events from the sxodim.com listing within walking reach; each row opens the event page there.
 function eventsCard(events) {
@@ -711,6 +720,7 @@ function drawResultsMap(recs) {
   layers.frame(start, recs);
   recs.forEach((place, index) => layers.upgradeRoute(index, start, place));
   layers.showEvents(result?.cityEvents?.items || []);
+  if (personal(start) && !result?.demo) layers.showPrivacyCell(start); else layers.hidePrivacyCell();
 }
 
 function renderEmpty(back) {

@@ -1,7 +1,7 @@
 // "Me": saved places, recent walks, language, theme, «На улице», hidden places, install, about and privacy.
 import { registerTab, openTab } from '../shell.js';
 import { h, icon, clear } from '../core/dom.js';
-import { t, LANGS, lang, setLang, date as formatDate, number, time } from '../core/i18n.js';
+import { t, LANGS, lang, setLang, date as formatDate, number, time, addStrings } from '../core/i18n.js';
 import * as store from '../core/store.js';
 import * as api from '../core/api.js';
 import { categoryArt, categoryName } from '../ui/common.js';
@@ -9,6 +9,19 @@ import { applyTheme } from '../core/theme.js';
 import { installState, promptInstall } from '../core/install.js';
 import { outbound } from '../core/privacy.js';
 import { toast } from '../ui/toast.js';
+import { LAW_URL } from '../ui/data-used.js';
+
+addStrings({
+  ru: { 'me.historyClear': 'Очистить историю', 'me.historyCleared': 'История и недавние точки старта удалены с этого телефона',
+    'privacy.p5': 'Для подбора не нужны ни регистрация, ни имя, ни телефон. Под каждым подбором есть панель «Какие данные использованы»: там видно, что именно ушло на сервер и в Gemini.',
+    'privacy.law': 'Как Aidem выполняет Закон РК № 94-V «О персональных данных и их защите»' },
+  kk: { 'me.historyClear': 'Тарихты тазалау', 'me.historyCleared': 'Тарих пен соңғы бастау нүктелері осы телефоннан өшірілді',
+    'privacy.p5': 'Іздеу үшін тіркелу де, аты-жөн де, телефон да керек емес. Әр іздеудің астында «Қандай деректер қолданылды» панелі бар: серверге және Gemini-ге не жіберілгені сонда көрінеді.',
+    'privacy.law': 'Aidem ҚР «Дербес деректер және оларды қорғау туралы» № 94-V Заңын қалай орындайды' },
+  en: { 'me.historyClear': 'Clear history', 'me.historyCleared': 'History and recent starting points are deleted from this phone',
+    'privacy.p5': 'Finding a walk needs no sign-up, name or phone number. Under every result there is a «What data we used» panel showing exactly what went to the server and to Gemini.',
+    'privacy.law': 'How Aidem follows Kazakhstan’s Law No. 94-V «On Personal Data and Their Protection»' },
+});
 
 let root = null;
 
@@ -40,6 +53,8 @@ function render() {
         h('small', { class: 'num', text: `${formatDate(item.at) || ''}, ${time(item.at)} · ${t('plan.min', { n: item.minutes ?? item.plan?.minutes ?? '' })}` })),
       item.kind === 'plan' ? h('button', { class: 'btn btn-quiet btn-sm', type: 'button', text: t('me.repeat'), onclick: () => repeat(item) }) : null)))
       : h('p', { class: 'empty-note' }, icon('history'), t('me.historyEmpty')),
+    // The history and the recent starts live only in this browser; one tap removes both.
+    walks.length ? h('button', { class: 'btn btn-quiet btn-sm history-clear', type: 'button', onclick: () => { store.set('history', []); store.set('recentStarts', []); toast(t('me.historyCleared'), { iconName: 'check' }); render(); } }, icon('close'), t('me.historyClear')) : null,
     h('h2', { class: 'block-title', text: t('me.settings') }),
     h('div', { class: 'settings' },
       h('div', { class: 'setting' }, h('span', { text: t('me.lang') }), segmented(t('me.lang'), LANGS, lang(), (id) => setLang(id))),
@@ -61,7 +76,8 @@ function render() {
       h('div', {}, h('strong', { text: t('me.watch') }), h('p', { class: 'fine', text: t('me.watchText') })),
       h('a', { class: 'btn btn-quiet btn-sm', href: '/watch' }, t('me.watchOpen'))),
     h('details', { class: 'disclosure' }, h('summary', {}, icon('loop'), t('me.about')), h('div', { class: 'prose' }, ['about.p1', 'about.p2', 'about.p3'].map((key) => h('p', { text: t(key) })), h('p', { class: 'fine', text: t('about.credit') }))),
-    h('details', { class: 'disclosure' }, h('summary', {}, icon('info'), t('me.privacy')), h('div', { class: 'prose' }, ['privacy.p1', 'privacy.p2', 'privacy.p3', 'privacy.p4'].map((key) => h('p', { text: t(key) })))),
+    h('details', { class: 'disclosure' }, h('summary', {}, icon('info'), t('me.privacy')), h('div', { class: 'prose' }, ['privacy.p1', 'privacy.p2', 'privacy.p3', 'privacy.p4', 'privacy.p5'].map((key) => h('p', { text: t(key) })),
+      h('p', {}, h('a', { href: LAW_URL, target: '_blank', rel: 'noopener noreferrer', text: t('privacy.law') })))),
     h('p', { class: 'fine data-line' }, icon('map'), t('me.data'), ': ', dataLine),
     h('p', { class: 'fine center brand-foot' }, h('img', { src: '/assets/brand/seruen/mark.svg', alt: '', width: 20, height: 20 }), 'Aidem by Ascension')));
 }
