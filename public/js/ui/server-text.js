@@ -60,7 +60,11 @@ const SPECIAL = {
     back: (p) => t(p.returnToStart ? 'why.back' : 'why.done', p),
   },
   step: {
-    visit: (p) => (has(`act.${p.category}`) ? t('step.visit', { minutes: p.minutes, activity: t(`act.${p.category}`) }) : null),
+    visit: (p) => {
+      // The kind of place («fountain», «cinema») says more than its category; older answers have no kind.
+      const key = p.kind && has(`actk.${p.kind}`) ? `actk.${p.kind}` : `act.${p.category}`;
+      return has(key) ? t('step.visit', { minutes: p.minutes, activity: t(key) }) : null;
+    },
   },
 };
 

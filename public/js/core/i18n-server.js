@@ -81,6 +81,17 @@ export const en = {
   'act.playground': 'look over the playground and judge whether it suits your child', 'act.attraction': 'look around and take photos where allowed',
   'act.restaurant': 'have a meal or a snack', 'act.mall': 'stay out of the weather and walk the galleries', 'act.culture': 'check the listings and pick what fits your time',
   'act.family': 'check tickets, age limits and opening hours before you go', 'act.nightlife': 'spend the evening',
+  // By the source's own kind of place, ahead of the category above (src/retrieval.mjs, KIND_ACTIVITIES).
+  'actk.fountain': 'sit by the fountain and take photos', 'actk.monument': 'walk round the monument and read the inscriptions',
+  'actk.memorial': 'see the memorial and read the inscriptions', 'actk.place_of_worship': 'see the building from outside',
+  'actk.plaza': 'cross the square and look around', 'actk.artwork': 'look at the artwork and take photos', 'actk.viewpoint': 'look at the city from above',
+  'actk.bridge': 'walk across the bridge and look at the river', 'actk.gallery': 'see the current exhibition', 'actk.exhibition_centre': 'see the current exhibition',
+  'actk.theatre': 'drop by the box office and check the listings', 'actk.cinema': 'check the schedule and get a ticket for a suitable screening',
+  'actk.library': 'read or work in quiet', 'actk.concert_hall': 'check the concert listings', 'actk.arts_centre': 'find out what is on today',
+  'actk.bakery': 'get pastries to go or eat in', 'actk.dessert': 'have a dessert and a coffee', 'actk.ice_cream': 'get an ice cream for the walk',
+  'actk.fast_food': 'grab a quick bite', 'actk.food_court': 'pick food from several counters in one place', 'actk.garden': 'stroll through the garden',
+  'actk.beach': 'walk along the water', 'actk.zoo': 'see the animals', 'actk.amusement_park': 'go on the rides', 'actk.theme_park': 'go on the rides',
+  'actk.aquarium': 'see the aquariums', 'actk.water_park': 'swim and ride the slides', 'actk.nightclub': 'go dancing in the evening',
 };
 
 export const kk = {
@@ -164,4 +175,14 @@ export const kk = {
   'act.playground': 'алаңды қарап, балаға сай ма өзіңіз бағалау', 'act.attraction': 'орынды көріп, рұқсат етілген жерде суретке түсіру',
   'act.restaurant': 'түскі ас ішу не тамақтанып алу', 'act.mall': 'ауа райын шатыр астында өткізіп, галереяларды аралау', 'act.culture': 'афишаны қарап, уақытыңызға сыятынын таңдау',
   'act.family': 'шығар алдында билет, жас шектеуі мен жұмыс уақытын тексеру', 'act.nightlife': 'кешті өткізу',
+  'actk.fountain': 'субұрқақ жанында отырып, суретке түсу', 'actk.monument': 'ескерткішті айналып, жазуларын оқу',
+  'actk.memorial': 'мемориалды көріп, жазуларын оқу', 'actk.place_of_worship': 'ғимаратты сырттан көру',
+  'actk.plaza': 'алаңды аралап, айналаны көру', 'actk.artwork': 'арт-нысанды қарап, суретке түсу', 'actk.viewpoint': 'қалаға биіктен қарау',
+  'actk.bridge': 'көпірден өтіп, өзенге қарау', 'actk.gallery': 'қазіргі көрмені көру', 'actk.exhibition_centre': 'қазіргі көрмені көру',
+  'actk.theatre': 'кассаға соғып, афишаны қарау', 'actk.cinema': 'кестені қарап, ыңғайлы сеансқа билет алу',
+  'actk.library': 'тыныштықта кітап оқу не жұмыс істеу', 'actk.concert_hall': 'концерттер афишасын қарау', 'actk.arts_centre': 'бүгін не өтетінін білу',
+  'actk.bakery': 'тоқаш алып кету не сол жерде жеу', 'actk.dessert': 'десерт жеп, кофе ішу', 'actk.ice_cream': 'серуенге балмұздақ алу',
+  'actk.fast_food': 'тез тамақтанып алу', 'actk.food_court': 'бір жердегі бірнеше орыннан тамақ таңдау', 'actk.garden': 'бақты аралау',
+  'actk.beach': 'су жағасымен жүру', 'actk.zoo': 'жануарларды көру', 'actk.amusement_park': 'аттракциондарға міну', 'actk.theme_park': 'аттракциондарға міну',
+  'actk.aquarium': 'аквариумдарды көру', 'actk.water_park': 'жүзіп, сырғанақтан сырғанау', 'actk.nightclub': 'кешке билеу',
 };
