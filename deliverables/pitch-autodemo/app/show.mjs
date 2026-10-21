@@ -283,6 +283,7 @@ async function onScreens(list) {
     S.placement = 'проверка: показ слева, суфлёр справа'; push(); return;
   }
   if (pick.count >= 2) {
+    S.side = false;
     // Full screen on the laptop too: no browser bars, only the prompter. Alt+Tab (Cmd+Tab) still reaches other windows.
     await place(pultCdp, pick.laptop, argv['pult-window'] ? 'maximized' : 'fullscreen');
     await place(deckCdp, pick.projector, 'fullscreen');
@@ -290,6 +291,7 @@ async function onScreens(list) {
     S.mirrored = false;
     log(`Экранов: ${pick.count}. ${S.placement}`, 'ok');
   } else if (pick.count === 1) {
+    if (S.side) return sideBySide(true, pick);
     // One screen (or the projector mirrors the laptop): whatever is on the laptop is on the wall, so the prompter hides behind the show.
     await place(pultCdp, pick.laptop, 'maximized');
     S.placement = 'один экран: суфлёр не спрятать, его увидит зал';
@@ -298,8 +300,32 @@ async function onScreens(list) {
   }
   push();
 }
+// A rehearsal at home on the laptop alone: the show and the prompter side by side («Рядом» on the prompter).
+// With a projector that extends the desktop the windows go back to their own screens.
+async function sideBySide(on = !S.side, pick = null) {
+  pick = pick || pickScreens(await readScreens());
+  if (on && pick.count !== 1) { log('«Рядом» нужно только на одном экране: с проектором окна уже на своих местах.', 'ok'); return; }
+  S.side = on;
+  if (!on) return onScreens();
+  const s = pick.laptop;
+  const L = s.availLeft ?? s.left, T = s.availTop ?? s.top, W = s.availWidth ?? s.width, H = s.availHeight ?? s.height;
+  const split = Math.round(W * 0.62);
+  await place(deckCdp, { availLeft: L, availTop: T, availWidth: split, availHeight: H }, 'normal');
+  await place(pultCdp, { availLeft: L + split, availTop: T, availWidth: W - split, availHeight: H }, 'normal');
+  S.placement = 'один экран, репетиция: показ слева, суфлёр справа';
+  S.mirrored = true;
+  log('Репетиция на одном экране: показ слева, суфлёр справа. В зале подключите проектор и нажмите Win+P → «Расширить».', 'ok');
+  push();
+}
+// T: the prompter over the show and back (one screen: the show covers it once the pitch starts).
+async function peekPult() {
+  const up = await pult.evaluate(() => document.hasFocus()).catch(() => false);
+  await (up ? (S.tabs[S.view]?.page || deck) : pult).bringToFront();
+}
 await onScreens();
 await pult.bringToFront();
+// If the prompter's window got lost: the same prompter opens from this address in any Chrome or Edge on the laptop.
+say(`Суфлёр вручную, если его окна не видно: ${SHOW}/pult?k=${TOKEN} (скопируйте адрес в Chrome или Edge на этом ноутбуке). Клавиша T показывает суфлёр поверх показа.`);
 
 // ---------- tabs of the site ----------
 const order = ['coffee', 'tourist', 'agent'];
@@ -505,7 +531,7 @@ function setPaused(on) {
 async function startPitch() {
   if (S.mode === 'tour') await stopTour();
   S.mode = 'pitch'; S.t0 = null;
-  if (S.mirrored && !TEST) await place(deckCdp, (await readScreens())[0] || {}, 'fullscreen').catch(() => {});
+  if (S.mirrored && !S.side && !TEST) await place(deckCdp, (await readScreens())[0] || {}, 'fullscreen').catch(() => {});
   await deck.bringToFront();
   push();
   loadSiteTabs().catch(() => {});
@@ -576,6 +602,7 @@ async function onKey(o, page) {
   if (/^[pPзЗ]$/.test(k)) return setPaused(!S.paused);
   if (/^[4gGпП]$/.test(k)) return bonus();
   if (/^[sSыЫ]$/.test(k)) return skipStep();
+  if (/^[tTеЕ]$/.test(k)) return peekPult();
   if (/^[qQйЙ]$/.test(k)) { S.ui.qa = !S.ui.qa; push(); return; }
   if (/^[+=]$/.test(k)) { S.ui.font = Math.min(6, S.ui.font + 1); push(); return; }
   if (/^[-_]$/.test(k)) { S.ui.font = Math.max(-4, S.ui.font - 1); push(); return; }
@@ -602,6 +629,7 @@ async function command(cmd) {
     case 'phone': return startPhone();
     case 'screens': return onScreens();
     case 'swapScreens': S.swapScreens = !S.swapScreens; return onScreens();
+    case 'side': return sideBySide();
     case 'recheck': await checkSite(); if (S.online) await loadSiteTabs(true); return;
     case 'reloadTabs': return loadSiteTabs(true);
     case 'reloadSpeech': speech = parseSpeech(SPEECH_FILE); plan = buildPlan(); log('Речь перечитана из файла', 'ok'); push(); return;
