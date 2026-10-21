@@ -109,7 +109,7 @@ export function notabilityChip(notability) {
 
 // «Почему это, а не другое»: one line per option from the server (versus), built only from confirmed data.
 // Gemini's line (aiVersus) is already in the asker's language; versus.text is Russian, so kk/en are put together from its reasons.
-const VERSUS = ['closer', 'shorter', 'roof', 'outdoor', 'hoursConfirmed', 'later', 'wheelchair', 'named', 'requestMatch', 'rated', 'notable', 'feature', 'longerVisit', 'otherKind', 'only', 'surprise', 'similar'];
+const VERSUS = ['closer', 'shorter', 'roof', 'outdoor', 'hoursConfirmed', 'later', 'wheelchair', 'named', 'requestMatch', 'rated', 'notable', 'feature', 'longerVisit', 'otherKind', 'only', 'surprise', 'similar', 'closerThan', 'farther', 'nearer', 'listed', 'hoursUnconfirmed'];
 // `feature` carries the record's fact as the server's Russian label; kk/en show it from this list or leave that reason out.
 const FACTS = {
   'есть Wi-Fi': { en: 'has Wi-Fi', kk: 'Wi-Fi бар' }, 'есть места на улице': { en: 'outdoor seating', kk: 'далада отыратын орын бар' },
