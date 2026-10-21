@@ -154,3 +154,22 @@ test('the watch page has every text in Russian, Kazakh and English', () => {
   assert.ok(used.length > 100);
   assert.deepEqual([...new Set(used)].filter(key => !(key in text.ru)), []);
 });
+
+test('the watch draws its icons from its own sprite, not from symbol fonts or WebP', () => {
+  const html = readFileSync(new URL('../public/watch.html', import.meta.url), 'utf8');
+  const script = readFileSync(new URL('../public/watch.js', import.meta.url), 'utf8');
+  const texts = readFileSync(new URL('../public/watch-text.js', import.meta.url), 'utf8');
+  const symbols = new Set([...html.matchAll(/<symbol id="i-([\w-]+)"/g)].map(match => match[1]));
+  const glyphs = Object.fromEntries([...script.match(/const GLYPHS = \{([^}]+)\}/)[1].matchAll(/'([^']+)': '([\w-]+)'/g)].map(match => [match[1], match[2]]));
+  const categories = [...script.match(/const CATEGORIES = \{([^}]+)\}/)[1].matchAll(/: '([\w-]+)'/g)].map(match => match[1]);
+  const used = [...html.matchAll(/href="#i-([\w-]+)"/g)].map(match => match[1]);
+  assert.ok(used.length >= 15);
+  assert.deepEqual([...used, ...Object.values(glyphs), ...categories, 'landmark'].filter(name => !symbols.has(name)), []);
+  // Apple Watch fonts lack symbols such as ✦ ✓ ★ ⌫, which showed as empty boxes. Outside the sprite only the markers that
+  // setText turns into icons may appear; «←» is on the laptop caption only.
+  const page = html.replace(/<!--[\s\S]*?-->/g, '').replace(/<svg class="sprite"[\s\S]*?<\/svg>/, '');
+  const odd = (source) => [...new Set([...source].filter(char => char.codePointAt(0) >= 0x2190 && !(char in glyphs) && char !== '←' && char !== '️'))];
+  assert.deepEqual(odd(page), []);
+  assert.deepEqual(odd(texts), []);
+  assert.doesNotMatch(html + script, /\.webp/);
+});
