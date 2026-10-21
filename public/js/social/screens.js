@@ -3,7 +3,7 @@
 import * as social from './service.js';
 import { createSocialLayer, CATEGORY_EMOJI } from './map-layer.js';
 import { coarse } from '../core/privacy.js';
-import { t, plural, lang, locale, pick } from '../core/i18n.js';
+import { t, plural, lang, locale, pick, placeName } from '../core/i18n.js';
 import * as store from '../core/store.js';
 import { places as loadPlaces } from '../core/api.js';
 import { pickedPlace } from '../core/picked.js';
@@ -642,7 +642,7 @@ export function mountSocial(root, ctx = {}) {
       const matches = [];
       for (const item of allPlaces) {
         if (categories && !categories.includes(item.category)) continue;
-        const named = !query || searchable(`${item.name} ${categoryName(item.category)}`).includes(query);
+        const named = !query || searchable(`${item.name} ${placeName(item.name)} ${categoryName(item.category)}`).includes(query);
         if (!named && !kinds.has(item.category)) continue;
         matches.push({ item, named, meters: social.distanceMeters(from, item) });
       }
@@ -650,7 +650,7 @@ export function mountSocial(root, ctx = {}) {
       fill(listHost,
         h('p', { class: 'sx-hint' }, t('sx.pp.count', { n: new Intl.NumberFormat(locale()).format(matches.length), from: from.label })),
         matches.length ? h('ul', { class: 'sx-suggestions' }, matches.slice(0, state.shown).map(({ item, meters }) => h('li', {},
-          h('button', { type: 'button', class: 'sx-suggestion', onclick: () => choose(placeOf(item)) }, h('strong', {}, item.name), h('span', {}, `${categoryName(item.category)} · ${km(meters)}`)))))
+          h('button', { type: 'button', class: 'sx-suggestion', onclick: () => choose(placeOf(item)) }, h('strong', {}, placeName(item.name)), h('span', {}, `${categoryName(item.category)} · ${km(meters)}`)))))
           : h('p', { class: 'sx-hint' }, t('sx.pp.empty')),
         matches.length > state.shown ? button(t('sx.pp.more'), () => { state.shown += 20; drawList(); }, 'ghost', { class: 'btn btn-ghost sx-btn sx-wide' }) : null);
     }
@@ -670,7 +670,7 @@ export function mountSocial(root, ctx = {}) {
       const chosen = form.place;
       fill(box,
         chosen ? h('div', { class: 'sx-picked-card' }, h('span', { class: 'sx-picked-pin', 'aria-hidden': 'true' }, '📍'),
-          h('span', { class: 'sx-row-text' }, h('strong', { class: 'sx-picked-name' }, chosen.name),
+          h('span', { class: 'sx-row-text' }, h('strong', { class: 'sx-picked-name' }, placeName(chosen.name)),
             h('span', {}, [chosen.category ? categoryName(chosen.category) : null, form.fromMap ? t('sx.pp.fromMap') : null].filter(Boolean).join(' · ') || t('sx.pp.point'))),
           button(t(state.open ? 'sx.pp.collapse' : 'sx.pp.change'), () => { state.open = !state.open; draw(); }, 'ghost', { class: 'btn btn-ghost sx-btn sx-small' }))
           : h('p', { class: 'sx-picked is-empty' }, t('sx.pp.none')),
@@ -696,7 +696,7 @@ export function mountSocial(root, ctx = {}) {
       h('div', { class: 'sx-pick-head' }, h('strong', {}, t('sx.pick.title')),
         button(t('sx.pick.cancel'), () => open(overlay.back), 'ghost', { class: 'btn btn-ghost sx-btn sx-small' })),
       overlay.candidate ? h('div', { class: 'sx-pick-choice' },
-        h('span', { class: 'sx-row-text' }, h('strong', {}, overlay.candidate.name), h('span', {}, overlay.candidate.category ? categoryName(overlay.candidate.category) : t('sx.pick.point'))),
+        h('span', { class: 'sx-row-text' }, h('strong', {}, placeName(overlay.candidate.name)), h('span', {}, overlay.candidate.category ? categoryName(overlay.candidate.category) : t('sx.pick.point'))),
         button(t('sx.pick.choose'), choose, 'primary', { class: 'btn btn-primary sx-btn sx-pick-confirm' }))
         : h('p', { class: 'sx-hint' }, allPlaces ? t('sx.pick.hint') : t('sx.pp.loading')));
     const tap = (id, point) => {
