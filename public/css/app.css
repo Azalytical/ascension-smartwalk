@@ -214,6 +214,11 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 
 /* Explore */
 .explore-list { display: grid; }
+.hex-mark { width: 14px; height: 16px; background: var(--gold); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+.h3-cell, .h3-hint { margin-bottom: 12px; }
+.h3-cell { gap: 4px; padding: 12px 16px; border-radius: var(--r-lg); background: var(--surface); border-left: 4px solid var(--gold); }
+.h3-cell-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.h3-cell-head .btn { --btn-h: 36px; padding: 0 12px; font-size: var(--fs-13); }
 
 /* Me */
 .settings { display: grid; gap: 16px; padding: 16px; border-radius: var(--r-lg); background: var(--surface); }

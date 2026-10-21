@@ -6,8 +6,9 @@ import * as store from '../core/store.js';
 import * as api from '../core/api.js';
 import { PRESETS, estimate, formatDistance } from '../core/geo.js';
 import { lang } from '../core/i18n.js';
-import { setOverlay, removeOverlay, setData, onLayerClick, cssVar, fitPoints, flyTo, mapReady } from '../map/map.js';
+import { setOverlay, removeOverlay, setData, onLayerClick, cssVar, fitPoints, flyTo, mapReady, getMap, isTilted } from '../map/map.js';
 import * as layers from '../map/layers.js';
+import { loadCells, showCells, selectCell, hideCells, groupPlaces } from '../map/h3.js';
 import { setSnap } from '../ui/sheet.js';
 import { categoryArt, categoryName, hoursStatus, hoursChip, CATEGORY_COLOR, backButton, listenButton, backTime } from '../ui/common.js';
 import { placeView } from '../ui/place.js';
@@ -29,6 +30,10 @@ let current = null;
 let vision = null;
 let listHost = null;
 let countHost = null;
+// «Соты H3»: the places' Uber H3 cells on the map (map/h3.js); a tapped cell narrows the list to its places.
+let hexes = false;
+let cells = null;
+let cell = null;
 
 const startPoint = () => {
   const saved = store.get('start');
@@ -38,16 +43,59 @@ const startPoint = () => {
 };
 const normalize = (text) => String(text || '').toLocaleLowerCase('ru').replace(/ё/g, 'е');
 
-function filtered() {
+const inCell = (place) => cells.places[place.id] === cell || cells.cells[cells.places[place.id]]?.parent === cell;
+
+function filtered({ inSelectedCell = true } = {}) {
   const start = startPoint();
   const categories = FILTERS.find(([id]) => id === filter)?.[1];
   const query = normalize(search.trim());
   return data.items
     .filter((place) => !categories || categories.includes(place.category))
     .filter((place) => !query || normalize(place.name).includes(query))
+    .filter((place) => !inSelectedCell || !hexes || !cell || !cells || inCell(place))
     .map((place) => ({ place, timing: estimate(start, place) }))
     .filter(({ place, timing }) => !openNow || hoursStatus(place, timing.walkMinutes, timing.visitMinutes).status === 'open')
     .sort((a, b) => a.timing.distanceMeters - b.timing.distanceMeters);
+}
+
+function pickCell(id) {
+  cell = id;
+  selectCell(id);
+  shown = PAGE;
+  renderList();
+  setSnap('half');
+  if (id) root?.querySelector('.h3-cell')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+/** What a tapped cell holds: places by category and how many of them have hours and wheelchair data. */
+function cellSummary(group) {
+  const total = group.places.length;
+  const byCategory = new Map();
+  for (const place of group.places) byCategory.set(place.category, (byCategory.get(place.category) || 0) + 1);
+  const categories = [...byCategory].sort((a, b) => b[1] - a[1]).map(([category, n]) => `${categoryName(category)}: ${number(n)}`).join(' · ');
+  const withHours = group.places.filter((place) => place.openingHours).length;
+  const withWheelchair = group.places.filter((place) => place.wheelchair).length;
+  return h('section', { class: 'block h3-cell', 'aria-live': 'polite' },
+    h('div', { class: 'h3-cell-head' }, h('strong', { text: t('h3.title', { n: number(total) }) }),
+      h('button', { class: 'btn btn-quiet btn-small', type: 'button', text: t('h3.clear'), onclick: () => pickCell(null) })),
+    h('p', { class: 'meta', text: t(group.resolution === cells.resolutions.fine ? 'h3.res9' : 'h3.res8') }),
+    h('p', { text: categories }),
+    h('p', { class: 'meta', text: `${t('h3.hours', { n: number(withHours), total: number(total) })} · ${t('h3.wheelchair', { n: number(withWheelchair), total: number(total) })}` }));
+}
+
+function toggleHexes(button) {
+  hexes = !hexes;
+  button.setAttribute('aria-pressed', String(hexes));
+  if (!hexes) { cell = null; hideCells(); renderList(); if (data) drawMap(filtered()); return; }
+  loadCells().then((loaded) => {
+    cells = loaded;
+    if (!hexes || !root) return;
+    if (data) drawMap(filtered());
+    renderList();
+    // The honeycomb reads best over the whole city.
+    const map = getMap();
+    if (map && map.getZoom() > 12.6) map.easeTo({ zoom: 12.4, duration: 700 });
+  }).catch(() => { hexes = false; button.setAttribute('aria-pressed', 'false'); if (countHost) countHost.textContent = t('h3.failed'); });
 }
 
 function geojson(items) {
@@ -59,7 +107,11 @@ function drawMap(items) {
   setOverlay('places', {
     sources: { places: { type: 'geojson', data: geojson(items) } },
     layers: [
-      { id: 'places-dots', type: 'circle', source: 'places', paint: { 'circle-color': colors, 'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 13, 4.5, 16, 8], 'circle-stroke-color': () => cssVar('--surface'), 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5] } },
+      // With «Соты H3» on, the dots shrink so the cells read and can be tapped between them.
+      // In 3D the cells stand as columns and the dots would float over them, so the dots step aside.
+      { id: 'places-dots', type: 'circle', source: 'places', layout: { visibility: hexes && isTilted() ? 'none' : 'visible' }, paint: { 'circle-color': colors,
+        'circle-radius': () => ['interpolate', ['linear'], ['zoom'], 10, hexes ? 1.5 : 2.5, 13, hexes ? 2.5 : 4.5, 16, hexes ? 5 : 8],
+        'circle-stroke-color': () => cssVar('--surface'), 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, hexes ? 1 : 1.5] } },
       { id: 'places-selected', type: 'circle', source: 'places', filter: ['==', ['get', 'id'], current?.place.id || ''], paint: { 'circle-color': () => cssVar('--gold'), 'circle-radius': 11, 'circle-stroke-color': () => cssVar('--ink'), 'circle-stroke-width': 3 } },
     ],
   });
@@ -72,10 +124,18 @@ function drawMap(items) {
 function renderList() {
   if (!data) return;
   const items = filtered();
-  setData('places', geojson(items));
+  const everywhere = hexes && cells ? filtered({ inSelectedCell: false }) : items;
+  setData('places', geojson(everywhere));
   countHost.textContent = t('explore.count', { n: number(items.length) });
-  if (!items.length) { clear(listHost, h('p', { class: 'empty-note', text: t('explore.empty') })); return; }
-  clear(listHost, h('div', { class: 'list' }, items.slice(0, shown).map(({ place, timing }) => h('button', { class: 'list-row place-row', type: 'button', onclick: () => openPlace(place) },
+  let summary = null;
+  if (hexes && cells) {
+    const groups = groupPlaces(cells, everywhere.map(({ place }) => place));
+    showCells(cells, everywhere.map(({ place }) => place), pickCell);
+    if (cell && !groups.has(cell)) { cell = null; selectCell(null); return renderList(); }
+    summary = cell ? cellSummary(groups.get(cell)) : h('p', { class: 'fine h3-hint', text: `${t('h3.hint')} ${t('h3.about')}` });
+  }
+  if (!items.length) { clear(listHost, summary, h('p', { class: 'empty-note', text: t('explore.empty') })); return; }
+  clear(listHost, summary, h('div', { class: 'list' }, items.slice(0, shown).map(({ place, timing }) => h('button', { class: 'list-row place-row', type: 'button', onclick: () => openPlace(place) },
     categoryArt(place.category, 36, 'art'),
     h('span', { class: 'row-text' }, h('strong', { text: place.name }),
       h('small', {}, categoryName(place.category), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }), t('explore.walk', { n: timing.walkMinutes })),
@@ -93,7 +153,8 @@ function renderBrowse() {
     FILTERS.map(([id]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(filter === id), dataset: { filter: id },
       onclick: () => { filter = id; shown = PAGE; chips.querySelectorAll('[data-filter]').forEach((chip) => chip.setAttribute('aria-pressed', String(chip.dataset.filter === id))); renderList(); } },
     id === 'all' ? t('explore.all') : categoryName(id === 'park' ? 'park' : id === 'culture' ? 'culture' : id))),
-    h('button', { type: 'button', class: 'chip chip-toggle', 'aria-pressed': String(openNow), onclick: (event) => { openNow = !openNow; event.currentTarget.setAttribute('aria-pressed', String(openNow)); renderList(); } }, h('span', { class: 'status-dot', 'aria-hidden': 'true' }), t('explore.openNow')));
+    h('button', { type: 'button', class: 'chip chip-toggle', 'aria-pressed': String(openNow), onclick: (event) => { openNow = !openNow; event.currentTarget.setAttribute('aria-pressed', String(openNow)); renderList(); } }, h('span', { class: 'status-dot', 'aria-hidden': 'true' }), t('explore.openNow')),
+    h('button', { type: 'button', class: 'chip chip-h3', 'aria-pressed': String(hexes), onclick: (event) => toggleHexes(event.currentTarget) }, h('span', { class: 'hex-mark', 'aria-hidden': 'true' }), t('h3.toggle')));
   countHost = h('p', { class: 'meta', role: 'status' });
   listHost = h('div', { class: 'explore-list' }, h('p', { class: 'empty-note', text: t('explore.loading') }));
   clear(root, h('section', { class: 'view explore-view', 'aria-labelledby': 'explore-title' },
@@ -181,6 +242,8 @@ function renderVision() {
 }
 const CONF = { high: 'conf.high', medium: 'conf.medium', low: 'conf.low' };
 
+document.addEventListener('seruen:tilt', () => { if (hexes && data && root && !current && !vision) drawMap(filtered({ inSelectedCell: false })); });
+
 registerTab({
   id: 'explore', ownMap: true, order: 20, icon: 'map', title: 'tab.explore',
   mount(container) {
@@ -198,5 +261,5 @@ registerTab({
     }).catch(() => { if (listHost) clear(listHost, h('p', { class: 'empty-note', text: t('explore.failed') })); });
   },
   reopen(params) { if (!root) return; if (params?.vision) startVision(params.vision); else { vision = null; renderBrowse(); } },
-  unmount() { removeOverlay('places'); layers.hideRoutes(); layers.hideStart(); root = null; vision = null; },
+  unmount() { removeOverlay('places'); hideCells(); hexes = false; cell = null; layers.hideRoutes(); layers.hideStart(); root = null; vision = null; },
 });
