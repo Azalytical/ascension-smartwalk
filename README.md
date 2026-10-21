@@ -1,0 +1,6 @@
+# Aidem: файлы для питча 22 октября
+
+- [aidem-pitch-autodemo.zip](aidem-pitch-autodemo.zip) — программа авто-демо и суфлёр (Windows и Mac). Распаковать, запустить `START-Windows.cmd` или `START-Mac.command`, подробности в README.txt внутри.
+- [aidem-deck-10min.zip](aidem-deck-10min.zip) — запасная колода без программы: распаковать, открыть `deck/index.html`.
+
+Исходники программы: ветка main, папка `deliverables/pitch-autodemo`.
