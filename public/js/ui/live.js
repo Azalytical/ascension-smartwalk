@@ -191,7 +191,7 @@ export function mountLive(container, { onFinished }) {
       h('div', { class: 'live-hero' }, ringHost,
         h('div', { class: 'live-side' }, h('div', { class: 'live-place' }, categoryArt(walk.place.category, 28), h('strong', { text: placeName(walk.place.name) })), returnLine, spareLine, phaseLine)),
       alertBox, action, stepper, replan.element, navHost,
-      watchButton({ place: walk.place, start: walk.start, walk: walk.plan.there, visit: walk.plan.visit, back: walk.plan.back, minutes: walk.plan.total }),
+      watchButton({ place: walk.place, start: walk.start, walk: walk.plan.there, visit: walk.plan.visit, back: walk.plan.back, minutes: walk.plan.total, oneWay: walk.oneWay }),
       h('p', { class: 'fine center', text: t('live.screenOn') })));
     tick();
     drawMap();
