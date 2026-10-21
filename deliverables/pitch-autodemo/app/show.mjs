@@ -418,7 +418,22 @@ async function goSlide(n, opt = {}) {
   push();
   if (n === 1 || n === 2) loadSiteTabs().catch(() => {});
   const first = segsNow()[0];
-  if (!back && first?.beat) await runBeatAfterBusy(first.beat);
+  if (!back && !opt.noBeat && first?.beat) await runBeatAfterBusy(first.beat);
+}
+// S: on to the next piece of text without its live step (the short version of the speech drops some of them).
+// The projector stays as it is; a step already running stops.
+async function skipStep() {
+  if (S.busy) { S.skip = true; return; }
+  if (S.mode !== 'pitch') return;
+  const segs = segsNow();
+  if (S.seg + 1 < segs.length) {
+    S.seg++; S.carry = []; S.note = '';
+    if (segs[S.seg].beat) log(`Шаг «${BEATS[segs[S.seg].beat]?.label || segs[S.seg].beat}» пропущен`, 'ok');
+    push();
+    return;
+  }
+  S.inBonus = false;
+  await goSlide(S.slide + 1, { noBeat: true });
 }
 async function runBeatAfterBusy(id) {
   if (S.busy) { S.busy = false; } // a beat that moved the slide (deckNext) hands over to the slide's own first step
@@ -543,6 +558,7 @@ async function onKey(o, page) {
   if (/^[cCсС]$/.test(k)) { S.captions = !S.captions; for (const t of Object.values(S.tabs)) t.page.evaluate((on) => window.__AD && window.__AD.captions(on), S.captions).catch(() => {}); push(); return; }
   if (/^[pPзЗ]$/.test(k)) return setPaused(!S.paused);
   if (/^[4gGпП]$/.test(k)) return bonus();
+  if (/^[sSыЫ]$/.test(k)) return skipStep();
   if (/^[qQйЙ]$/.test(k)) { S.ui.qa = !S.ui.qa; push(); return; }
   if (/^[+=]$/.test(k)) { S.ui.font = Math.min(6, S.ui.font + 1); push(); return; }
   if (/^[-_]$/.test(k)) { S.ui.font = Math.max(-4, S.ui.font - 1); push(); return; }
