@@ -8,6 +8,7 @@
 | [ascension-smartwalk-presentation.pdf](ascension-smartwalk-presentation.pdf) | Презентация, 14 слайдов на 6 минут: проблема, продукт, как работает RAG, бизнес-идея, ограничения, риски, план |
 | [deck/](deck/) | Та же презентация с анимацией: откройте `deck/index.html` в Chrome или Edge, клавиша **F** для полного экрана, **S** для заметок докладчика. Работает без интернета. Подробно: [deck/README.md](deck/README.md) |
 | [ascension-smartwalk-tests-and-limitations.pdf](ascension-smartwalk-tests-and-limitations.pdf) | Тестовые сценарии и ограничения: 15 сценариев (6 из задания и 9 своих) со входом, ожидаемым и фактическим ответом и Pass/Fail, затем ограничения и этика |
+| [pitch-autodemo/](pitch-autodemo/) | Для питча 22 октября: программа сама показывает колоду и живой сайт на проекторе, а на экране ноутбука суфлёр с речью. Запуск двойным щелчком на Windows и macOS: [pitch-autodemo/README.md](pitch-autodemo/README.md) |
 | [START-HERE.txt](START-HERE.txt) | Все ссылки одной страницей: демо, видео, репозиторий, документы |
 
 Ссылки:

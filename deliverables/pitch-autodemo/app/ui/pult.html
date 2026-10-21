@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0A0F15">
+<title>Aidem · суфлёр и пульт</title>
+<link rel="stylesheet" href="/ui/pult.css">
+<script src="/ui/qrcode.js" defer></script>
+<script src="/ui/pult.js" defer></script>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#0E1621"/><path d="M37.6 16.7A16 16 0 1 0 48 30" fill="none" stroke="#F5B700" stroke-width="6" stroke-linecap="round"/><circle cx="43.5" cy="20.5" r="3.6" fill="#4AA8FF"/></svg><b><em>ai</em>dem</b><span class="only-laptop">суфлёр и пульт</span></div>
+    <span class="mode" id="mode">ожидание</span>
+    <div class="status" id="status"></div>
+    <div class="clock"><strong id="clock">0:00</strong><span id="plan"></span></div>
+  </header>
+
+  <main class="main">
+    <section class="speech" id="speech" aria-live="polite">
+      <div class="slidehead"><span class="num" id="snum">00</span><span class="stitle" id="stitle"></span><span class="who" id="who"></span><span class="win" id="swin"></span></div>
+      <p class="screen" id="screen"></p>
+      <div class="prev" id="prev"></div>
+      <div class="beat" id="beat" hidden></div>
+      <div class="now" id="now"></div>
+      <div class="nextstep" id="nextstep"></div>
+      <div class="notes" id="notes" hidden></div>
+    </section>
+
+    <aside class="side only-laptop">
+      <ol class="slides" id="slides"></ol>
+      <div class="msgs" id="msgs"></div>
+      <div class="keys">
+        <div><kbd>→</kbd> <kbd>PgDn</kbd> кликер: дальше</div>
+        <div><kbd>←</kbd> назад · <kbd>Esc</kbd> выйти из демо</div>
+        <div><kbd>Пробел</kbd> пауза в демо · <kbd>B</kbd> чёрный экран</div>
+        <div><kbd>4</kbd> бонус на 07 · <kbd>Q</kbd> вопросы · <kbd>+</kbd><kbd>−</kbd> шрифт</div>
+      </div>
+    </aside>
+    <section class="start" id="start" hidden>
+      <div class="start-in">
+        <h1>Питч Aidem, 22 октября</h1>
+        <p class="lead" id="startLead">На проекторе титульный слайд. Первое → на кликере или кнопка ниже запускает показ.</p>
+        <div class="checks" id="checks"></div>
+        <div class="actions">
+          <button type="button" class="go" data-cmd="start">Начать питч <small>→ или кликер</small></button>
+          <button type="button" class="alt" data-cmd="tour">Полный тур по сайту <small>сам, ~5 минут</small></button>
+          <button type="button" class="alt" data-cmd="tourLoop">Тур по кругу <small>для стенда, до Esc</small></button>
+        </div>
+        <div class="actions small">
+          <button type="button" class="alt" data-cmd="screens">Проверить экраны</button>
+          <button type="button" class="alt" data-cmd="swapScreens">Поменять экраны местами</button>
+          <button type="button" class="alt" data-cmd="recheck">Проверить сайт и обновить вкладки</button>
+          <button type="button" class="alt" data-cmd="phone">Суфлёр на телефоне</button>
+          <button type="button" class="alt" data-cmd="reloadSpeech">Перечитать речь</button>
+        </div>
+        <div class="phone" id="phone" hidden></div>
+        <details class="prep"><summary>Без программы: ручной способ из речи</summary><ol id="prep"></ol></details>
+        <details class="prep"><summary>Если что-то сломалось</summary><ul id="broken"></ul></details>
+        <details class="prep"><summary>Короткая версия речи</summary><p id="shortIntro"></p><ol id="short"></ol></details>
+      </div>
+    </section>
+
+    <section class="qa" id="qa" hidden>
+      <div class="qa-head"><h2>Вопросы жюри: короткие ответы</h2><button type="button" class="t" data-cmd="qa">Закрыть <kbd>Q</kbd></button></div>
+      <div class="qa-list" id="qaList"></div>
+    </section>
+  </main>
+
+  <footer class="bar">
+    <button type="button" class="b" data-key="ArrowLeft" aria-label="Назад">◀</button>
+    <button type="button" class="b" data-key=" " aria-label="Пауза" id="pauseBtn">⏸</button>
+    <button type="button" class="b big" data-key="ArrowRight" aria-label="Дальше">▶</button>
+    <span class="grow"></span>
+    <button type="button" class="t" data-cmd="qa">Вопросы жюри <kbd>Q</kbd></button>
+    <button type="button" class="t only-laptop" data-cmd="font-">A−</button>
+    <button type="button" class="t only-laptop" data-cmd="font+">A+</button>
+    <button type="button" class="t only-laptop" data-cmd="idle">Пульт</button>
+  </footer>
+
+</div>
+</body>
+</html>
