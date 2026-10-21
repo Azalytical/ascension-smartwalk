@@ -191,9 +191,12 @@ export function toggleTilt() {
     setOverlay('buildings-3d', { layers: [{ id: 'seruen-3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: 13, requiresSource: 'openmaptiles',
       paint: { 'fill-extrusion-color': () => (dark ? '#2A2A2F' : '#E4E2DB'), 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': 0.85 } }] });
   }
-  map.easeTo({ pitch: tilted ? 58 : 0, bearing: tilted ? -18 : 0, zoom: tilted ? Math.max(map.getZoom(), 15) : map.getZoom(), padding, duration: 900 });
+  // Buildings need zoom 15; H3 columns (map/h3.js) read best over the whole city, so the zoom stays.
+  map.easeTo({ pitch: tilted ? 58 : 0, bearing: tilted ? -18 : 0, zoom: tilted && !overlays.has('h3') ? Math.max(map.getZoom(), 15) : map.getZoom(), padding, duration: 900 });
+  document.dispatchEvent(new CustomEvent('seruen:tilt', { detail: tilted }));
   return tilted;
 }
+export const isTilted = () => tilted;
 
 export function userDot() {
   return h('div', { class: 'user-dot', 'aria-hidden': 'true' }, h('span'));
