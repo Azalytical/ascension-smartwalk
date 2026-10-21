@@ -286,7 +286,41 @@ function placeIndex() {
   };
 }
 
-function activitiesFor(category) {
+// What to do at a place of a given kind (the source's own category: a fountain, a mosque, a cinema), more concrete than
+// the app category alone. Still an idea of the service, not a fact: the part after «;» says what the source does not confirm.
+export const KIND_ACTIVITIES = {
+  fountain: 'Посидеть у фонтана и сделать фото; работает ли фонтан сегодня, источник не сообщает.',
+  monument: 'Обойти памятник и прочитать надписи; доступ ближе к нему уточнить на месте.',
+  memorial: 'Осмотреть мемориал и прочитать надписи; это место памяти, снимайте там, где уместно.',
+  place_of_worship: 'Осмотреть здание снаружи; внутрь — в закрытой одежде и не во время службы, правила уточнить на месте.',
+  plaza: 'Пройти площадь и осмотреться; события на ней сегодня источник не сообщает.',
+  artwork: 'Рассмотреть арт-объект и сделать фото; автор и история в источнике могут быть не указаны.',
+  viewpoint: 'Посмотреть на город сверху; доступ и часы работы уточнить заранее.',
+  bridge: 'Пройти по мосту и посмотреть на реку; переходы и подходы проверяйте сами.',
+  gallery: 'Посмотреть текущую выставку; режим работы и билеты уточнить заранее.',
+  exhibition_centre: 'Посмотреть текущую выставку; расписание и вход уточнить заранее.',
+  theatre: 'Заглянуть в кассу и посмотреть афишу; спектакль обычно дольше вашего визита, время сверить заранее.',
+  cinema: 'Посмотреть расписание и взять билет на удобный сеанс; фильм обычно идёт дольше часа, сверьте с временем возврата.',
+  library: 'Почитать или поработать в тишине; правила входа и читательский билет уточнить на месте.',
+  concert_hall: 'Посмотреть афишу концертов; билеты и время начала уточнить заранее.',
+  arts_centre: 'Узнать, что идёт сегодня: выставка, показ или мастер-класс; программу уточнить заранее.',
+  bakery: 'Взять выпечку с собой или перекусить на месте; ассортимент уточнить у заведения.',
+  dessert: 'Взять десерт и кофе; меню и наличие мест уточнить у заведения.',
+  ice_cream: 'Взять мороженое с собой на прогулку; ассортимент уточнить у заведения.',
+  fast_food: 'Быстро перекусить; меню и цены уточнить у заведения.',
+  food_court: 'Выбрать еду из нескольких точек в одном месте; часы работы точек уточнить.',
+  garden: 'Пройтись по саду; доступ на территорию уточнить заранее.',
+  beach: 'Пройтись вдоль воды; купание и условия на месте уточнить заранее.',
+  zoo: 'Посмотреть животных; билеты, возрастные ограничения и режим работы проверить до выхода.',
+  amusement_park: 'Покататься на аттракционах; билеты, возрастные ограничения и ограничения по росту проверить до выхода.',
+  theme_park: 'Покататься на аттракционах; билеты, возрастные ограничения и ограничения по росту проверить до выхода.',
+  aquarium: 'Посмотреть аквариумы; билеты, возрастные ограничения и режим работы проверить до выхода.',
+  water_park: 'Поплавать и покататься с горок; билеты, возрастные ограничения и режим работы проверить до выхода.',
+  nightclub: 'Потанцевать вечером; возрастные ограничения, вход и программу на сегодня уточнить у заведения.',
+};
+
+function activitiesFor(category, kind) {
+  if (Object.hasOwn(KIND_ACTIVITIES, kind)) return [KIND_ACTIVITIES[kind]];
   return ({
     park: ['Выделить время на короткую прогулку; доступ на территорию и условия на месте уточнить заранее.'],
     cafe: ['Сделать перерыв на кофе; меню, наличие мест и удобств уточнить у заведения.'],
@@ -351,9 +385,9 @@ function provenanceFor(poi) {
 /** The visit as concrete steps with clock times, plus an optional nearby second stop from the same base. */
 function planFor(pick, constraints, reference, pairing) {
   const { poi, walkMinutes, visitMinutes, returnMinutes } = pick;
-  const activity = (activitiesFor(poi.category)?.[0] ?? '').split(';')[0].replace(/\.$/, '');
+  const activity = (activitiesFor(poi.category, pick.kind)?.[0] ?? '').split(';')[0].replace(/\.$/, '');
   const steps = [`${walkMinutes} мин пешком до «${poi.name}»`, `${visitMinutes} мин на месте: ${activity.charAt(0).toLocaleLowerCase('ru')}${activity.slice(1)}`];
-  const stepKeys = [{ key: 'walk', params: { minutes: walkMinutes, name: poi.name } }, { key: 'visit', params: { minutes: visitMinutes, category: poi.category } }];
+  const stepKeys = [{ key: 'walk', params: { minutes: walkMinutes, name: poi.name } }, { key: 'visit', params: { minutes: visitMinutes, category: poi.category, kind: pick.kind ?? null } }];
   if (pairing) {
     steps.push(`если останется время, ${pairing.label} «${pairing.name}» в ${pairing.distanceMeters} м (+${pairing.extraMinutes} мин)`);
     stepKeys.push({ key: pairing.category === 'cafe' ? 'pairingCafe' : 'pairingWalk', params: { name: pairing.name, meters: pairing.distanceMeters, extra: pairing.extraMinutes } });
@@ -1005,7 +1039,7 @@ export function recommend(dataset, input, context = {}) {
     const why = whyFor({ ...pick, weather }, constraints, intents, reference);
     return { ...poi, kind: pick.kind, distanceMeters: Math.ceil(directDistance), estimatedWalkDistanceMeters: Math.ceil(directDistance * DETOUR),
       walkMinutes, visitMinutes, returnMinutes, safetyReserveMinutes: reserve, totalMinutes,
-      why: why.text, whyKeys: why.parts, activities: activitiesFor(category), activitiesAreSuggestions: true,
+      why: why.text, whyKeys: why.parts, activities: activitiesFor(category, pick.kind), activitiesAreSuggestions: true,
       plan: planFor({ ...pick, poi }, constraints, reference, pairing), pairing,
       confidence: confidenceFor(poi, hours, constraints), notability: notabilityFor(poi), provenance: provenanceFor(poi), wheelchair: wheelchairOf(poi),
       // People's stars, kept apart from notability (open data): shown as «Оценки пользователей Aidem».
