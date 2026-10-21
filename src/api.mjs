@@ -544,7 +544,9 @@ async function watchAsk(request, url, env, dataset) {
   const body = { query: (url.searchParams.get('q') || '').trim().slice(0, 500) || 'Куда сходить рядом?', lat: number('lat'), lon: number('lon'),
     minutes: url.searchParams.has('minutes') ? number('minutes') : 45, ...(url.searchParams.has('lang') ? { lang: url.searchParams.get('lang') } : {}),
     ...(url.searchParams.has('reserve') ? { reserveMinutes: number('reserve') } : {}), ...hiddenParam(url) };
-  const text = url.searchParams.get('format') === 'text';
+  // A browser opening the Siri link (Accept: text/html) gets the spoken answer as text instead of raw JSON; format=json forces JSON.
+  const format = url.searchParams.get('format');
+  const text = format === 'text' || (!format && /text\/html/.test(request.headers.get('Accept') || ''));
   // A Kazakh or English question gets an answer in its language, from Gemini and without it.
   const lang = spokenLanguage(url.searchParams.get('q'), url.searchParams.get('lang'));
   if (!body.lang) body.lang = lang;
