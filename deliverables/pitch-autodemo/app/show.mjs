@@ -95,7 +95,7 @@ function snapshot() {
     mode: S.mode, online: S.online, gemini: S.gemini, places: S.places, siteError: S.siteError,
     slide: S.slide, seg: S.seg, inBonus: S.inBonus, carry: S.carry, view: S.view, busy: S.busy, beat: S.beat, queue: S.queue, paused: S.paused,
     t0: S.t0, now: Date.now(), captions: S.captions, blackout: S.blackout, screens: S.screens, placement: S.placement, mirrored: S.mirrored,
-    tabs: Object.fromEntries(Object.entries(S.tabs).map(([k, t]) => [k, { state: t.state, at: t.loadedAt }])), phone: S.phone, note: S.note,
+    tabs: Object.fromEntries(Object.entries(S.tabs).map(([k, t]) => [k, { state: t.state, at: t.loadedAt, lang: t.lang }])), phone: S.phone, note: S.note,
     tour: S.tour, messages: S.messages, ui: S.ui, site: SITE_LABEL, offlineVideo: Boolean(OFFLINE_VIDEO),
   };
 }
@@ -228,7 +228,7 @@ const context = await chromium.launchPersistentContext(PROFILE, {
     '--disable-features=Translate,MediaRouter,GlobalMediaControls,HardwareMediaKeyHandling,PrivacySandboxSettings4', '--lang=ru', '--deny-permission-prompts',
     ...(TEST ? ['--test-type', '--window-position=0,0', '--window-size=1920,1080'] : []), ...(argv['chrome-arg'] ? [String(argv['chrome-arg'])] : [])],
 });
-const CFG = { siteHost: SITE_HOST, showHost: SHOW_HOST, siteLabel: SITE_LABEL, lang: 'ru', zoom: argv.zoom === undefined ? 'auto' : Number(argv.zoom), zoomBase: 1280, captions: true };
+const CFG = { siteHost: SITE_HOST, showHost: SHOW_HOST, siteLabel: SITE_LABEL, lang: (TEST && argv['test-lang']) || 'ru', zoom: argv.zoom === undefined ? 'auto' : Number(argv.zoom), zoomBase: 1280, captions: true };
 await context.addInitScript({ content: `window.__AIDEM = ${JSON.stringify(CFG)};` });
 await context.addInitScript({ path: join(HERE, 'lib', 'page-init.js') });
 await context.addInitScript({ path: join(HERE, 'lib', 'overlay.js') });
@@ -320,6 +320,7 @@ async function openTab(name, url) {
       await t.page.goto(SITE + url, { waitUntil: 'domcontentloaded', timeout: 20000 });
       if (name === 'agent') await t.page.waitForSelector('#examples .chip', { timeout: 15000 });
       else await t.page.waitForSelector('.result-row, .state-view', { timeout: 25000 });
+      t.lang = await ensureRussian(t.page, name);
       t.state = (name === 'agent' || await t.page.locator('.result-row').count()) ? 'ready' : 'failed';
     } catch (e) { t.state = 'failed'; t.error = e.message.split('\n')[0]; }
     t.loadedAt = Date.now();
@@ -328,6 +329,21 @@ async function openTab(name, url) {
     return t.state;
   })();
   return t;
+}
+// The page-init script saves Russian before the site starts, and the browser runs with locale ru-RU, so an English or
+// Kazakh Chrome still shows the site in Russian. If the site comes up in another language anyway (site storage off),
+// the page's own switch (РУС) puts it back: the demo steps look for Russian text.
+async function ensureRussian(page, name) {
+  const now = () => page.evaluate(() => document.documentElement.lang).catch(() => '');
+  let lang = await now();
+  if (!lang || lang === 'ru') return lang || '?';
+  await page.locator('.lang-switch .lang-opt[data-lang="ru"]:visible, #langs [data-lang="ru"]:visible').first().click({ timeout: 3000 }).catch(() => {});
+  await sleep(800);
+  if (name !== 'agent') await page.waitForSelector('.result-row, .state-view', { timeout: 20000 }).catch(() => {});
+  const was = lang;
+  lang = await now();
+  log(`Вкладка «${name}» открылась на языке ${was}: ${lang === 'ru' ? 'переключил на русский' : 'не переключилась, нажмите РУС в шапке сайта'}`, lang === 'ru' ? 'ok' : 'bad');
+  return lang;
 }
 async function loadSiteTabs(force = false) {
   if (!S.online) return;
