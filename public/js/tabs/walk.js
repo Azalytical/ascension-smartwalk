@@ -651,7 +651,7 @@ const ensureAtLeastHalf = () => { if (getSnap() === 'full') setSnap('half'); };
 // «Клетка на карте»: the box the person's point was rounded to before it left the phone.
 function showCell() {
   layers.showPrivacyCell(start);
-  fitPoints(cellBox(start), { maxZoom: 18 });
+  fitPoints(cellBox(start), { maxZoom: 17 });
   ensureAtLeastHalf();
   toast(t('du.point.shown'), { iconName: 'locate' });
 }
