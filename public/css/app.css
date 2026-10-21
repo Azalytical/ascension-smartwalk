@@ -11,11 +11,18 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .brand img { border-radius: 9px; }
 .wordmark { font-family: var(--font-display); font-weight: 700; font-size: 21px; letter-spacing: -0.02em; line-height: 1; }
 .wordmark .wm-ai { color: var(--gold-strong); }
-.topbar { position: fixed; top: calc(var(--safe-top) + 10px); left: 12px; z-index: 5; }
+.topbar { position: fixed; top: calc(var(--safe-top) + 10px); left: 12px; z-index: 5; display: flex; align-items: center; gap: 8px; }
 .topbar .brand { padding: 6px 14px 6px 6px; border-radius: var(--r-pill); background: var(--glass); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); box-shadow: var(--shadow-1); }
 .topbar .wordmark { font-size: 18px; }
 .sheet-brand { display: none; }
 .brand-city { font-size: var(--fs-13); color: var(--ink-3); font-weight: 550; }
+/* Language switch: РУС · ҚАЗ · ENG */
+.lang-switch { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--r-pill); background: var(--glass); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); box-shadow: var(--shadow-1); }
+.lang-opt { min-width: 44px; height: 38px; padding: 0 9px; border-radius: var(--r-pill); font-size: var(--fs-13); font-weight: 700; letter-spacing: .02em; color: var(--ink-2); transition: background-color var(--t-fast), color var(--t-fast); }
+.lang-opt[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+.lang-opt:active { transform: scale(.94); }
+/* The «Вернуться к прогулке» pill takes the top right corner on phones; the switch is also in «Моё». */
+body:has(.live-pill:not([hidden])) .topbar .lang-switch { display: none; }
 
 /* Map controls */
 .map-fabs { position: fixed; right: 12px; bottom: calc(var(--sheet-visible) + 12px); z-index: 5; display: grid; gap: 8px; transition: bottom var(--t-sheet) var(--ease-drawer), opacity var(--t-fast); }
@@ -248,7 +255,10 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
   .topbar { display: none; }
   .sheet { top: 16px; left: 16px; right: auto; bottom: calc(16px + var(--tabbar-h) + 8px); width: var(--panel-w); height: auto !important; transform: none !important; border-radius: var(--r-xl); touch-action: auto; box-shadow: var(--shadow-2); }
   .sheet-handle { display: none; }
-  .sheet-brand { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 10px; }
+  .sheet-brand { display: flex; align-items: center; gap: 12px; padding: 18px 20px 10px; }
+  .sheet-brand .lang-switch { margin-left: auto; background: var(--surface-3); box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .sheet-brand .lang-opt { height: 34px; }
+  .sheet-brand .lang-opt[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
   .sheet-body { flex: 1 1 auto; height: auto !important; padding: 0 20px 24px; }
   .tabbar { left: 16px; right: auto; bottom: 16px; width: var(--panel-w); border-radius: var(--r-lg); border: 0; box-shadow: var(--shadow-2); padding: 4px; }
   .tab { min-height: 56px; border-radius: 16px; }
@@ -268,7 +278,7 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 }
 
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  .fab, .topbar .brand { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .fab, .topbar .brand, .topbar .lang-switch { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 .noscript { padding: 24px; font-family: system-ui; }
 

@@ -40,7 +40,7 @@ export function navLinks(from, to, serverLinks = null) {
   // The server's links carry no start point: the map app starts from where the person is.
   const links = [
     [lang() === 'en' ? '2GIS' : '2ГИС', serverLinks?.twoGis || `https://2gis.kz/astana/routeSearch/rsType/pedestrian/from/${from.lon},${from.lat}/to/${to.lon},${to.lat}`],
-    [lang() === 'en' ? 'Yandex Maps' : 'Яндекс Карты', `https://yandex.kz/maps/?rtext=${from.lat},${from.lon}~${to.lat},${to.lon}&rtt=pd`],
+    [{ en: 'Yandex Maps', kk: 'Яндекс Карталар' }[lang()] || 'Яндекс Карты', `https://yandex.kz/maps/?rtext=${from.lat},${from.lon}~${to.lat},${to.lon}&rtt=pd`],
     ['Google Maps', serverLinks?.googleMapsWalk || `https://www.google.com/maps/dir/?api=1&origin=${from.lat},${from.lon}&destination=${to.lat},${to.lon}&travelmode=walking`],
   ];
   return h('div', { class: 'nav-links' }, h('span', { class: 'nav-links-label', text: t('place.routeIn') }),

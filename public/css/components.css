@@ -151,6 +151,8 @@ button, a, [role="button"], .chip, .seg { touch-action: manipulation; -webkit-us
 .banner.is-good { background: var(--green-soft); }
 .ai-card { border-radius: var(--r-lg); padding: 14px var(--s-4) 10px; background: linear-gradient(180deg, var(--gold-soft), color-mix(in srgb, var(--gold-soft) 35%, var(--surface))); display: grid; gap: var(--s-2); }
 .ai-card.is-quiet { background: var(--surface-2); }
+/* After a language switch the tip is asked for again; the old words stay faded until the new ones come. */
+.ai-card.is-updating .ai-text { opacity: .45; transition: opacity var(--t-fast); }
 .ai-label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-13); font-weight: 700; color: var(--gold-ink); }
 .ai-label .icon { width: 16px; height: 16px; }
 .ai-text { font-size: var(--fs-17); line-height: 1.45; text-wrap: pretty; }

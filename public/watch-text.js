@@ -140,7 +140,7 @@ window.AidemWatchText = {
     'caption.title': 'Взгляните на запястье: куда идти, сколько и когда обратно.',
     'caption.walk': 'Выберите настроение, и часы покажут стрелку к месту, минуты пешком и кольцо времени: туда, на месте, обратно. Синяя точка идёт по кольцу. Когда пора возвращаться, приходит уведомление «Пора обратно», и его повторяют любые часы или браслет, подключённые к телефону.',
     'caption.meet': '«Встречи»: привяжите часы кодом с телефона, и они покажут ваши встречи, кто уже в пути и стрелку к месту встречи или к другу.',
-    'caption.shape': 'Форма часов', 'caption.round': 'Круглые',
+    'caption.shape': 'Форма часов', 'caption.round': 'Круглые', 'caption.lang': 'Язык',
     'caption.demo': 'Демо-прогулка: время ×30',
     'caption.open': 'На часах откройте ',
     'caption.full': '← Полная версия Aidem'
@@ -284,7 +284,7 @@ window.AidemWatchText = {
     'caption.title': 'Білегіңізге қараңыз: қайда бару, қанша жүру және қашан қайту.',
     'caption.walk': 'Көңіл-күйді таңдаңыз, сағат орынға бағыт көрсеткісін, жаяу жүру минуттарын және уақыт сақинасын көрсетеді: ол жаққа, орында, кері. Көк нүкте сақина бойымен жүреді. Қайтатын уақыт келгенде «Қайтатын уақыт» хабарламасы келеді, оны телефонға қосылған кез келген сағат немесе білезік қайталайды.',
     'caption.meet': '«Кездесулер»: сағатты телефондағы кодпен байланыстырыңыз, сонда ол кездесулеріңізді, кім жолда екенін және кездесу орнына не досыңызға бағытты көрсетеді.',
-    'caption.shape': 'Сағат пішіні', 'caption.round': 'Дөңгелек',
+    'caption.shape': 'Сағат пішіні', 'caption.round': 'Дөңгелек', 'caption.lang': 'Тіл',
     'caption.demo': 'Демо-серуен: уақыт ×30',
     'caption.open': 'Сағатта ашыңыз: ',
     'caption.full': '← Aidem толық нұсқасы'
@@ -428,7 +428,7 @@ window.AidemWatchText = {
     'caption.title': 'Glance at your wrist: where to go, how long, and when to head back.',
     'caption.walk': 'Pick a mood, and the watch shows an arrow to the place, the minutes on foot and a ring of time: there, on site, back. A blue dot moves along the ring. When it is time to return, a “Time to head back” notification arrives, and any watch or band connected to the phone repeats it.',
     'caption.meet': '“Meetups”: link the watch with a code from the phone, and it shows your meetups, who is already on the way, and an arrow to the meeting place or to a friend.',
-    'caption.shape': 'Watch shape', 'caption.round': 'Round',
+    'caption.shape': 'Watch shape', 'caption.round': 'Round', 'caption.lang': 'Language',
     'caption.demo': 'Demo walk: time ×30',
     'caption.open': 'On the watch, open ',
     'caption.full': '← Full version of Aidem'

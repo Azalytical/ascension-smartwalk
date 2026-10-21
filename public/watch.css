@@ -216,6 +216,7 @@ html.framed .caption{display:block;max-width:380px;color:var(--ink)}
 .segmented{display:inline-flex;margin:20px 0 14px;padding:4px;border-radius:999px;background:var(--surface)}
 .segmented button{min-height:40px;padding:8px 16px;border-radius:999px;font-size:14px;font-weight:650;color:var(--muted)}
 .segmented button[aria-pressed="true"]{background:var(--gold);color:var(--ink-on-gold)}
+.segmented-lang{display:flex;width:max-content;margin-top:0}
 .demo-toggle{display:flex;align-items:center;gap:10px;font-size:15px;cursor:pointer}
 .demo-toggle input{width:18px;height:18px;accent-color:var(--gold)}
 .caption .open-on-watch{margin-top:14px}

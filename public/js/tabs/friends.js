@@ -27,6 +27,7 @@ shell.registerTab({
     pending = [];
     for (const action of actions) action(screen);
   },
+  relang() { screen?.relang(); },
   unmount() {
     screen?.unmount();
     screen = null;

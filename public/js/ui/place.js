@@ -1,7 +1,7 @@
 // Place details: the time ring, why it fits, a step plan, what is known and what is not, and the actions.
 // Each block that the server labels with its origin (data, computed, idea) shows that label.
 import { h, icon, externalLink, safeUrl } from '../core/dom.js';
-import { t, date as formatDate } from '../core/i18n.js';
+import { t, date as formatDate, placeName } from '../core/i18n.js';
 import { formatDistance } from '../core/geo.js';
 import { lang } from '../core/i18n.js';
 import * as store from '../core/store.js';
@@ -68,7 +68,7 @@ export function placeView({ place, timing, start, serverHours, why, activities =
   return h('article', { class: 'view place-view', 'aria-labelledby': 'place-title' },
     h('div', { class: 'view-bar' }, backButton(backLabel || t('common.back'), onBack), h('div', { class: 'view-bar-actions' }, voice, saveButton, shareButton)),
     h('header', { class: 'place-head' }, categoryArt(place.category, 56, 'art art-lg'),
-      h('div', {}, h('h2', { id: 'place-title', class: 'title-2', text: place.name }),
+      h('div', {}, h('h2', { id: 'place-title', class: 'title-2', text: placeName(place.name) }),
         h('p', { class: 'meta' }, categoryName(place.category), timing.distanceMeters ? h('span', { class: 'meta-sep', 'aria-hidden': 'true' }) : null,
           timing.distanceMeters ? t('place.straight', { d: formatDistance(timing.distanceMeters, lang()) }) : null),
         h('div', { class: 'place-badges' }, hoursChip(hours), confidenceChip(place.confidence), notabilityChip(place.notability), ratingChip(place)))),

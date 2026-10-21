@@ -19,6 +19,9 @@
     .fr-top a { pointer-events: auto; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 999px; background: var(--surface); color: var(--ink);
       text-decoration: none; font-weight: 650; box-shadow: 0 4px 16px rgba(14, 22, 33, .16); }
     .fr-top svg { width: 22px; height: 22px; }
+    .fr-top .lang-switch { pointer-events: auto; display: inline-flex; gap: 2px; padding: 3px; margin-left: auto; border-radius: 999px; background: var(--surface); box-shadow: 0 4px 16px rgba(14, 22, 33, .16); }
+    .fr-top .lang-opt { min-width: 44px; height: 38px; padding: 0 9px; border: 0; border-radius: 999px; background: none; color: inherit; font: 700 13px var(--font); letter-spacing: .02em; opacity: .75; cursor: pointer; }
+    .fr-top .lang-opt[aria-pressed="true"] { background: var(--ink); color: var(--bg); opacity: 1; }
     #sheet { position: fixed; left: 0; right: 0; bottom: 0; height: var(--sheet-height, 62dvh); overflow: auto; overscroll-behavior: contain; background: var(--surface);
       border-radius: 22px 22px 0 0; box-shadow: 0 -8px 30px rgba(14, 22, 33, .18); padding: 0 16px max(16px, env(safe-area-inset-bottom)); box-sizing: border-box; z-index: 4;
       transition: height 260ms cubic-bezier(.2, .8, .2, 1); }
@@ -40,6 +43,29 @@
   <script type="module">
     import { mountSocial } from '/js/social/screens.js';
     import * as social from '/js/social/service.js';
+    import { t, addStrings } from '/js/core/i18n.js';
+    import { on } from '/js/core/store.js';
+    import { langSwitch } from '/js/ui/lang-switch.js';
+
+    // The page's own labels; the language is the one chosen in Aidem on this device, and the switch at the top changes it here too.
+    addStrings({
+      ru: { 'fr.title': 'Aidem · друзья', 'fr.back': 'Вернуться к прогулкам Aidem', 'fr.map': 'Карта друзей, встреч и событий', 'fr.sheet': 'Друзья, встречи и события',
+        'fr.handle': 'Развернуть или свернуть панель', 'fr.noMap': 'Карта не загрузилась. Друзья, встречи и события работают и без неё.', 'fr.place': 'Место встречи' },
+      kk: { 'fr.title': 'Aidem · достар', 'fr.back': 'Aidem серуендеріне оралу', 'fr.map': 'Достар, кездесулер мен іс-шаралар картасы', 'fr.sheet': 'Достар, кездесулер мен іс-шаралар',
+        'fr.handle': 'Панельді жаю не жию', 'fr.noMap': 'Карта жүктелмеді. Достар, кездесулер мен іс-шаралар онсыз да жұмыс істейді.', 'fr.place': 'Кездесу орны' },
+      en: { 'fr.title': 'Aidem · friends', 'fr.back': 'Back to Aidem walks', 'fr.map': 'Map of friends, meetups and events', 'fr.sheet': 'Friends, meetups and events',
+        'fr.handle': 'Expand or collapse the panel', 'fr.noMap': 'The map did not load. Friends, meetups and events still work without it.', 'fr.place': 'Meeting place' },
+    });
+    function label() {
+      document.title = t('fr.title');
+      document.getElementById('map').setAttribute('aria-label', t('fr.map'));
+      document.querySelector('.fr-top a').setAttribute('aria-label', t('fr.back'));
+      document.getElementById('sheet').setAttribute('aria-label', t('fr.sheet'));
+      document.querySelector('.fr-handle').setAttribute('aria-label', t('fr.handle'));
+      const note = document.querySelector('.fr-fallback');
+      if (note) note.textContent = t('fr.noMap');
+    }
+    document.querySelector('.fr-top').append(langSwitch());
 
     const sheet = document.getElementById('sheet');
     const heights = { peek: 0.3, half: 0.62, full: 0.9 };
@@ -69,15 +95,17 @@
       });
       pad();
     } else {
-      document.getElementById('map').append(Object.assign(document.createElement('p'), { className: 'fr-fallback', textContent: 'Карта не загрузилась. Друзья, встречи и события работают и без неё.' }));
+      document.getElementById('map').append(Object.assign(document.createElement('p'), { className: 'fr-fallback', textContent: t('fr.noMap') }));
     }
 
     social.start();
     const screen = mountSocial(document.getElementById('sheet-body'), { map, maplibregl: window.maplibregl, openSheet });
+    label();
+    on('lang', () => { label(); screen.relang(); });
 
     const params = new URLSearchParams(location.search);
     const invite = params.get('friend'), eventId = params.get('event'), meetupId = params.get('meetup');
-    const place = params.get('lat') && params.get('lon') ? { id: params.get('place'), name: params.get('name') || 'Место встречи', lat: Number(params.get('lat')), lon: Number(params.get('lon')) } : null;
+    const place = params.get('lat') && params.get('lon') ? { id: params.get('place'), name: params.get('name') || t('fr.place'), lat: Number(params.get('lat')), lon: Number(params.get('lon')) } : null;
     if (invite || eventId || meetupId || place) history.replaceState(null, '', location.pathname);
     if (invite) screen.openInvite(invite);
     if (eventId) screen.openEvent(eventId);

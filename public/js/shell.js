@@ -32,7 +32,8 @@ export function initShell(rootEl, barEl) {
   root = rootEl;
   bar = barEl;
   renderBar();
-  on('lang', () => { renderBar(); if (active) mount(active, true); });
+  // A tab with relang() redraws itself in the new language and keeps what is open in it; the others mount again.
+  on('lang', () => { renderBar(); if (active?.relang) active.relang(context()); else if (active) mount(active, true); });
 }
 
 function title(tab) { return typeof tab.title === 'string' ? t(tab.title) : pick(tab.title); }
