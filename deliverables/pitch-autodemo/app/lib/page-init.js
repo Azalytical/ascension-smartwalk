@@ -41,10 +41,10 @@
   // ---------- 1. keys ----------
   const send = (o) => { try { if (window.__aidemKey) window.__aidemKey(o); } catch (e) { /* the show is closing */ } };
   const typingIn = (el) => !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
-  // Keys the show owns on every page. Letters come in both layouts (Russian keyboard: и = b, с = c, з = p, й = q).
+  // Keys the show owns on every page. Letters come in both layouts (Russian keyboard: и = b, с = c, з = p, й = q, е = t).
   const OWN = new Set(['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Enter', 'Home', 'End', 'Escape', 'F5', 'Backspace',
     'b', 'B', 'и', 'И', '.', 'c', 'C', 'с', 'С', 'p', 'P', 'з', 'З', 'a', 'A', 'ф', 'Ф', '4', 'g', 'G', 'п', 'П', 'f', 'F', 'а', 'А', 's', 'S', 'ы', 'Ы',
-    'd', 'D', 'в', 'В', 'm', 'M', 'ь', 'Ь', 'v', 'V', 'м', 'М', 'h', 'H', 'р', 'Р', 'q', 'Q', 'й', 'Й', '+', '=', '-', '_', 'F1']);
+    'd', 'D', 'в', 'В', 'm', 'M', 'ь', 'Ь', 'v', 'V', 'м', 'М', 'h', 'H', 'р', 'Р', 'q', 'Q', 'й', 'Й', 't', 'T', 'е', 'Е', '+', '=', '-', '_', 'F1']);
   addEventListener('keydown', (e) => {
     const key = e.key;
     // Ctrl/Cmd + digit switches tabs in the browser itself; the show only hears about it so it knows where the presenter is.
