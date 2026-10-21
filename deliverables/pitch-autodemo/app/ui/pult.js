@@ -157,6 +157,13 @@
     const bad = ['coffee', 'tourist'].filter((k) => tabs[k] && tabs[k].state === 'failed');
     if (bad.length) add('bad', 'Не загрузилась вкладка: ' + bad.map((k) => (k === 'coffee' ? 'кофе' : 'турист')).join(', '), 'Нажмите «Проверить сайт и обновить вкладки».');
     if (st.placement) add(st.mirrored ? 'warn' : 'ok', 'Окна: ' + st.placement);
+    const ov = st.overlay;
+    if (ov) {
+      if (ov.state === 'failed') add('warn', 'Окно-суфлёр поверх всех окон не запустилось.', 'Суфлёр в этом окне работает как обычно.');
+      else if (ov.on) add('ok', 'Окно-суфлёр поверх всех окон: видно на экране ноутбука, в демонстрации экрана и записи его нет.', 'Ctrl+Alt+H спрятать или показать, Ctrl+Alt+= и Ctrl+Alt+- шрифт. Перетаскивается мышью. С проектором в режиме «Повторить» зал видит всё, что на ноутбуке, и это окно тоже.');
+    }
+    const ovl = $('ovl');
+    if (ovl) { ovl.hidden = !ov || ov.state === 'failed'; if (ov) ovl.textContent = ov.on ? 'Спрятать окно-суфлёр' : 'Показать окно-суфлёр поверх всех окон'; }
     $('checks').innerHTML = checks.join('');
     const phone = $('phone');
     phone.hidden = !st.phone;
