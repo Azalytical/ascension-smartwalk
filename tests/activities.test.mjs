@@ -4,9 +4,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { recommend, KIND_ACTIVITIES } from '../src/retrieval.mjs';
 
+// The app's dictionaries only: public/js/ui/server-text.js needs files the build generates.
 globalThis.document ??= { documentElement: {}, addEventListener() {} };
-const { setLang } = await import('../public/js/core/i18n.js');
-const { planSteps } = await import('../public/js/ui/server-text.js');
+const { t, has, setLang } = await import('../public/js/core/i18n.js');
 
 const record = (overrides = {}) => ({ id: 'osm:node:1', name: 'Поющие фонтаны', lat: 51.12, lon: 71.42, category: 'fountain',
   sourceUrl: 'https://www.openstreetmap.org/node/1', retrievedAt: '2026-10-19T12:00:00Z', source: { id: 'osm', label: 'OpenStreetMap', license: 'ODbL-1.0' }, ...overrides });
@@ -29,25 +29,21 @@ test('a kind without its own idea keeps the category one', () => {
 });
 
 test('every kind idea says what the source does not confirm, and has a Kazakh and English step', () => {
-  const [card] = recommend([record()], near).recommendations;
-  const withVisit = params => ({ ...card, plan: { ...card.plan, stepKeys: card.plan.stepKeys.map((item, index) => index === 1 ? { key: 'visit', params } : item) } });
   for (const [kind, text] of Object.entries(KIND_ACTIVITIES)) {
     assert.match(text, /^[А-Я][^;]+; .+\.$/u, kind);
     for (const language of ['kk', 'en']) {
       setLang(language);
-      const step = planSteps(withVisit({ minutes: 15, category: 'attraction', kind }))[1];
-      // Neither the Russian text nor the category's own line: the kind has its template.
-      assert.notEqual(step, card.plan.steps[1], `${language} ${kind} fell back to Russian`);
-      assert.notEqual(step, planSteps(withVisit({ minutes: 15, category: 'attraction' }))[1], `${language} ${kind} fell back to the category`);
-      if (language === 'en') assert.doesNotMatch(step, /[а-яё]/u, kind);
+      // server-text.js renders the visit step with actk.<kind> and falls back to act.<category> when a kind has none.
+      assert.ok(has(`actk.${kind}`), `${language} ${kind}`);
+      assert.notEqual(t(`actk.${kind}`), t('act.attraction'), `${language} ${kind}`);
+      if (language === 'en') assert.doesNotMatch(t(`actk.${kind}`), /[а-яё]/u, kind);
     }
   }
   setLang('en');
-  assert.equal(planSteps(card)[1], '15 min on site: sit by the fountain and take photos');
+  assert.equal(t('step.visit', { minutes: 15, activity: t('actk.fountain') }), '15 min on site: sit by the fountain and take photos');
   setLang('kk');
-  assert.equal(planSteps(card)[1], 'орнында 15 мин: субұрқақ жанында отырып, суретке түсу');
-  // An answer saved before kinds were sent still reads by its category.
-  setLang('en');
-  assert.equal(planSteps(withVisit({ minutes: 15, category: 'attraction' }))[1], '15 min on site: look around and take photos where allowed');
+  assert.equal(t('step.visit', { minutes: 15, activity: t('actk.fountain') }), 'орнында 15 мин: субұрқақ жанында отырып, суретке түсу');
   setLang('ru');
+  // In Russian the server's own text stays, so there is no Russian template to drift from it.
+  assert.equal(has('actk.fountain'), false);
 });
