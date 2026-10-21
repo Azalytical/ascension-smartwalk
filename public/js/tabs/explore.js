@@ -8,7 +8,8 @@ import { PRESETS, estimate, formatDistance } from '../core/geo.js';
 import { lang } from '../core/i18n.js';
 import { setOverlay, removeOverlay, setData, onLayerClick, cssVar, fitPoints, flyTo, mapReady, getMap, isTilted } from '../map/map.js';
 import * as layers from '../map/layers.js';
-import { loadCells, showCells, selectCell, hideCells, groupPlaces } from '../map/h3.js';
+import { loadCells, showCells, showGaps, selectCell, hideCells, groupPlaces } from '../map/h3.js';
+import { gapsSummary, gapCell } from '../ui/gaps.js';
 import { setSnap } from '../ui/sheet.js';
 import { categoryArt, categoryName, hoursStatus, hoursChip, CATEGORY_COLOR, backButton, listenButton, backTime } from '../ui/common.js';
 import { placeView } from '../ui/place.js';
@@ -34,6 +35,8 @@ let countHost = null;
 let hexes = false;
 let cells = null;
 let cell = null;
+// What the cells show: 'count' (places in each cell) or 'gaps' («Город 15 минут»: what is not within 15 minutes on foot).
+let lens = 'count';
 
 const startPoint = () => {
   const saved = store.get('start');
@@ -83,10 +86,31 @@ function cellSummary(group) {
     h('p', { class: 'meta', text: `${t('h3.hours', { n: number(withHours), total: number(total) })} · ${t('h3.wheelchair', { n: number(withWheelchair), total: number(total) })}` }));
 }
 
+function setLens(next) {
+  lens = next;
+  cell = null;
+  selectCell(null);
+  shown = PAGE;
+  if (data) drawMap(filtered());
+  renderList();
+  // The gaps lie mostly at the edges of the built-up city, so the lens opens on the city: the middle 90% of the cells,
+  // leaving out the few far ones (the airport, the outskirts) that would shrink every cell to a dot.
+  if (lens === 'gaps') {
+    const corners = Object.values(cells.cells).map((item) => item.outline[0]);
+    const share = (values, q) => values.sort((a, b) => a - b)[Math.floor((values.length - 1) * q)];
+    const lons = corners.map(([lon]) => lon), lats = corners.map(([, lat]) => lat);
+    // About 12 km across: zoom 10.6 fits it in the strip of map the half-open sheet leaves on a phone.
+    getMap()?.easeTo({ center: [(share(lons, 0.05) + share(lons, 0.95)) / 2, (share(lats, 0.05) + share(lats, 0.95)) / 2], zoom: 10.6, duration: 700 });
+  }
+}
+
+const lensSwitch = () => h('div', { class: 'chip-row no-drag h3-lens', role: 'group', 'aria-label': t('h3.toggle') },
+  [['count', t('gaps.places')], ['gaps', t('gaps.toggle')]].map(([id, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(lens === id), onclick: () => setLens(id) }, label)));
+
 function toggleHexes(button) {
   hexes = !hexes;
   button.setAttribute('aria-pressed', String(hexes));
-  if (!hexes) { cell = null; hideCells(); renderList(); if (data) drawMap(filtered()); return; }
+  if (!hexes) { cell = null; lens = 'count'; hideCells(); renderList(); if (data) drawMap(filtered()); return; }
   loadCells().then((loaded) => {
     cells = loaded;
     if (!hexes || !root) return;
@@ -108,8 +132,9 @@ function drawMap(items) {
     sources: { places: { type: 'geojson', data: geojson(items) } },
     layers: [
       // With «Соты H3» on, the dots shrink so the cells read and can be tapped between them.
-      // In 3D the cells stand as columns and the dots would float over them, so the dots step aside.
-      { id: 'places-dots', type: 'circle', source: 'places', layout: { visibility: hexes && isTilted() ? 'none' : 'visible' }, paint: { 'circle-color': colors,
+      // In 3D the cells stand as columns and the dots would float over them, so the dots step aside;
+      // «Город 15 минут» is about the city rather than single places, so its colours stay clear of dots.
+      { id: 'places-dots', type: 'circle', source: 'places', layout: { visibility: hexes && (isTilted() || lens === 'gaps') ? 'none' : 'visible' }, paint: { 'circle-color': colors,
         'circle-radius': () => ['interpolate', ['linear'], ['zoom'], 10, hexes ? 1.5 : 2.5, 13, hexes ? 2.5 : 4.5, 16, hexes ? 5 : 8],
         'circle-stroke-color': () => cssVar('--surface'), 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, hexes ? 1 : 1.5] } },
       { id: 'places-selected', type: 'circle', source: 'places', filter: ['==', ['get', 'id'], current?.place.id || ''], paint: { 'circle-color': () => cssVar('--gold'), 'circle-radius': 11, 'circle-stroke-color': () => cssVar('--ink'), 'circle-stroke-width': 3 } },
@@ -128,11 +153,16 @@ function renderList() {
   setData('places', geojson(everywhere));
   countHost.textContent = t('explore.count', { n: number(items.length) });
   let summary = null;
-  if (hexes && cells) {
+  if (hexes && cells && lens === 'gaps') {
+    // The gaps are the city's, so they stay the same whatever the filters; a tapped cell still narrows the list.
+    showGaps(cells, pickCell);
+    const clearButton = h('button', { class: 'btn btn-quiet btn-small', type: 'button', text: t('h3.clear'), onclick: () => pickCell(null) });
+    summary = h('div', {}, lensSwitch(), cell ? gapCell(cells, cell, clearButton) : gapsSummary(cells));
+  } else if (hexes && cells) {
     const groups = groupPlaces(cells, everywhere.map(({ place }) => place));
     showCells(cells, everywhere.map(({ place }) => place), pickCell);
     if (cell && !groups.has(cell)) { cell = null; selectCell(null); return renderList(); }
-    summary = cell ? cellSummary(groups.get(cell)) : h('p', { class: 'fine h3-hint', text: `${t('h3.hint')} ${t('h3.about')}` });
+    summary = h('div', {}, lensSwitch(), cell ? cellSummary(groups.get(cell)) : h('p', { class: 'fine h3-hint', text: `${t('h3.hint')} ${t('h3.about')}` }));
   }
   if (!items.length) { clear(listHost, summary, h('p', { class: 'empty-note', text: t('explore.empty') })); return; }
   clear(listHost, summary, h('div', { class: 'list' }, items.slice(0, shown).map(({ place, timing }) => h('button', { class: 'list-row place-row', type: 'button', onclick: () => openPlace(place) },
@@ -261,5 +291,5 @@ registerTab({
     }).catch(() => { if (listHost) clear(listHost, h('p', { class: 'empty-note', text: t('explore.failed') })); });
   },
   reopen(params) { if (!root) return; if (params?.vision) startVision(params.vision); else { vision = null; renderBrowse(); } },
-  unmount() { removeOverlay('places'); hideCells(); hexes = false; cell = null; layers.hideRoutes(); layers.hideStart(); root = null; vision = null; },
+  unmount() { removeOverlay('places'); hideCells(); hexes = false; cell = null; lens = 'count'; layers.hideRoutes(); layers.hideStart(); root = null; vision = null; },
 });
