@@ -51,7 +51,44 @@ export const PRESETS = [
   { id: 'expo', name: { ru: 'EXPO', kk: 'EXPO', en: 'EXPO' }, lat: 51.09279, lon: 71.42148 },
   { id: 'opera', name: { ru: 'Астана Опера', kk: 'Астана Опера', en: 'Astana Opera' }, lat: 51.13545, lon: 71.41075 },
   { id: 'embankment', name: { ru: 'Набережная Есиля', kk: 'Есіл жағалауы', en: 'Yesil embankment' }, lat: 51.161, lon: 71.423 },
+  // The Pyramid from the OSM record in data/places.json; NU at its campus on Kabanbay Batyr 53 (no record in the base).
+  { id: 'pyramid', name: { ru: 'Дворец мира и согласия', kk: 'Бейбітшілік және келісім сарайы', en: 'Palace of Peace and Reconciliation' }, lat: 51.12312, lon: 71.46346 },
+  { id: 'nu', name: { ru: 'Назарбаев Университет', kk: 'Назарбаев Университеті', en: 'Nazarbayev University' }, lat: 51.0903, lon: 71.3967 },
 ];
+
+// How people in Astana name a start in a request: «час у меги», «возле шатра», «у шара на ЭКСПО», «от Байтерека», «у пирамиды»,
+// «Бәйтеректен», «near Khan Shatyr». Each name takes its case ending; «в Мегу» is not a start but a place to go to.
+const START_NAMES = {
+  baiterek: 'б[аә]йтерек\\p{L}*|ba[iy]terek',
+  'khan-shatyr': '(?:хан[\\s-]*)?шат(?:ы?р|[её]р)\\p{L}*|(?:khan[\\s-]*)?shatyr',
+  mega: 'мег(?:а|и|е|у|ой|ы)?(?:\\s+силк\\s*уэй\\p{L}*)?|mega(?:\\s+silk\\s*way)?',
+  expo: 'шар(?:а|е|у|ом)?(?:\\s+(?:на|у)\\s+(?:экспо|expo))?|экспо|expo|н[уұ]р[\\s-]*[аә]л[еә]м\\p{L}*|nur[\\s-]*alem',
+  opera: '(?:астана[\\s-]+)?опер(?:а|ы|е|у|ой)|оперн\\p{L}*\\s+театр\\p{L}*|(?:astana\\s+)?opera',
+  embankment: 'набережн(?:ая|ой|ую)(?:\\s+есил\\p{L}*)?|(?:yesil\\s+|esil\\s+)?embankment|жағалау\\p{L}*',
+  pyramid: 'пирамид(?:а|ы|е|у|ой)?|двор(?:е)?ц\\p{L}*\\s+мира(?:\\s+и\\s+согласия)?|бейбітшілік\\s+(?:және|пен)\\s+келісім\\s+сарай\\p{L}*|pyramid|palace\\s+of\\s+peace(?:\\s+and\\s+reconciliation)?',
+  nu: 'назарбаев[\\s-]*универ\\p{L}*|nazarbayev\\s+univ\\p{L}*',
+};
+const BEFORE = '(?:от|у|возле|около|рядом\\s+с|недалеко\\s+от|из|со?|from|near|at|by|around)\\s+';
+const AFTER_KK = '(?:(?:дан|ден|тан|тен|нан|нен)(?:\\s+бастап)?|(?:дың|дің|тың|тің|ның|нің)?\\s+(?:жаны|қасы|маңы)(?:нан|нда))';
+const START_PATTERNS = Object.entries(START_NAMES).flatMap(([id, name]) => [
+  [id, new RegExp(`(?<!\\p{L})${BEFORE}(?:${name})(?!\\p{L})`, 'iu')],
+  [id, new RegExp(`(?<!\\p{L})(?:${name})${AFTER_KK}(?!\\p{L})`, 'iu')],
+]);
+// «у NU» only in capitals, so the word «ну» stays a word.
+START_PATTERNS.push(['nu', /(?<!\p{L})(?:[уУ]|[оО]т|[вВ]озле|[оО]коло|[nN]ear|[fF]rom|[aA]t)\s+(?:NU|НУ)(?!\p{L})/u]);
+
+/** The start named in a request, and the request without it: «час у меги, кофе» → { id: 'mega', query: 'час, кофе' }. */
+export function startFrom(text) {
+  const query = String(text || '');
+  let found = null;
+  for (const [id, pattern] of START_PATTERNS) {
+    const match = pattern.exec(query);
+    if (match && (!found || match.index < found.index)) found = { id, index: match.index, length: match[0].length };
+  }
+  if (!found) return null;
+  const rest = `${query.slice(0, found.index)} ${query.slice(found.index + found.length)}`;
+  return { id: found.id, query: rest.replace(/\s+([,.!?])/g, '$1').replace(/([,.!?;:])(?:\s*[,.;:])+/g, '$1').replace(/^[\s,.;:—-]+|[\s,.;:—-]+$/g, '').replace(/\s+/g, ' ').trim() };
+}
 
 export function formatDistance(meters, lang = 'ru') {
   const km = { ru: 'км', kk: 'км', en: 'km' }[lang] || 'км';
