@@ -2,6 +2,7 @@
 // The cells come precomputed from scripts/h3-cells.mjs (resolution 9 and its resolution 8 parents), so the browser needs no h3-js.
 // Resolution 8 is drawn when the map is zoomed out, 9 closer in; with the 3D button on, each cell is a column as tall as its count.
 // Only places are put into cells, never the person's own point.
+// The «Город 15 минут» lens colours the same resolution 9 cells by what is not within 15 minutes on foot (cells.reach).
 import { setOverlay, removeOverlay, setData, onLayerClick, cssVar, isTilted } from './map.js';
 
 const SPLIT_ZOOM = 13.5;
@@ -11,6 +12,7 @@ let shown = false;
 let collection = empty;
 let selectedId = '';
 let onSelect = null;
+let lens = 'count';
 
 export function loadCells() {
   cellsPromise ||= fetch('/data/h3.json').then((response) => {
@@ -43,7 +45,27 @@ function featuresFor(cells, groups) {
   })) };
 }
 
+/** The cells with a gap, as many needs missing as `gaps`; cells with everything near are drawn faintly so the city still reads. */
+function gapFeatures(cells) {
+  return { type: 'FeatureCollection', features: Object.entries(cells.cells).map(([id, cell]) => ({
+    type: 'Feature', properties: { id, res: cells.resolutions.fine, gaps: Object.keys(cells.reach?.gaps?.[id] || {}).length },
+    geometry: { type: 'Polygon', coordinates: [cell.outline] },
+  })) };
+}
+
+function gapLayers() {
+  const color = () => ['match', ['get', 'gaps'], 0, cssVar('--green'), 1, cssVar('--amber'), cssVar('--red')];
+  return [
+    { id: 'h3-gaps', type: 'fill', source: 'h3', beforeId: 'places-dots', paint: { 'fill-color': color,
+      'fill-opacity': ['match', ['get', 'gaps'], 0, 0.08, 1, 0.3, 2, 0.45, 0.6] } },
+    { id: 'h3-gaps-line', type: 'line', source: 'h3', filter: ['>', ['get', 'gaps'], 0], beforeId: 'places-dots', paint: { 'line-color': color, 'line-width': 1, 'line-opacity': 0.8 } },
+  ];
+}
+
 function layers() {
+  const selected = { id: 'h3-selected', type: 'line', source: 'h3', filter: ['==', ['get', 'id'], selectedId], beforeId: 'places-dots',
+    paint: { 'line-color': () => cssVar('--ink'), 'line-width': 3 } };
+  if (lens === 'gaps') return [...gapLayers(), selected];
   const fine = ['==', ['get', 'res'], 9];
   const coarse = ['==', ['get', 'res'], 8];
   const opacity = ['interpolate', ['linear'], ['get', 'count'], 1, 0.1, 8, 0.28, 30, 0.5];
@@ -57,8 +79,6 @@ function layers() {
   const above = { minzoom: SPLIT_ZOOM };
   const flat = [fill('h3-fill-8', coarse, below), line('h3-line-8', coarse, below), fill('h3-fill-9', fine, above), line('h3-line-9', fine, above)];
   const tall = [column('h3-col-8', coarse, below, 60), column('h3-col-9', fine, above, 40)];
-  const selected = { id: 'h3-selected', type: 'line', source: 'h3', filter: ['==', ['get', 'id'], selectedId], beforeId: 'places-dots',
-    paint: { 'line-color': () => cssVar('--ink'), 'line-width': 3 } };
   return [...(isTilted() ? tall : flat), selected];
 }
 
@@ -66,15 +86,27 @@ function draw() {
   // Flat cells and columns are different layers, so the old set goes before the new one is added.
   removeOverlay('h3');
   setOverlay('h3', { sources: { h3: { type: 'geojson', data: collection } }, layers: layers() });
-  for (const id of ['h3-fill-8', 'h3-fill-9', 'h3-col-8', 'h3-col-9']) onLayerClick(id, (feature) => onSelect?.(feature.properties.id));
+  const ids = lens === 'gaps' ? ['h3-gaps'] : ['h3-fill-8', 'h3-fill-9', 'h3-col-8', 'h3-col-9'];
+  for (const id of ids) onLayerClick(id, (feature) => onSelect?.(feature.properties.id));
 }
 
 /** Draws the cells of the given places; `select` gets a cell id when one is tapped. */
 export function showCells(cells, items, select) {
   onSelect = select;
   collection = featuresFor(cells, groupPlaces(cells, items));
-  if (shown) { setData('h3', collection); return; }
+  if (shown && lens === 'count') { setData('h3', collection); return; }
   shown = true;
+  lens = 'count';
+  draw();
+}
+
+/** «Город 15 минут»: every cell with places, coloured by what is not within 15 minutes on foot of it. */
+export function showGaps(cells, select) {
+  onSelect = select;
+  if (shown && lens === 'gaps') return;
+  collection = gapFeatures(cells);
+  shown = true;
+  lens = 'gaps';
   draw();
 }
 
@@ -88,6 +120,7 @@ export function hideCells() {
   shown = false;
   selectedId = '';
   onSelect = null;
+  lens = 'count';
   removeOverlay('h3');
 }
 
