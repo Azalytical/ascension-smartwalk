@@ -214,6 +214,7 @@ const PROFILE = String(argv.profile || profileDir());
 if (!TEST) closeOldShow(PROFILE);
 say(`Браузер: ${found.name}. Профиль показа: ${PROFILE}`);
 say(`Сайт: ${SITE}. Речь: ${SPEECH_FILE}`);
+say(`Колода: ${DECK_HTML}, картинки: ${DECK_ASSETS || 'НЕ НАЙДЕНЫ'}. Запись без интернета: ${OFFLINE_VIDEO || 'нет'}`);
 checkSite().then((ok) => log(ok ? `Сайт на связи: ${S.places ?? '?'} мест, Gemini ${S.gemini ? 'отвечает' : 'выключен (подбор работает без него)'}` : `Сайт недоступен (${S.siteError}): живое демо заменят слайды`, ok ? 'ok' : 'bad'));
 
 const context = await chromium.launchPersistentContext(PROFILE, {
@@ -307,7 +308,8 @@ async function openTab(name, url) {
     const page = await context.newPage();
     t = S.tabs[name] = { name, page, state: 'new', loadedAt: 0, ready: null };
     page.on('crash', () => { t.state = 'failed'; log(`Вкладка «${name}» упала`, 'bad'); });
-    await deck.bringToFront();
+    // A new tab comes to the front by itself: what the hall was looking at goes back on top.
+    await (S.tabs[S.view]?.page || deck).bringToFront();
   }
   t.state = 'loading';
   t.url = url;
@@ -581,11 +583,12 @@ async function command(cmd) {
 // ---------- start ----------
 // The deck shows the title slide while the site tabs load behind it.
 await checkSite();
-loadSiteTabs().catch(() => {});
+const tabsLoading = loadSiteTabs().catch(() => {});
 await deck.bringToFront();
 await pult.bringToFront();
 log('Готово. Пульт и суфлёр на экране ноутбука. Первое → или кнопка «Начать питч» запускает показ.', 'ok');
 if (CHECK) {
+  await tabsLoading;
   await Promise.all(Object.values(S.tabs).map((t) => t.ready).filter(Boolean));
   say('Проверка:', JSON.stringify(snapshot().tabs), 'экранов', S.screens.count);
   setTimeout(() => shutdown(), 500);
