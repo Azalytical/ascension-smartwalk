@@ -1,6 +1,7 @@
 // Walk-specific map layers: start point, reach ring, numbered result pins and route lines.
 import { h, icon, safeUrl } from '../core/dom.js';
 import { circlePolygon } from '../core/geo.js';
+import { cellBox } from '../core/privacy.js';
 import { walkingRoute } from '../core/api.js';
 import { setOverlay, removeOverlay, setData, marker, cssVar, fitPoints, getMap } from './map.js';
 
@@ -90,5 +91,18 @@ export function showEvents(events) {
 }
 export function hideEvents() { eventPins.forEach((pin) => pin?.remove()); eventPins = []; }
 
-export function clearWalkLayers() { hidePins(); hideRoutes(); hideReach(); hideEvents(); }
+// The cell the server works with when the start is the person's own point: core/privacy.js rounds it to three decimals,
+// so every point inside this 0.001° × 0.001° box (about 110 × 70 m in Astana) reaches the server as the same point.
+export function showPrivacyCell(point) {
+  setOverlay('privacy-cell', {
+    sources: { 'privacy-cell': { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [cellBox(point)] } } } },
+    layers: [
+      { id: 'privacy-cell-fill', type: 'fill', source: 'privacy-cell', paint: { 'fill-color': () => cssVar('--sky'), 'fill-opacity': 0.12 } },
+      { id: 'privacy-cell-line', type: 'line', source: 'privacy-cell', paint: { 'line-color': () => cssVar('--sky'), 'line-width': 2, 'line-dasharray': [2, 1.5] } },
+    ],
+  });
+}
+export function hidePrivacyCell() { removeOverlay('privacy-cell'); }
+
+export function clearWalkLayers() { hidePins(); hideRoutes(); hideReach(); hideEvents(); hidePrivacyCell(); }
 export const mapAvailable = () => Boolean(getMap());
