@@ -270,21 +270,25 @@ export function mountSocial(root, ctx = {}) {
       if (invite) await acceptInvite(invite.code);
       else toast(t('sx.ob.created', { name: me.name }), 'success');
       // «Позвать друзей» on a place card before there was a profile: the invitation to that place opens now.
+      // A place only opened on the map opens it too (the form picks it up itself), as the note above promised.
       const waiting = view.pendingPlace;
       view.pendingPlace = null;
       if (waiting) open({ type: 'newMeetup', prefill: { place: waiting, title: waiting.name } });
+      else if (nextPlace && !invite) open({ type: 'newMeetup' });
     };
     const code = h('input', { class: 'sx-input sx-code-input', inputmode: 'numeric', maxlength: 6, placeholder: '123456', 'aria-label': t('sx.ob.codeLabel') });
+    const nextPlace = view.pendingPlace || (!invite ? pickedPlace() : null);
     return h('div', { class: 'sx-onboarding' },
       invite?.inviter ? h('div', { class: 'sx-invite-card' }, avatar(invite.inviter, 'lg'), h('div', {}, h('strong', {}, t('sx.ob.invited', { name: invite.inviter.name })), h('p', {}, t('sx.ob.invitedText')))) : null,
-      view.pendingPlace ? h('p', { class: 'sx-note' }, t('sx.ob.placeNext', { name: view.pendingPlace.name })) : null,
+      nextPlace ? h('p', { class: 'sx-note' }, t('sx.ob.placeNext', { name: placeName(nextPlace.name) })) : null,
       h('div', { class: 'sx-hero' }, h('div', { class: 'sx-hero-faces', 'aria-hidden': 'true' }, '🦊', '🐻', '🐼'),
         h('h2', {}, t('sx.ob.title')),
         h('p', {}, t('sx.ob.text'))),
       h('ul', { class: 'sx-promises' },
         h('li', {}, h('span', {}, '🔒'), t('sx.ob.p1')),
         h('li', {}, h('span', {}, '⏱'), t('sx.ob.p2')),
-        h('li', {}, h('span', {}, '✋'), t('sx.ob.p3'))),
+        h('li', {}, h('span', {}, '✋'), t('sx.ob.p3')),
+        h('li', {}, h('span', {}, '📍'), t('sx.ob.p4'))),
       h('form', { class: 'sx-form', onsubmit: start },
         h('label', { class: 'sx-label', for: 'sx-name' }, t('sx.name')), name,
         h('span', { class: 'sx-label' }, t('sx.emoji')), picker,
