@@ -82,7 +82,9 @@ async function collect(store) {
   }
 }
 
-test('a collection run reads the listing page by page and the site, walks and the agent use it', async () => {
+test('a collection run reads the listing page by page and the site, walks and the agent use it', async t => {
+  // /api/events lists the coming days from the server clock: pin it to a day inside the fixture's quiz run (18–20 October).
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-20T12:00:00+05:00') });
   // The concerts page lists the same cards under other event pages: six more events.
   const { asked, fetcher } = sxodim({ afisha: listing, 'events/kontserty': listing.replace(/\/astana\/event\/([a-z0-9-]+)/g, '/astana/event/$1-2') });
   const store = localCityEvents({ manual: true, fetcher, places, now: morning });
