@@ -45,19 +45,20 @@ export const farNote = (far, lang = 'ru') => (FALLBACK_TEXT.far[lang] || FALLBAC
 
 const S = (description, extra = {}) => ({ type: 'STRING', description, ...extra });
 const N = description => ({ type: 'NUMBER', description });
+const ONE_WAY = { type: 'BOOLEAN', description: 'false, если человек не собирается возвращаться к старту («только туда», «в один конец»). По умолчанию true.' };
 const DECLARATIONS = [
   { name: 'get_weather', description: 'Погода сейчас у точки человека: температура, как ощущается, ветер, осадки, закат, совет «под крышу».' },
   { name: 'plan_walk', description: 'До 3 отдельных мест рядом с человеком, на которые хватит времени: дорога туда, на месте, обратно и запас, который выбрал человек (сервер подставляет его сам); закрытые к приходу по часам из источника и скрытые человеком места отсеяны. У каждого места versus: чем оно отличается от других вариантов. Бывает готовый microRoute из 3 мест и nearestBeyondLimits, если ничего не подошло.',
-    parameters: { type: 'OBJECT', properties: { minutes: N('Всего времени на прогулку, 10–180 минут.'), query: S('Пожелание своими словами.'),
+    parameters: { type: 'OBJECT', properties: { minutes: N('Всего времени на прогулку, 10–240 минут.'), query: S('Пожелание своими словами.'),
       category: S('Категория, если ясна.', { enum: CATEGORIES }), with_child: { type: 'BOOLEAN', description: 'С ребёнком.' },
-      max_walk_minutes: N('Максимум идти в одну сторону, минут.') } } },
+      max_walk_minutes: N('Максимум идти в одну сторону, минут.'), return_to_start: ONE_WAY } } },
   { name: 'search_places', description: 'Поиск мест рядом с человеком по названию или словам и категории.',
     parameters: { type: 'OBJECT', properties: { query: S('Название или слова.'), category: S('Категория.', { enum: CATEGORIES }), limit: N('1–10.') } } },
   { name: 'place_details', description: 'Подробности о месте из источника: адрес, контакты, Wi-Fi, коляска, часы и открыто ли на время визита.',
     parameters: { type: 'OBJECT', properties: { id: S('id места из результатов.') }, required: ['id'] } },
   { name: 'build_route', description: 'Мини-маршрут из 2–3 мест от точки человека и обратно: лучший порядок, минуты каждого отрезка, часы на момент прихода, помещается ли во время.',
     parameters: { type: 'OBJECT', properties: { place_ids: { type: 'ARRAY', items: { type: 'STRING' }, description: '2–3 id мест.' },
-      minutes: N('Всего времени, минут.') }, required: ['place_ids'] } },
+      minutes: N('Всего времени, минут.'), return_to_start: ONE_WAY }, required: ['place_ids'] } },
   { name: 'give_answer', description: 'Финальный ответ человеку. Вызвать один раз в конце.',
     parameters: { type: 'OBJECT', properties: { summary: S('2–3 предложения на языке answerLanguage.'),
       place_ids: { type: 'ARRAY', items: { type: 'STRING' }, description: '1–3 id из результатов инструментов.' },

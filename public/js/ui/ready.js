@@ -4,6 +4,7 @@ import { h, icon } from '../core/dom.js';
 import { t } from '../core/i18n.js';
 import * as api from '../core/api.js';
 import { categoryArt, hoursStatus, backButton } from './common.js';
+import './trip.js';
 
 const WET = [51, 53, 55, 61, 63, 65, 66, 67, 71, 73, 75, 77, 80, 81, 82, 85, 86, 95, 96, 99];
 const SNOW = [71, 73, 75, 77, 85, 86];
@@ -32,8 +33,8 @@ function hoursItem(status) {
   return item('clock', 'warn', t('ready.hoursUnknown'), t('ready.hoursCheck'));
 }
 
-/** `backAt` is the same «вернётесь к» as the card; `onGo` starts the walk. */
-export function readyView({ place, timing, backAt, serverHours = null, onGo, onBack }) {
+/** `backAt` is the same «вернётесь к» as the card («закончите к» for `oneWay`); `onGo` starts the walk. */
+export function readyView({ place, timing, backAt, serverHours = null, onGo, onBack, oneWay = false }) {
   const weatherHost = item('cloud', 'muted', t('ready.weatherLoading'), null);
   api.weather().then((current) => weatherHost.replaceWith(weatherItem(current)));
   const reserve = timing.safetyReserveMinutes ?? 5;
@@ -42,8 +43,8 @@ export function readyView({ place, timing, backAt, serverHours = null, onGo, onB
     h('h2', { id: 'ready-title', class: 'title-2', text: t('ready.title') }),
     h('div', { class: 'ready-place' }, categoryArt(place.category, 36, 'art'), h('strong', { text: place.name })),
     h('ul', { class: 'ready-list' },
-      item('return', 'good', t('ready.back', { time: backAt }),
-        t('ready.backText', { walk: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, reserve })),
+      item(oneWay ? 'flag' : 'return', 'good', t(oneWay ? 'ready.done' : 'ready.back', { time: backAt }),
+        t(oneWay ? 'ready.oneWayText' : 'ready.backText', { walk: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, reserve })),
       weatherHost,
       hoursItem(hoursStatus(place, timing.walkMinutes, timing.visitMinutes, serverHours))),
     h('p', { class: 'ready-note' }, icon('info', 'icon-xs'), h('span', { text: t('ready.note') })),

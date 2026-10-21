@@ -22,8 +22,13 @@ import { readyView } from '../ui/ready.js';
 import { applyTheme } from '../core/theme.js';
 import { understoodLabel, noteTexts, unconfirmedTexts, warningTexts, whyText } from '../ui/server-text.js';
 import { dataUsedView } from '../ui/data-used.js';
+import { hoursLabel } from '../ui/trip.js';
+import { MAX_MINUTES } from '../core/time-words.js';
 
 const MINUTES = [30, 45, 60, 90, 120];
+// «2+ ч» opens these in a row of their own; 3 hours when it is tapped.
+const LONG = [150, 180, 240];
+const LONG_DEFAULT = 180;
 const MAX_WALK = [10, 15, 20, 30];
 // Minutes kept spare before «вернётесь к»; the server counts them in every option.
 const RESERVES = [5, 10, 15];
@@ -32,7 +37,7 @@ const MOODS = [
   ['kids', 'family'], ['culture', 'museum'], ['sights', 'landmark'], ['indoor', 'indoor'],
 ];
 
-const defaults = { minutes: 45, maxWalk: 15, query: '', mood: null, when: 'now', reserve: 5 };
+const defaults = { minutes: 45, maxWalk: 15, query: '', mood: null, when: 'now', reserve: 5, oneWay: false };
 let plan = { ...defaults, ...(store.get('plan') || {}) };
 let start = store.get('start') || presetStart('baiterek');
 let view = store.get('walk') ? 'live' : 'plan';
@@ -70,6 +75,9 @@ function presetStart(id) {
   return { kind: 'preset', id: preset.id, name: pick(preset.name), names: preset.name, lat: preset.lat, lon: preset.lon };
 }
 const startName = () => (start.names ? pick(start.names) : start.kind === 'gps' ? t('start.here') : start.kind === 'map' ? t('start.picked') : start.name);
+// «Только туда» for the answer on screen: what was asked, not the switch now; a saved demo answer is always there and back.
+const isOneWay = () => request?.returnToStart === false && !result?.demo;
+const reach = () => reachMeters(plan.minutes, plan.maxWalk, plan.reserve, plan.oneWay);
 // The answer's own start: the person's start, or the saved scenario's start for an offline demo answer.
 const origin = () => result?.demo?.start || start;
 const originName = () => (result?.demo ? pick(result.demo.start.names) : startName());
@@ -167,9 +175,30 @@ function render() {
 
 function renderPlan() {
   const minutesGroup = h('div', { class: 'segmented', role: 'radiogroup', 'aria-label': t('plan.title') },
-    MINUTES.map((value) => h('button', { type: 'button', role: 'radio', class: 'seg', 'aria-checked': String(plan.minutes === value),
-      onclick: () => { plan.minutes = value; savePlan(); updatePlanLive(); minutesGroup.querySelectorAll('.seg').forEach((b, i) => b.setAttribute('aria-checked', String(MINUTES[i] === value))); } },
-    h('span', { class: 'num', text: value === 120 ? t('plan.2h') : value }), value === 120 ? null : h('small', { text: t('plan.min', { n: '' }).trim() }))));
+    MINUTES.map((value) => h('button', { type: 'button', role: 'radio', class: 'seg', dataset: { minutes: value }, 'aria-checked': String(plan.minutes === value),
+      onclick: () => setMinutes(value) },
+    // Two hours as «2» over «ч», like the minutes and «2+» next to it: one line each, also in Kazakh on a narrow phone.
+    h('span', { class: 'num', text: value === 120 ? '2' : value }), h('small', { text: value === 120 ? t('plan.hoursUnit') : t('plan.min', { n: '' }).trim() }))),
+    h('button', { type: 'button', role: 'radio', class: 'seg seg-long', 'aria-label': t('plan.longLabel'), 'aria-checked': String(plan.minutes > 120),
+      onclick: () => setMinutes(plan.minutes > 120 ? plan.minutes : LONG_DEFAULT) }, h('span', { class: 'num', text: '2+' }), h('small', { text: t('plan.hoursUnit') })));
+  const longGroup = h('div', { class: 'segmented segmented-sm long-group', role: 'radiogroup', 'aria-label': t('plan.longLabel'), hidden: plan.minutes <= 120 },
+    LONG.map((value) => h('button', { type: 'button', role: 'radio', class: 'seg', dataset: { minutes: value }, 'aria-checked': String(plan.minutes === value),
+      onclick: () => setMinutes(value) }, h('span', { class: 'num', text: hoursLabel(value) }))));
+  function setMinutes(value) {
+    plan.minutes = value; savePlan(); updatePlanLive();
+    minutesGroup.querySelectorAll('.seg').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.minutes ? Number(b.dataset.minutes) === value : value > 120)));
+    longGroup.querySelectorAll('.seg').forEach((b) => b.setAttribute('aria-checked', String(Number(b.dataset.minutes) === value)));
+    longGroup.hidden = value <= 120;
+  }
+
+  // «Только туда»: the walk ends at the place, so the time is the way there, the visit and the reserve.
+  const tripGroup = h('div', { class: 'segmented segmented-sm trip-group', role: 'radiogroup', 'aria-label': t('plan.trip') },
+    [false, true].map((oneWay) => h('button', { type: 'button', role: 'radio', class: 'seg', dataset: { trip: oneWay ? 'one' : 'round' }, 'aria-checked': String(Boolean(plan.oneWay) === oneWay),
+      onclick: () => setTrip(oneWay) }, h('span', { class: 'seg-line' }, icon(oneWay ? 'flag' : 'loop', 'icon-xs'), t(oneWay ? 'plan.oneWay' : 'plan.round')))));
+  function setTrip(oneWay) {
+    plan.oneWay = oneWay; savePlan(); updatePlanLive();
+    tripGroup.querySelectorAll('.seg').forEach((b) => b.setAttribute('aria-checked', String((b.dataset.trip === 'one') === oneWay)));
+  }
 
   const query = h('input', { id: 'query', class: 'field-input', type: 'search', enterkeyhint: 'search', autocomplete: 'off', spellcheck: 'false', maxlength: 400,
     placeholder: t('plan.queryPlaceholder'), value: plan.query, 'aria-label': t('plan.queryLabel') });
@@ -209,8 +238,8 @@ function renderPlan() {
   const cta = h('button', { class: 'btn btn-gold btn-xl cta', type: 'button', onclick: submit }, h('span', { class: 'cta-main' }, icon('sparkle'), t('plan.submit')), returnLine);
   cta.addEventListener('refresh', () => updatePlanLive());
   function updatePlanLive() {
-    returnLine.textContent = t('plan.returnBy', { time: time(leaveAt() + plan.minutes * 60000) });
-    layers.updateReach(start, reachMeters(plan.minutes, plan.maxWalk, plan.reserve));
+    returnLine.textContent = t(plan.oneWay ? 'plan.doneBy' : 'plan.returnBy', { time: time(leaveAt() + plan.minutes * 60000) });
+    layers.updateReach(start, reach());
   }
 
   const weatherHost = h('div');
@@ -223,6 +252,8 @@ function renderPlan() {
     h('div', { class: 'plan-top' }, h('p', { class: 'eyebrowless', text: greeting() }), h('div', { class: 'plan-top-side' }, outdoor, weatherHost)),
     h('h1', { id: 'plan-title', class: 'title-1', text: t('plan.title') }),
     minutesGroup,
+    longGroup,
+    tripGroup,
     h('div', { class: 'search-field' }, icon('search', 'search-icon'), query, mic),
     moods,
     startRow,
@@ -325,10 +356,12 @@ function onPhrase(text) {
   if (command === 'stop') { voiceTurns = 0; stopSpeaking(); return; }
   if (command === 'go' && hasResults) { voiceTurns = 0; startPlace(recs[selected] || recs[0], true); return; }
   if (typeof command === 'number' && hasResults && recs[command]) { speakNext = true; openResult(command); return; }
-  // A follow-up that only changes the time ("а на полчаса?") keeps the previous wishes.
+  // A follow-up that only changes the time ("а на полчаса?", "а только туда?") keeps the previous wishes.
   const said = understand(text);
-  if (said.minutes && voiceTurns > 1 && said.query.replace(/[^\p{L}\d]+/gu, '').length < 3) plan.minutes = said.minutes;
-  else { plan.query = text; plan.mood = null; root?.querySelectorAll('.chip[data-mood]').forEach((chip) => chip.setAttribute('aria-pressed', 'false')); }
+  if ((said.minutes || said.oneWay !== null) && voiceTurns > 1 && said.query.replace(/[^\p{L}\d]+/gu, '').length < 3) {
+    if (said.minutes) plan.minutes = said.minutes;
+    if (said.oneWay !== null) plan.oneWay = said.oneWay;
+  } else { plan.query = text; plan.mood = null; root?.querySelectorAll('.chip[data-mood]').forEach((chip) => chip.setAttribute('aria-pressed', 'false')); }
   savePlan();
   submit({ spoken: true });
 }
@@ -349,16 +382,17 @@ const timingOf = (place) => ({ distanceMeters: place.distanceMeters, walkMinutes
 
 function startPlace(place, spoken) {
   const timing = timingOf(place);
-  startWalk({ place, start: origin(), timing, backAt: backOf(place) });
+  const oneWay = isOneWay();
+  startWalk({ place, start: origin(), timing, backAt: backOf(place), oneWay });
   view = 'live'; render();
-  if (spoken) speakText(t('voice.go', { name: place.name, time: backOf(place) }));
+  if (spoken) speakText(t(oneWay ? 'voice.goOne' : 'voice.go', { name: place.name, time: backOf(place) }));
 }
 
 function drawPlanMap() {
   layers.hidePins(); layers.hideRoutes(); layers.hidePrivacyCell();
   layers.showStart(start, startName(), { tag: true });
-  layers.showReach(start, reachMeters(plan.minutes, plan.maxWalk, plan.reserve));
-  const radius = reachMeters(plan.minutes, plan.maxWalk, plan.reserve);
+  const radius = reach();
+  layers.showReach(start, radius);
   const dLat = radius / 111320; const dLon = radius / (111320 * Math.cos(start.lat * Math.PI / 180));
   if (getMap()) fitPoints([[start.lon - dLon, start.lat - dLat], [start.lon + dLon, start.lat + dLat]], { maxZoom: 15, duration: 600 });
 }
@@ -426,7 +460,7 @@ function renderPick() {
 
 // ---------- request ----------
 function buildRequest(surprise = false) {
-  const body = { ...outbound(start), minutes: plan.minutes, maxWalkMinutes: plan.maxWalk, query: plan.query.trim(), withChild: plan.mood === 'kids', category: 'any', returnToStart: true, lang: lang(),
+  const body = { ...outbound(start), minutes: plan.minutes, maxWalkMinutes: plan.maxWalk, query: plan.query.trim(), withChild: plan.mood === 'kids', category: 'any', returnToStart: !plan.oneWay, lang: lang(),
     reserveMinutes: RESERVES.includes(plan.reserve) ? plan.reserve : defaults.reserve };
   if (plan.when !== 'now') body.visitDate = isoWithOffset(leaveAt());
   const hidden = [...store.hiddenIds(), ...(surprise ? surpriseSeen : [])];
@@ -445,8 +479,11 @@ function askForStart() {
 async function submit(options) {
   speakNext = options?.spoken === true;
   if (!speakNext) voiceTurns = 0;
+  // «3 часа», «только туда»: the time and the way back said in the request set the switches, and the rest stays the request.
   const said = understand(plan.query);
-  if (said.minutes) { plan.minutes = said.minutes; plan.query = said.query; plan.mood = null; savePlan(); }
+  if (said.minutes) plan.minutes = said.minutes;
+  if (said.oneWay !== null) plan.oneWay = said.oneWay;
+  if (said.minutes || said.oneWay !== null) { plan.query = said.query; plan.mood = null; savePlan(); }
   // «час у меги», «от Байтерека»: a start named in the request becomes the start, and the rest stays the request.
   const named = startFrom(plan.query);
   if (named) {
@@ -517,6 +554,7 @@ function shareLink() {
   const url = new URL(location.origin);
   url.searchParams.set('t', String(plan.minutes));
   if (plan.maxWalk !== defaults.maxWalk) url.searchParams.set('w', String(plan.maxWalk));
+  if (plan.oneWay) url.searchParams.set('one', '1');
   if (plan.query) url.searchParams.set('q', plan.query);
   if (start.kind === 'preset') url.searchParams.set('from', start.id);
   else { url.searchParams.set('lat', start.lat.toFixed(5)); url.searchParams.set('lon', start.lon.toFixed(5)); }
@@ -560,7 +598,7 @@ function renderResults() {
     demo ? demoBanner(demo) : null,
     h('h2', { id: 'results-title', class: 'title-1', text: t(surprise ? 'results.surprise' : 'results.title', { min: minutes }) }),
     h('p', { class: 'meta' }, icon('pin', 'icon-xs'), t('results.start', { name: originName() }), h('span', { class: 'meta-sep', 'aria-hidden': 'true' }),
-      demo ? t('demo.at', { time: demo.time }) : t('plan.returnBy', { time: time(leave + request.minutes * 60000) })),
+      demo ? t('demo.at', { time: demo.time }) : t(isOneWay() ? 'results.oneWayBy' : 'plan.returnBy', { time: time(leave + request.minutes * 60000) })),
     surprise ? h('p', { class: 'surprise-note' }, icon('sparkle', 'icon-xs'), h('span', { text: surprise.poolSize > 1 ? t('surprise.notePool', { n: surprise.poolSize }) : t('surprise.note') })) : null,
     // The Gemini tip compares all the options, so it stays out when only the surprise is shown.
     surprise ? null : tip,
@@ -577,7 +615,7 @@ function renderResults() {
     // The Gemini tip is read through its own «Слушать» button, so «Стоп» there also ends the conversation.
     const listen = llm && !surprise && tip.querySelector('.listen-btn');
     if (listen?.play) answer(null, listen.play());
-    else answer(t('voice.answer', { n: recs.length, name: recs[0].name, walk: recs[0].walkMinutes, time: backOf(recs[0]) }));
+    else answer(t(isOneWay() ? 'voice.answerOne' : 'voice.answer', { n: recs.length, name: recs[0].name, walk: recs[0].walkMinutes, time: backOf(recs[0]) }));
   }
 }
 
@@ -648,7 +686,7 @@ function routeCard(route) {
   return h('section', { class: 'route-card' },
     h('div', { class: 'route-head' }, h('span', { class: 'route-icon', 'aria-hidden': 'true' }, icon('route')),
       h('div', {}, h('strong', { text: t('results.route', { n: stops.length }) }),
-        h('small', { class: 'num', text: t('results.routeMeta', { n: route.totalMinutes, time: route.backBy || '' }) }))),
+        h('small', { class: 'num', text: t(route.returnToStart === false ? 'results.routeMetaOne' : 'results.routeMeta', { n: route.totalMinutes, time: route.backBy || '' }) }))),
     h('ol', { class: 'route-stops' }, stops.map((stop) => h('li', {},
       h('span', { class: 'route-time num', text: stop.arriveAt || '' }),
       h('span', { class: 'row-text' }, h('strong', { text: stop.name }), h('small', { text: t('results.routeStop', { walk: stop.walkFromPreviousMinutes, visit: stop.visitMinutes }) }))))),
@@ -734,24 +772,25 @@ function renderEmpty(back) {
   // The nearest place and «no options» are already said by the screen itself.
   const notes = notesView([], { skip: /^(?:Ближе всего подходит|В текущем наборе данных нет)/ });
   const actions = [];
-  if (plan.minutes < 180) actions.push(h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { plan.minutes = Math.min(180, plan.minutes + 15); savePlan(); submit(); } }, icon('plus'), t('results.empty.add')));
+  const oneWay = isOneWay();
+  if (plan.minutes < MAX_MINUTES) actions.push(h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { plan.minutes = Math.min(MAX_MINUTES, plan.minutes + 15); savePlan(); submit(); } }, icon('plus'), t('results.empty.add')));
   if (plan.maxWalk < 30) actions.push(h('button', { class: 'btn btn-quiet', type: 'button', onclick: () => { plan.maxWalk = 30; savePlan(); submit(); } }, icon('walk'), t('results.empty.walk')));
   if (plan.query) actions.push(h('button', { class: 'btn btn-quiet', type: 'button', onclick: () => { plan.query = ''; plan.mood = null; savePlan(); submit(); } }, icon('close'), t('results.empty.clear')));
   const nearest = result?.nearestBeyondLimits;
-  if (nearest?.neededMinutes && nearest.neededMinutes <= 180) {
-    const minutes = Math.min(180, Math.ceil(nearest.neededMinutes / 15) * 15);
+  if (nearest?.neededMinutes && nearest.neededMinutes <= MAX_MINUTES) {
+    const minutes = Math.min(MAX_MINUTES, Math.ceil(nearest.neededMinutes / 15) * 15);
     actions.unshift(h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { plan.minutes = minutes; plan.maxWalk = Math.max(plan.maxWalk, Math.min(60, nearest.walkMinutes)); savePlan(); submit(); } },
       icon('plus'), t('results.empty.take', { n: minutes })));
   }
   clear(root, h('section', { class: 'view state-view' }, h('div', { class: 'view-bar' }, back, voiceButton()),
     h('div', { class: 'state-icon', 'aria-hidden': 'true' }, icon('compass')),
-    h('h2', { class: 'title-2', text: t('results.empty.title') }), h('p', { class: 'lead', text: t('results.empty.text') }),
+    h('h2', { class: 'title-2', text: t('results.empty.title') }), h('p', { class: 'lead', text: t(oneWay ? 'results.empty.textOne' : 'results.empty.text') }),
     nearest ? h('div', { class: 'pairing nearest' }, categoryArt(nearest.category, 36, 'art'), h('span', { class: 'row-text' }, h('small', { text: t('results.nearest') }), h('strong', { text: nearest.name }),
-      h('small', { text: t('results.nearestValue', { walk: nearest.walkMinutes, n: nearest.neededMinutes }) }))) : null,
+      h('small', { text: t(oneWay ? 'results.nearestValueOne' : 'results.nearestValue', { walk: nearest.walkMinutes, n: nearest.neededMinutes }) }))) : null,
     notes.notices,
     h('div', { class: 'stack' }, actions),
     notes.unchecked));
-  layers.hidePins(); layers.hideRoutes(); layers.showReach(start, reachMeters(plan.minutes, plan.maxWalk, plan.reserve));
+  layers.hidePins(); layers.hideRoutes(); layers.showReach(start, reach());
   if (speakNext) answer(`${t('results.empty.title')} ${nearest?.name ? t('voice.nearest', { name: nearest.name, n: nearest.neededMinutes }) : ''}`);
 }
 
@@ -784,10 +823,10 @@ function renderPlace() {
   clear(root, placeView({ place, timing, start, serverHours: place.hoursCheck, why: whyText(place), activities: place.activities || [], warnings: warningTexts(place),
     backLabel: t('common.back'), onBack: () => { view = 'results'; render(); },
     onStart: () => { voiceTurns = 0; view = 'ready'; render(); }, voice: voiceButton(), onHide: () => hidePlace(place),
-    routeInfo: lastRoute?.id === place.id ? lastRoute.route : null, shareUrl: url.href, backAt: backOf(place), spareAt: place.plan?.spareUntil || null }));
+    routeInfo: lastRoute?.id === place.id ? lastRoute.route : null, shareUrl: url.href, backAt: backOf(place), spareAt: place.plan?.spareUntil || null, oneWay: isOneWay() }));
   // Opened by voice («второй»): say why it fits and how long it takes, then wait for «поехали».
   // The server's «why» is written for reading (all the minutes), so only Gemini's idea is said aloud.
-  if (speakNext) answer(`${place.name}. ${place.aiWhy || ''} ${t('voice.place', { walk: place.walkMinutes, time: backOf(place) })}`);
+  if (speakNext) answer(`${place.name}. ${place.aiWhy || ''} ${t(isOneWay() ? 'voice.placeOne' : 'voice.place', { walk: place.walkMinutes, time: backOf(place) })}`);
   layers.selectPin(selected);
   layers.selectRoute(selected);
   fitPoints([[start.lon, start.lat], [place.lon, place.lat]], { maxZoom: 17 });
@@ -821,7 +860,7 @@ function hidePlace(place) {
 function renderReady() {
   const place = result?.recommendations?.[selected];
   if (!place) { view = 'results'; render(); return; }
-  clear(root, readyView({ place, timing: timingOf(place), backAt: backOf(place), serverHours: place.hoursCheck,
+  clear(root, readyView({ place, timing: timingOf(place), backAt: backOf(place), serverHours: place.hoursCheck, oneWay: isOneWay(),
     onGo: () => startPlace(place), onBack: () => { view = 'place'; render(); } }));
 }
 
@@ -843,7 +882,9 @@ function applyUrl() {
   const params = new URLSearchParams(location.search);
   if (!params.has('t') && !params.has('q') && !params.has('from') && !params.has('lat')) return false;
   const minutes = Number(params.get('t'));
-  if (minutes >= 10 && minutes <= 180) plan.minutes = minutes;
+  if (minutes >= 10 && minutes <= MAX_MINUTES) plan.minutes = minutes;
+  // A link says the whole walk: without one=1 it is there and back.
+  plan.oneWay = params.get('one') === '1';
   const maxWalk = Number(params.get('w'));
   if (maxWalk >= 1 && maxWalk <= 60) plan.maxWalk = maxWalk;
   if (params.has('q')) { plan.query = params.get('q').slice(0, 400); plan.mood = null; }

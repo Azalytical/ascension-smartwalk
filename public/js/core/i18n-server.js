@@ -2,7 +2,7 @@
 // The server sends each one as a key with params too; ui/server-text.js builds the line from these templates.
 // Russian needs nothing here: the app shows the server's own text.
 export const en = {
-  'u.time': '{minutes} min in total, up to {maxWalk} min on foot each way{back}, {reserve} min spare', 'u.timeBack': ', returning to the start',
+  'u.time': '{minutes} min in total, up to {maxWalk} min on foot each way{back}, {reserve} min spare', 'u.timeBack': ', returning to the start', 'u.timeOneWay': ', one way only',
   'u.categories': 'Categories: {list}', 'u.semantic': 'Request meaning by Gemini embeddings: {list}', 'u.excluded': 'Without: {list}',
   'u.child': 'With a child', 'u.childFromQuery': 'With a child (understood from the request)', 'u.sightseeing': 'See the city: sights, museums, parks',
   'u.night': 'Late evening: only places open for the visit', 'u.nightShifted': 'Late evening: opening hours checked for today, 22:00',
@@ -95,7 +95,7 @@ export const en = {
 };
 
 export const kk = {
-  'u.time': 'Барлығы {minutes} мин, бір бағытқа жаяу {maxWalk} минутқа дейін{back}, қор {reserve} мин', 'u.timeBack': ', бастапқы нүктеге оралып',
+  'u.time': 'Барлығы {minutes} мин, бір бағытқа жаяу {maxWalk} минутқа дейін{back}, қор {reserve} мин', 'u.timeBack': ', бастапқы нүктеге оралып', 'u.timeOneWay': ', тек бару',
   'u.categories': 'Санаттар: {list}', 'u.semantic': 'Gemini эмбеддингтері бойынша сұрау мағынасы: {list}', 'u.excluded': 'Қоспағанда: {list}',
   'u.child': 'Баламен', 'u.childFromQuery': 'Баламен (сұраудан түсінілді)', 'u.sightseeing': 'Қаланы көру: көрікті жерлер, мұражайлар, саябақтар',
   'u.night': 'Кешкі уақыт: тек бару уақытында ашық орындар', 'u.nightShifted': 'Кешкі уақыт: жұмыс уақыты бүгінгі 22:00-ге тексерілді',

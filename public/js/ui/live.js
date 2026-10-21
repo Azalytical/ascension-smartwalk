@@ -1,5 +1,6 @@
 // "Walk in progress": a return countdown computed from timestamps, phases there / on site / back,
 // a single turnaround alert, and the screen kept awake. The walk survives reloads (store key "walk").
+// «Только туда» (walk.oneWay): no way back, so the walk ends on site and the countdown is to «закончите к».
 import { h, icon, clear } from '../core/dom.js';
 import { t, time } from '../core/i18n.js';
 import { haversine } from '../core/geo.js';
@@ -9,15 +10,17 @@ import { navLinks, categoryArt, watchButton } from './common.js';
 import { toast, announce } from './toast.js';
 import { ratingBlock } from './rating.js';
 import { replanBlock } from './replan.js';
+import './trip.js';
 import { marker, fitPoints, userDot } from '../map/map.js';
 import { showStart, showRoutes, upgradeRoute, hideRoutes, hideStart } from '../map/layers.js';
 
 const PHASES = ['there', 'visit', 'back'];
+const phasesOf = (walk) => (walk.oneWay ? PHASES.slice(0, 2) : PHASES);
 
 /** `backAt` is the «вернётесь к» the card and the voice already said (the server's plan.backAt), kept when the walk starts on time. */
-export function startWalk({ place, start, timing, backAt = null }) {
+export function startWalk({ place, start, timing, backAt = null, oneWay = false }) {
   const walk = {
-    startedAt: Date.now(), promised: backAt, phase: 'there', phaseAt: { there: Date.now() }, alerted: false,
+    startedAt: Date.now(), promised: backAt, phase: 'there', phaseAt: { there: Date.now() }, alerted: false, oneWay,
     place: { id: place.id, name: place.name, category: place.category, lat: place.lat, lon: place.lon },
     start: { name: start.name, lat: start.lat, lon: start.lon, kind: start.kind },
     plan: { there: Math.ceil(timing.walkMinutes), visit: Math.ceil(timing.visitMinutes), back: Math.ceil(timing.returnMinutes), reserve: Math.ceil(timing.safetyReserveMinutes ?? 5), total: Math.ceil(timing.totalMinutes) },
@@ -88,9 +91,10 @@ export function mountLive(container, { onFinished }) {
   };
 
   const advance = () => {
-    const index = PHASES.indexOf(walk.phase);
-    if (index === PHASES.length - 1) { finish(); return; }
-    const phase = PHASES[index + 1];
+    const phases = phasesOf(walk);
+    const index = phases.indexOf(walk.phase);
+    if (index === phases.length - 1) { finish(); return; }
+    const phase = phases[index + 1];
     walk = { ...walk, phase, phaseAt: { ...walk.phaseAt, [phase]: Date.now() } };
     store.set('walk', walk);
     if (phase === 'back') announce(t('live.phase.back'));
@@ -111,28 +115,34 @@ export function mountLive(container, { onFinished }) {
     clear(ringHost, timeRing({ there: walk.plan.there, visit: walk.plan.visit, back: walk.plan.back, reserve: walk.plan.reserve, size: 148, stroke: 12, progress, className: 'ring-live' }));
     countdown.textContent = `${remaining < 0 ? '+' : ''}${clock(remaining)}`;
     replan.element.hidden = walk.phase === 'back';
-    countLabel.textContent = toEnd < 0 ? t('live.over') : toBack < 0 ? t('live.inReserve') : t('live.toReturn');
+    countLabel.textContent = toEnd < 0 ? t('live.over') : toBack < 0 ? t('live.inReserve') : t(walk.oneWay ? 'live.toEnd' : 'live.toReturn');
     ringHost.append(h('div', { class: 'ring-center' }, countdown, countLabel));
     ringHost.classList.toggle('is-over', toEnd < 0);
-    returnLine.replaceChildren(icon('return'), t('live.returnBy', { time: backAt(walk) }));
+    returnLine.replaceChildren(icon(walk.oneWay ? 'flag' : 'return'), t(walk.oneWay ? 'live.doneBy' : 'live.returnBy', { time: backAt(walk) }));
     spareLine.textContent = walk.plan.reserve > 0 ? t('live.spareBy', { time: time(walk.startedAt + walk.plan.total * 60000) }) : '';
 
     const sincePhase = (now - (walk.phaseAt[walk.phase] || walk.startedAt)) / 60000;
     const left = walk.phase === 'there' ? walk.plan.there - sincePhase : walk.phase === 'visit' ? walk.plan.visit - sincePhase : walk.plan.back - sincePhase;
     phaseLine.textContent = t(walk.phase === 'there' ? 'live.thereLeft' : walk.phase === 'visit' ? 'live.visitLeft' : 'live.backLeft', { n: Math.max(0, Math.ceil(left)) });
-    stepper.replaceChildren(...PHASES.map((phase, i) => h('li', { class: i < PHASES.indexOf(walk.phase) ? 'is-done' : phase === walk.phase ? 'is-current' : '' }, h('span', { class: 'step-dot', 'aria-hidden': 'true' }, i < PHASES.indexOf(walk.phase) ? icon('check') : null), t(`live.phase.${phase}`))));
-    action.replaceChildren(icon(walk.phase === 'back' ? 'flag' : walk.phase === 'visit' ? 'return' : 'pin'), t(walk.phase === 'there' ? 'live.arrived' : walk.phase === 'visit' ? 'live.goBack' : 'live.done'));
+    const phases = phasesOf(walk);
+    stepper.classList.toggle('is-one-way', Boolean(walk.oneWay));
+    stepper.replaceChildren(...phases.map((phase, i) => h('li', { class: i < phases.indexOf(walk.phase) ? 'is-done' : phase === walk.phase ? 'is-current' : '' }, h('span', { class: 'step-dot', 'aria-hidden': 'true' }, i < phases.indexOf(walk.phase) ? icon('check') : null), t(`live.phase.${phase}`))));
+    // One way, the visit is the last step: the button ends the walk there.
+    const last = walk.phase === 'back' || (walk.oneWay && walk.phase === 'visit');
+    action.replaceChildren(icon(last ? 'flag' : walk.phase === 'visit' ? 'return' : 'pin'),
+      t(walk.phase === 'there' ? 'live.arrived' : walk.phase === 'back' ? 'live.done' : walk.oneWay ? 'live.endWalk' : 'live.goBack'));
 
-    // One turnaround alert: when the planned time to leave the place has come.
+    // One turnaround alert: when the planned time to leave the place has come (one way, when the time on site is up).
     const turnaroundAt = walk.startedAt + (walk.plan.there + walk.plan.visit) * 60000;
     if (walk.phase !== 'back' && now >= turnaroundAt) {
+      const alertText = t(walk.oneWay ? 'live.timeUp' : 'live.turnaround', { time: backAt(walk) });
       alertBox.hidden = false;
-      alertBox.replaceChildren(icon('return'), h('span', { text: t('live.turnaround', { time: backAt(walk) }) }));
+      alertBox.replaceChildren(icon(walk.oneWay ? 'flag' : 'return'), h('span', { text: alertText }));
       if (!walk.alerted) {
         walk = { ...walk, alerted: true };
         store.set('walk', walk);
         navigator.vibrate?.([220, 120, 220]);
-        announce(t('live.turnaround', { time: backAt(walk) }));
+        announce(alertText);
       }
     } else alertBox.hidden = true;
   }
@@ -168,7 +178,7 @@ export function mountLive(container, { onFinished }) {
       const late = finished.late;
       clear(container, h('section', { class: 'view live-done' },
         h('div', { class: `done-badge${late ? ' is-late' : ''}` }, icon(late ? 'clock' : 'check')),
-        h('h2', { class: 'title-1', text: late ? t('live.finished.late', { n: late }) : t('live.finished.title') }),
+        h('h2', { class: 'title-1', text: late ? t(walk.oneWay ? 'live.finished.lateOne' : 'live.finished.late', { n: late }) : t(walk.oneWay ? 'live.finished.titleOne' : 'live.finished.title') }),
         h('p', { class: 'lead', text: t('live.finished.text', { n: finished.minutes, plan: walk.plan.total }) }),
         h('div', { class: 'done-place' }, categoryArt(walk.place.category, 40), h('strong', { text: walk.place.name })),
         ratingBlock(walk.place, { prompt: true }),

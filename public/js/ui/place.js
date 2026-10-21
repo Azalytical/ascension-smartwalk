@@ -10,11 +10,14 @@ import { categoryArt, categoryName, hoursStatus, hoursChip, navLinks, share, bac
 import { toast } from './toast.js';
 import { ratingBlock, ratingChip } from './rating.js';
 import { confidenceReasons, notabilityReasons, planSteps } from './server-text.js';
+import './trip.js';
 
 const WHEELCHAIR = { yes: 'place.wheelchair.yes', limited: 'place.wheelchair.limited', no: 'place.wheelchair.no' };
 
-export function placeView({ place, timing, start, serverHours, why, activities = [], warnings = [], onBack, backLabel, onStart, routeInfo, shareUrl, voice = null, backAt = null, spareAt = null, onHide = null }) {
+export function placeView({ place, timing, start, serverHours, why, activities = [], warnings = [], onBack, backLabel, onStart, routeInfo, shareUrl, voice = null, backAt = null, spareAt = null, onHide = null, oneWay = false }) {
   const back = backAt || backTime(timing);
+  // «Только туда»: no «Обратно» in the legend, and the clock time is when the walk ends.
+  const backText = t(oneWay ? 'place.doneNow' : 'place.returnNow', { time: back });
   const versus = versusText(place);
   const hours = hoursStatus(place, timing.walkMinutes, timing.visitMinutes, serverHours);
   const saved = store.isSaved(place.id);
@@ -27,11 +30,11 @@ export function placeView({ place, timing, start, serverHours, why, activities =
     saveButton.replaceChildren(icon(now ? 'heart-fill' : 'heart'));
     toast(t(now ? 'toast.saved' : 'toast.unsaved'), { iconName: now ? 'heart-fill' : 'heart' });
   });
-  const shareButton = h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: place.name, text: `${place.name}: ${t('place.returnNow', { time: back })}`, url: shareUrl }) }, icon('share'));
+  const shareButton = h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('place.share'), onclick: () => share({ title: place.name, text: `${place.name}: ${backText}`, url: shareUrl }) }, icon('share'));
 
   const total = Math.ceil(timing.totalMinutes);
   const legend = [['there', 'place.there', timing.walkMinutes], ['visit', 'place.visit', timing.visitMinutes], ['back', 'place.back', timing.returnMinutes], ['reserve', 'place.reserve', timing.safetyReserveMinutes]]
-    .map(([key, label, value]) => h('li', { class: `legend-${key}` }, h('span', { class: 'legend-dot', 'aria-hidden': 'true' }), h('span', { text: t(label) }), h('strong', { class: 'num', text: t('plan.min', { n: Math.ceil(value) }) })));
+    .filter(([key]) => !(oneWay && key === 'back')).map(([key, label, value]) => h('li', { class: `legend-${key}` }, h('span', { class: 'legend-dot', 'aria-hidden': 'true' }), h('span', { text: t(label) }), h('strong', { class: 'num', text: t('plan.min', { n: Math.ceil(value) }) })));
 
   const facts = [];
   if (place.openingHours) facts.push(row('clock', t('place.hours'), place.openingHours));
@@ -71,7 +74,7 @@ export function placeView({ place, timing, start, serverHours, why, activities =
         h('div', { class: 'place-badges' }, hoursChip(hours), confidenceChip(place.confidence), notabilityChip(place.notability), ratingChip(place)))),
     h('section', { class: 'time-card' },
       timeRing({ there: timing.walkMinutes, visit: timing.visitMinutes, back: timing.returnMinutes, reserve: timing.safetyReserveMinutes, size: 132, stroke: 13, label: `${total}`, sublabel: t('plan.min', { n: '' }).trim() }),
-      h('div', { class: 'time-card-side' }, h('ul', { class: 'legend' }, legend), h('p', { class: 'return-by' }, icon('return'), t('place.returnNow', { time: back })),
+      h('div', { class: 'time-card-side' }, h('ul', { class: 'legend' }, legend), h('p', { class: 'return-by' }, icon(oneWay ? 'flag' : 'return'), backText),
         spareAt ? h('p', { class: 'spare-by', text: t('live.spareBy', { time: spareAt }) }) : null)),
     routeLine,
     versus ? h('p', { class: 'versus-line' }, icon('check', 'icon-xs'), h('span', {}, h('strong', { text: `${t('place.versus')} ` }), versus)) : null,

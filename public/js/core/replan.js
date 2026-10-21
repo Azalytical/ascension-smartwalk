@@ -1,7 +1,8 @@
 // «Что-то пошло не так» during a walk, worked out on the phone from the place list: nothing here is sent anywhere.
 // The promised «вернётесь к» stays: a new place must fit the way there from where the person is, the visit and the way
 // back to the start before that time, and the walk's reserve stays on top. With nothing that fits, the answer is when
-// the person would be back by turning round now.
+// the person would be back by turning round now. A one-way walk (walk.oneWay) has no way back: a new place must fit
+// the way there and the visit before the promised «закончите к».
 import { haversine, walkMinutes, VISIT } from './geo.js';
 
 const INDOOR = ['mall', 'museum', 'cafe', 'restaurant', 'culture'];
@@ -40,7 +41,7 @@ export function alternatives(walk, items, { reason, here, now, hoursAt }) {
     const there = walkMinutes(haversine(here.lat, here.lon, place.lat, place.lon));
     if (there > MAX_WALK) continue;
     const visit = VISIT[place.category] ?? 20;
-    const back = walkMinutes(haversine(place.lat, place.lon, walk.start.lat, walk.start.lon));
+    const back = walk.oneWay ? 0 : walkMinutes(haversine(place.lat, place.lon, walk.start.lat, walk.start.lon));
     if (there + visit + back > left) continue;
     let hours = null;
     if (place.openingHours) {

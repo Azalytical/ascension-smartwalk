@@ -94,6 +94,9 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .cta-main { display: inline-flex; align-items: center; gap: var(--s-2); }
 .cta-sub { font-size: var(--fs-13); font-weight: 550; opacity: .72; }
 .plan-more { margin-top: 0; }
+/* «2+ ч» (2,5, 3, 4 ч) and «Туда и обратно / Только туда» sit close under the time they belong to. */
+.plan-view .long-group, .plan-view .trip-group { margin-top: -6px; }
+.seg-line { display: inline-flex; align-items: center; gap: 6px; }
 .ideas { display: flex; gap: 10px; overflow-x: auto; margin-inline: calc(var(--s-4) * -1); padding: 2px var(--s-4) 4px; scrollbar-width: none; scroll-snap-type: x proximity; touch-action: pan-x; }
 .ideas::-webkit-scrollbar { display: none; }
 .idea { flex: none; width: 216px; display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: var(--r-lg); background: var(--surface); text-align: left; scroll-snap-align: start; transition: transform var(--t-press) var(--ease-out); }
@@ -195,6 +198,8 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .live-alert { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: var(--r-md); background: var(--amber-soft); color: var(--ink); font-weight: 650; }
 .live-alert .icon { color: var(--amber); }
 .stepper { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+/* «Только туда»: two steps, there and on site. */
+.stepper.is-one-way { grid-template-columns: repeat(2, 1fr); }
 .stepper li { display: grid; justify-items: center; gap: 6px; font-size: var(--fs-13); color: var(--ink-3); text-align: center; position: relative; }
 .stepper .step-dot { width: 26px; height: 26px; border-radius: 50%; background: var(--surface-3); display: grid; place-items: center; color: var(--on-ink); }
 .stepper .step-dot .icon { width: 15px; height: 15px; }

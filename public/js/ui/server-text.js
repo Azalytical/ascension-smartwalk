@@ -24,7 +24,7 @@ function common(params = {}) {
 // Templates that need a choice or a piece built from params; the rest are `${prefix}.${key}` filled with common(params).
 const SPECIAL = {
   u: {
-    time: (p) => t('u.time', { ...p, back: p.returnToStart ? t('u.timeBack') : '' }),
+    time: (p) => t('u.time', { ...p, back: t(p.returnToStart ? 'u.timeBack' : 'u.timeOneWay') }),
     categories: (p) => t('u.categories', { list: categories(p.categories) }),
     semantic: (p) => t('u.semantic', { list: categories(p.categories) }),
     excluded: (p) => t('u.excluded', { list: categories(p.categories) }),

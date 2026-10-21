@@ -33,14 +33,14 @@ test('return budget and max outbound time are enforced independently', () => {
 
 test('finite coordinates, Astana bounds, time, and boolean inputs are validated', () => {
   for (const invalid of [null, {}, { ...start, lat: NaN }, { ...start, lon: Infinity }, { ...start, lat: 50.99 },
-    { ...start, lat: 51.351 }, { ...start, lon: 71.7 }, { ...start, minutes: 9 }, { ...start, minutes: 181 },
+    { ...start, lat: 51.351 }, { ...start, lon: 71.7 }, { ...start, minutes: 9 }, { ...start, minutes: 241 },
     { ...start, minutes: null }, { ...start, lat: '' }, { ...start, maxWalkMinutes: 0 },
     { ...start, withChild: 'true' }, { ...start, returnToStart: 'false' }, { ...start, query: [] },
     { ...start, category: 'casino' }, { ...start, visitDate: 'yesterday' }]) {
     assert.throws(() => recommend([], invalid), error => error.code === 'INVALID_INPUT' && error.status === 400);
   }
   assert.doesNotThrow(() => recommend([], { lat: '51.0', lon: '71.25', minutes: 10 }));
-  assert.doesNotThrow(() => recommend([], { lat: 51.35, lon: 71.65, minutes: 180 }));
+  assert.doesNotThrow(() => recommend([], { lat: 51.35, lon: 71.65, minutes: 240 }));
 });
 
 test('dataset wrapper accepted and unknown fields stay unknown', () => {
