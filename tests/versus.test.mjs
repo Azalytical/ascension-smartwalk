@@ -45,6 +45,11 @@ test('a minute closer on foot but clearly nearer in metres says so; unconfirmed 
   assert.deepEqual(reasons(pair.find(card => card.id === open.id)).map(([key]) => key), ['hoursConfirmed']);
   assert.deepEqual(reasons(pair.find(card => card.id === unknown.id)), [['hoursUnconfirmed', {}]]);
   assert.equal(pair.find(card => card.id === unknown.id).versus.text, 'Часы работы не подтверждены, в отличие от остальных.');
+  // «В отличие от остальных» only when all the others have them: with a second card without hours it is not said.
+  const alsoUnknown = place('osm:node:18', { name: 'Ещё кофейня без часов', category: 'cafe', tags: { amenity: 'cafe' }, lat: 51.1215, lon: 71.4198 });
+  const three = recommend([open, unknown, alsoUnknown], { ...start, query: 'кофе' }).recommendations;
+  assert.equal(three.length, 3);
+  assert.ok(three.every(card => !card.versus.reasons.some(reason => reason.key === 'hoursUnconfirmed')));
 });
 
 test('the new lines exist in Kazakh and English, with the place name and the numbers', () => {
