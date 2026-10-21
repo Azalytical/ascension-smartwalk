@@ -8,6 +8,7 @@ import { timeRing } from './ring.js';
 import { navLinks, categoryArt, watchButton } from './common.js';
 import { toast, announce } from './toast.js';
 import { ratingBlock } from './rating.js';
+import { replanBlock } from './replan.js';
 import { marker, fitPoints, userDot } from '../map/map.js';
 import { showStart, showRoutes, upgradeRoute, hideRoutes, hideStart } from '../map/layers.js';
 
@@ -50,6 +51,8 @@ export function mountLive(container, { onFinished }) {
   let placeMarker = null;
   let meMarker = null;
   let finished = null;
+  // The latest GPS fix stays on the phone; «Что-то пошло не так?» plans from it.
+  let fix = null;
 
   const ringHost = h('div', { class: 'live-ring' });
   const countdown = h('strong', { class: 'live-count num' });
@@ -61,6 +64,12 @@ export function mountLive(container, { onFinished }) {
   const action = h('button', { class: 'btn btn-gold btn-xl live-action', type: 'button' });
   const alertBox = h('div', { class: 'live-alert', role: 'alert', hidden: true });
   const navHost = h('div');
+  const replan = replanBlock({ getWalk: () => walk, getFix: () => fix, apply: (next, message) => {
+    walk = next;
+    store.set('walk', walk);
+    toast(message, { iconName: 'return', duration: 6000 });
+    render();
+  } });
 
   const finish = () => {
     const now = Date.now();
@@ -101,6 +110,7 @@ export function mountLive(container, { onFinished }) {
     const progress = elapsed / (walk.plan.total * 60);
     clear(ringHost, timeRing({ there: walk.plan.there, visit: walk.plan.visit, back: walk.plan.back, reserve: walk.plan.reserve, size: 148, stroke: 12, progress, className: 'ring-live' }));
     countdown.textContent = `${remaining < 0 ? '+' : ''}${clock(remaining)}`;
+    replan.element.hidden = walk.phase === 'back';
     countLabel.textContent = toEnd < 0 ? t('live.over') : toBack < 0 ? t('live.inReserve') : t('live.toReturn');
     ringHost.append(h('div', { class: 'ring-center' }, countdown, countLabel));
     ringHost.classList.toggle('is-over', toEnd < 0);
@@ -129,13 +139,14 @@ export function mountLive(container, { onFinished }) {
 
   function drawMap() {
     const target = walk.phase === 'back' ? walk.start : walk.place;
-    const from = walk.phase === 'back' ? walk.place : walk.start;
+    // After a change of plan the leg starts where the person was, not at the start or the place.
+    const from = walk.phase === 'back' ? walk.backFrom || walk.place : walk.from || walk.start;
     showStart(walk.start, walk.start.name);
     placeMarker?.remove();
     placeMarker = marker(h('div', { class: 'result-pin is-selected', 'aria-hidden': 'true' }, categoryArt(walk.place.category, 22, 'pin-art')), [walk.place.lon, walk.place.lat], { anchor: 'bottom' });
     showRoutes([{ coordinates: [[from.lon, from.lat], [target.lon, target.lat]], selected: true }]);
     upgradeRoute(0, from, target);
-    fitPoints([[walk.start.lon, walk.start.lat], [walk.place.lon, walk.place.lat]], { maxZoom: 17 });
+    fitPoints([[walk.start.lon, walk.start.lat], [walk.place.lon, walk.place.lat], [from.lon, from.lat]], { maxZoom: 17 });
     clear(navHost, navLinks(from, target));
   }
 
@@ -143,6 +154,7 @@ export function mountLive(container, { onFinished }) {
     if (walk.start.kind !== 'gps' || !navigator.geolocation) return;
     watchId = navigator.geolocation.watchPosition((position) => {
       const { latitude: lat, longitude: lon } = position.coords;
+      fix = { lat, lon, at: Date.now() };
       meMarker?.remove();
       meMarker = marker(userDot(), [lon, lat]);
       if (walk.phase === 'there' && haversine(lat, lon, walk.place.lat, walk.place.lon) < 60) advance();
@@ -168,7 +180,7 @@ export function mountLive(container, { onFinished }) {
         h('button', { class: 'btn btn-quiet btn-sm', type: 'button', onclick: stop }, icon('stop'), t('live.finish'))),
       h('div', { class: 'live-hero' }, ringHost,
         h('div', { class: 'live-side' }, h('div', { class: 'live-place' }, categoryArt(walk.place.category, 28), h('strong', { text: walk.place.name })), returnLine, spareLine, phaseLine)),
-      alertBox, action, stepper, navHost,
+      alertBox, action, stepper, replan.element, navHost,
       watchButton({ place: walk.place, start: walk.start, walk: walk.plan.there, visit: walk.plan.visit, back: walk.plan.back, minutes: walk.plan.total }),
       h('p', { class: 'fine center', text: t('live.screenOn') })));
     tick();
