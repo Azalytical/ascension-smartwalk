@@ -53,6 +53,8 @@ export const BEATS = {
       await d.cap('Живой сайт · <i>«Хочу выпить кофе и немного отдохнуть»</i> · 45 минут', 0, 5600);
       await d.glance('#results-title', { fx: 0.25, dur: 700 });
       await d.sleep(800);
+      // With Gemini on, its tip sits above the list: the panel scrolls so the three cafés are in view.
+      await d.scrollTo('.result-row', { at: 0.12, dur: 900 });
       const rows = d.page.locator('.result-row');
       const n = Math.min(3, await rows.count());
       for (let i = 0; i < n; i++) { await d.glance(rows.nth(i), { fx: 0.86, fy: 0.42, dur: 650 }); await d.sleep(650); }
@@ -63,7 +65,13 @@ export const BEATS = {
     async run(c) {
       const { d } = await c.front('coffee', { results: true });
       await toResults(d);
-      await d.tap(d.page.locator('.result-row').first(), { fx: 0.35, after: 900 });
+      const row = d.page.locator('.result-row').first();
+      await d.tap(row, { fx: 0.35, after: 900 });
+      if (!(await d.exists('.place-view', 3000))) {
+        // A second try on the name itself; then the row's own click, so a missed aim never costs the card.
+        if (await d.exists('.result-row')) await d.tap(row.locator('.result-name'), { after: 900 }).catch(() => {});
+        if (!(await d.exists('.place-view', 2500)) && await d.exists('.result-row')) await row.click({ timeout: 2000 }).catch(() => {});
+      }
       if (!(await d.exists('.place-view', 4000))) throw new Error('карточка не открылась');
       await d.ring('.place-view .time-card');
       await d.cap('Туда, на месте, обратно, запас и <i>во сколько вы вернётесь</i>', 0, 4800);
@@ -102,6 +110,7 @@ export const BEATS = {
       await d.glance('#results-title', { fx: 0.25, dur: 700 });
       await d.sleep(600);
       const first = d.page.locator('.result-row').first();
+      await d.reveal(first, 300);
       await d.glance(first, { fx: 0.5, fy: 0.3 });
       await d.ring(first);
       await d.sleep(2600);
