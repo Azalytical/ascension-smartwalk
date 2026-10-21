@@ -1,6 +1,6 @@
 // One set of tools over the Aidem place base, shared by the MCP server (/mcp) and the Gemini agent (/api/agent).
 // Every tool is deterministic and read-only except get_weather, which asks Open-Meteo for the weather around a rounded point.
-import { recommend, preparedPlaces, haversineMeters, VISIT, RESERVE_OPTIONS, DEFAULT_RESERVE } from './retrieval.mjs';
+import { recommend, preparedPlaces, haversineMeters, VISIT, RESERVE_OPTIONS, DEFAULT_RESERVE, MAX_MINUTES } from './retrieval.mjs';
 import { checkVisit } from './hours.mjs';
 import { placeLinks, mapLinks } from './links.mjs';
 import { astanaWeather } from './weather.mjs';
@@ -87,7 +87,7 @@ function brief(poi, extra = {}) {
 
 function planWalk(args, { dataset, now, ratings = null, cityEvents = null }) {
   const start = location(args, true);
-  const minutes = number(args, 'minutes', { min: 10, max: 180, fallback: 60 });
+  const minutes = number(args, 'minutes', { min: 10, max: MAX_MINUTES, fallback: 60 });
   const at = visitTime(args);
   const query = typeof args?.query === 'string' ? args.query.slice(0, 300) : '';
   let result;
@@ -232,12 +232,12 @@ export const TOOLS = [
   { name: 'plan_walk', title: 'Подобрать прогулку',
     description: 'Подбирает до 3 отдельных мест рядом с точкой старта, на которые хватит времени: дорога туда, время на месте, дорога обратно и запас (5, 10 или 15 минут, по умолчанию 5). Отсеивает места, закрытые к моменту прихода по часам работы из источника, и места, которые человек скрыл. Для каждого места даёт «почему», versus (чем отличается от других вариантов, только по данным), план с часами, уверенность, предупреждения, источник и ссылки Google Maps, 2ГИС и Google Календарь. surprise = true даёт одно случайное место из прошедших эти проверки.',
     inputSchema: { type: 'object', properties: { lat, lon,
-      minutes: { type: 'number', description: 'Сколько всего времени на прогулку, минут (10–180). По умолчанию 60.' },
+      minutes: { type: 'number', description: 'Сколько всего времени на прогулку, минут (10–240). По умолчанию 60.' },
       query: { type: 'string', description: 'Пожелание своими словами на русском, казахском или английском: «тихое кафе», «с ребёнком», «под крышей».' },
       category: categoryField,
       with_child: { type: 'boolean', description: 'С ребёнком: только парки и детские площадки.' },
       max_walk_minutes: { type: 'number', description: 'Сколько максимум идти в одну сторону, минут.' },
-      return_to_start: { type: 'boolean', description: 'Нужно ли вернуться к точке старта. По умолчанию да.' },
+      return_to_start: { type: 'boolean', description: 'Нужно ли вернуться к точке старта. По умолчанию да; false — только туда: дорога туда, время на месте и запас.' },
       reserve_minutes: { type: 'number', enum: RESERVE_OPTIONS, description: 'Запас времени сверх дороги и посещения: 5, 10 или 15 минут. По умолчанию 5.' },
       exclude_ids: { type: 'array', items: { type: 'string' }, description: 'id мест, которые человек попросил больше не предлагать (до 200).' },
       surprise: { type: 'boolean', description: '«Удиви меня»: одно случайное место из подходящих по времени, часам и условиям.' },

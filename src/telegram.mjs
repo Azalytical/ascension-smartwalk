@@ -3,7 +3,7 @@
  * webhook response body, so no outbound call is needed. Patterns (button keyboard, request_location,
  * secret token header, 30-minute in-memory session) come from the Ascension HackAlem bot.
  */
-import { recommend } from './retrieval.mjs';
+import { recommend, MAX_MINUTES } from './retrieval.mjs';
 import { coarse } from './privacy.mjs';
 
 const SESSION_TTL_MS = 30 * 60 * 1000;
@@ -46,7 +46,7 @@ export function minutesFrom(text) {
   let total = (hours ? Number(hours[1]) * 60 : 0) + (minutes ? Number(minutes[1]) : 0);
   if (!total && /полчаса|half an hour/.test(t)) total = 30;
   if (!total && /(^|\s)(час|hour|an hour|бір сағат)/.test(t)) total = 60;
-  return Math.min(180, Math.max(20, Math.round(total || 60)));
+  return Math.min(MAX_MINUTES, Math.max(20, Math.round(total || 60)));
 }
 
 function formatResult(result, generation) {

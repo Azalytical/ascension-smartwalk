@@ -37,6 +37,7 @@ test('time phrases map to the API time limits', () => {
   assert.equal(minutesFrom('1,5 ч'), 90);
   assert.equal(minutesFrom('40 минут'), 40);
   assert.equal(minutesFrom('полчаса'), 30);
-  assert.equal(minutesFrom('10 часов'), 180);
+  assert.equal(minutesFrom('3 часа'), 180);
+  assert.equal(minutesFrom('10 часов'), 240);
   assert.equal(minutesFrom('кофе'), 60);
 });

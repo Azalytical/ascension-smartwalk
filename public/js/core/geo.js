@@ -27,10 +27,10 @@ export function estimate(start, place) {
   return { distanceMeters: Math.ceil(distance), walkMinutes: walk, visitMinutes: visit, returnMinutes: walk, safetyReserveMinutes: RESERVE, totalMinutes: walk * 2 + visit + RESERVE };
 }
 
-/** How far one can go and still come back: the radius of the reach ring on the map. */
-export function reachMeters(minutes, maxWalk, reserve = RESERVE) {
-  const oneWay = Math.max(0, Math.min(maxWalk, Math.floor((minutes - reserve - 15) / 2)));
-  return oneWay * METERS_PER_MINUTE / DETOUR;
+/** How far one can go and still come back (or, for «только туда», still have a short visit): the reach ring on the map. */
+export function reachMeters(minutes, maxWalk, reserve = RESERVE, oneWay = false) {
+  const walk = Math.max(0, Math.min(maxWalk, Math.floor((minutes - reserve - 15) / (oneWay ? 1 : 2))));
+  return walk * METERS_PER_MINUTE / DETOUR;
 }
 
 export function circlePolygon(lon, lat, radiusMeters, steps = 72) {

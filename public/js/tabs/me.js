@@ -94,6 +94,7 @@ function repeat(item) {
   if (item.plan) store.set('plan', item.plan);
   const url = new URL(location.origin);
   url.searchParams.set('t', item.plan?.minutes || 45);
+  if (item.plan?.oneWay) url.searchParams.set('one', '1');
   if (item.plan?.query) url.searchParams.set('q', item.plan.query);
   if (item.start?.kind === 'preset') url.searchParams.set('from', item.start.id);
   // The address bar can be reloaded or copied, so the person's own point goes into it rounded.

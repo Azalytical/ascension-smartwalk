@@ -18,6 +18,9 @@ addStrings({
     'replan.kept': 'Вернётесь всё так же к {time}: на месте будет {n} мин вместо {m}.',
     'replan.later': 'Вернётесь к {time}, на {n} мин позже; запас ещё покрывает.', 'replan.over': 'Вернётесь к {time}: это на {n} мин позже запаса. Можно повернуть обратно сейчас.',
     'replan.private': 'Считается на телефоне по списку мест: ваша точка никуда не отправляется.', 'replan.failed': 'Не удалось загрузить список мест.',
+    'replan.forClosedOne': 'Вместо «{name}», успеете до {time}:', 'replan.forRainOne': 'Под крышей, успеете до {time}:', 'replan.rowOne': '{there} мин отсюда · {visit} мин на месте',
+    'replan.switchedOne': 'Новый план: «{name}», закончите к {time}', 'replan.keptOne': 'Закончите всё так же к {time}: на месте будет {n} мин вместо {m}.',
+    'replan.laterOne': 'Закончите к {time}, на {n} мин позже; запас ещё покрывает.', 'replan.overOne': 'Закончите к {time}: это на {n} мин позже запаса.',
   },
   kk: {
     'replan.title': 'Жоспар өзгерді ме?', 'replan.closed': 'Орын жабық', 'replan.rain': 'Жаңбыр не суық', 'replan.late': '15 минутқа кешігіп жатырмын',
@@ -29,6 +32,9 @@ addStrings({
     'replan.kept': 'Бұрынғыдай сағат {time} ораласыз: орнында {m} мин орнына {n} мин боласыз.',
     'replan.later': 'Сағат {time} ораласыз, {n} мин кешірек; қор әлі жетеді.', 'replan.over': 'Сағат {time} ораласыз: бұл қордан {n} мин кеш. Қазір кері қайтуға болады.',
     'replan.private': 'Орындар тізімі бойынша телефонда есептеледі: сіздің нүктеңіз ешқайда жіберілмейді.', 'replan.failed': 'Орындар тізімін жүктеу мүмкін болмады.',
+    'replan.forClosedOne': '«{name}» орнына, сағат {time} дейін үлгересіз:', 'replan.forRainOne': 'Шатыр астында, сағат {time} дейін үлгересіз:', 'replan.rowOne': 'осы жерден {there} мин · орнында {visit} мин',
+    'replan.switchedOne': 'Жаңа жоспар: «{name}», сағат {time} аяқтайсыз', 'replan.keptOne': 'Бұрынғыдай сағат {time} аяқтайсыз: орнында {m} мин орнына {n} мин боласыз.',
+    'replan.laterOne': 'Сағат {time} аяқтайсыз, {n} мин кешірек; қор әлі жетеді.', 'replan.overOne': 'Сағат {time} аяқтайсыз: бұл қордан {n} мин кеш.',
   },
   en: {
     'replan.title': 'Something went wrong?', 'replan.closed': 'Place is closed', 'replan.rain': 'Rain or cold', 'replan.late': 'Running 15 min late',
@@ -40,11 +46,16 @@ addStrings({
     'replan.kept': 'Still back by {time}: {n} min on site instead of {m}.',
     'replan.later': 'Back by {time}, {n} min later; the reserve still covers it.', 'replan.over': 'Back by {time}: {n} min past the reserve. You can turn back now.',
     'replan.private': 'Worked out on your phone from the place list: your location is not sent anywhere.', 'replan.failed': 'Could not load the place list.',
+    'replan.forClosedOne': 'Instead of «{name}», done by {time}:', 'replan.forRainOne': 'Under a roof, done by {time}:', 'replan.rowOne': '{there} min from here · {visit} min on site',
+    'replan.switchedOne': 'New plan: «{name}», done by {time}', 'replan.keptOne': 'Still done by {time}: {n} min on site instead of {m}.',
+    'replan.laterOne': 'Done by {time}, {n} min later; the reserve still covers it.', 'replan.overOne': 'Done by {time}: {n} min past the reserve.',
   },
 });
 
 const hoursAt = (openingHours, arrival, visit) => checkVisit(openingHours, arrival, visit);
 const backClock = (walk) => time(walk.startedAt + (walk.plan.there + walk.plan.visit + walk.plan.back) * 60000);
+// One way there is no way back: «закончите к» instead of «вернётесь к», and no «Повернуть обратно».
+const say = (walk, key, params) => t(walk.oneWay ? `${key}One` : key, params);
 
 /**
  * The block under the walk's steps. `getWalk()` is the current walk, `getFix()` the latest GPS fix (kept on the phone),
@@ -70,34 +81,35 @@ export function replanBlock({ getWalk, getFix, apply }) {
     const found = alternatives(walk, data.items, { reason, here: point, now, hoursAt });
     const promised = backClock(walk);
     const back = time(now + found.backNow * 60000);
-    const turnNote = h('p', { class: 'fine', text: found.lateBy ? t('replan.backLate', { time: back, n: found.lateBy }) : t('replan.backNow', { time: back }) });
+    const turnNote = walk.oneWay ? null : h('p', { class: 'fine', text: found.lateBy ? t('replan.backLate', { time: back, n: found.lateBy }) : t('replan.backNow', { time: back }) });
+    const turn = walk.oneWay ? null : backButton();
     if (!found.options.length) {
-      clear(result, h('p', { class: 'lead', text: t('replan.none', { time: promised }) }), turnNote, backButton());
+      clear(result, h('p', { class: 'lead', text: t('replan.none', { time: promised }) }), turnNote, turn);
       return;
     }
     clear(result,
-      h('p', { class: 'meta', text: t(reason === 'rain' ? 'replan.forRain' : 'replan.forClosed', { name: walk.place.name, time: promised }) }),
+      h('p', { class: 'meta', text: say(walk, reason === 'rain' ? 'replan.forRain' : 'replan.forClosed', { name: walk.place.name, time: promised }) }),
       h('div', { class: 'list' }, found.options.map((option) => h('button', { class: 'list-row place-row', type: 'button',
         'aria-label': `${t('replan.go')}: ${option.place.name}`,
         onclick: () => {
           const next = switchTo(getWalk(), option, { here: point, now: Date.now() });
           clear(result);
-          apply(next, t('replan.switched', { name: option.place.name, time: backClock(next) }));
+          apply(next, say(next, 'replan.switched', { name: option.place.name, time: backClock(next) }));
         } },
       categoryArt(option.place.category, 36, 'art'),
       h('span', { class: 'row-text' }, h('strong', { text: option.place.name }),
-        h('small', { text: t('replan.row', option) }),
+        h('small', { text: say(walk, 'replan.row', option) }),
         hoursChip(hoursStatus(option.place, option.there, option.visit))),
       icon('chevron', 'row-chevron')))),
-      turnNote, backButton(), h('p', { class: 'fine', text: t('replan.private') }));
+      turnNote, turn, h('p', { class: 'fine', text: t('replan.private') }));
   }
 
   function late() {
     const change = runLate(getWalk(), 15);
     const at = backClock(change.walk);
-    const message = change.kept ? t('replan.kept', { time: at, n: change.visitAfter, m: change.visitBefore })
-      : change.over ? t('replan.over', { time: at, n: change.over }) : t('replan.later', { time: at, n: change.later });
-    clear(result, h('p', { class: change.over ? 'banner is-bad' : 'meta', text: message }), change.over ? backButton() : null);
+    const message = change.kept ? say(change.walk, 'replan.kept', { time: at, n: change.visitAfter, m: change.visitBefore })
+      : change.over ? say(change.walk, 'replan.over', { time: at, n: change.over }) : say(change.walk, 'replan.later', { time: at, n: change.later });
+    clear(result, h('p', { class: change.over ? 'banner is-bad' : 'meta', text: message }), change.over && !change.walk.oneWay ? backButton() : null);
     apply(change.walk, message);
   }
 

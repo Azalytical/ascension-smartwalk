@@ -93,7 +93,7 @@ function schedule({ stops, legs, walking, total }, constraints, reference) {
     returnMinutes, reserveMinutes: constraints.safetyReserveMinutes, totalMinutes: total, returnToStart: constraints.returnToStart,
     backBy, isEstimate: true,
     summary: `${path}${constraints.returnToStart ? ` → обратно ${returnMinutes} мин` : ''}. Всего около ${total} из ${constraints.minutes} мин`
-      + `${backBy ? `, вернётесь примерно к ${backBy}` : ''}.`,
+      + `${backBy ? `, ${constraints.returnToStart ? 'вернётесь' : 'закончите'} примерно к ${backBy}` : ''}.`,
     warnings: ['Маршрут построен по прямой между точками с коэффициентом обхода; переходы и входы не проверены.',
       'Порядок мест выбран по времени и соответствию запросу; на месте его можно поменять.'],
   };

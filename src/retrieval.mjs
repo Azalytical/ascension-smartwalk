@@ -15,6 +15,8 @@ const SPEED_KMH = 4.2;
 // Spare minutes on top of the way there, the visit and the way back. The visitor picks one of these; 5 by default.
 export const RESERVE_OPTIONS = Object.freeze([5, 10, 15]);
 export const DEFAULT_RESERVE = 5;
+// The longest walk the app plans: «2 ч+» offers 2.5, 3 and 4 hours.
+export const MAX_MINUTES = 240;
 const MAX_HIDDEN = 200;
 export const VISIT = { park: 15, cafe: 20, museum: 35, playground: 20, attraction: 15, restaurant: 45, mall: 40, culture: 60, family: 60, nightlife: 60 };
 const LABELS = { park: 'парк', cafe: 'кафе', museum: 'музей', playground: 'площадка', attraction: 'достопримечательность',
@@ -176,7 +178,7 @@ function constraintsFor(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) invalid('Передайте координаты и ограничения прогулки.');
   const lat = numeric(input.lat, NaN, 'Широта', BOUNDS.minLat, BOUNDS.maxLat);
   const lon = numeric(input.lon, NaN, 'Долгота', BOUNDS.minLon, BOUNDS.maxLon);
-  const minutes = numeric(input.minutes, 60, 'Время прогулки', 10, 180);
+  const minutes = numeric(input.minutes, 60, 'Время прогулки', 10, MAX_MINUTES);
   const maxWalkMinutes = numeric(input.maxWalkMinutes, 20, 'Путь в одну сторону', 1, 180);
   if (input.withChild !== undefined && typeof input.withChild !== 'boolean') invalid('withChild должен быть логическим значением.');
   if (input.returnToStart !== undefined && typeof input.returnToStart !== 'boolean') invalid('returnToStart должен быть логическим значением.');
@@ -794,7 +796,7 @@ function understoodFor(constraints, requested, excluded, intents, reference, nig
   // `params` carry what the label says, so the app can put it in Kazakh or English.
   const items = [
     { key: 'location', label: 'Точка старта: используется только для расчёта, не сохраняется и не передаётся модели', params: {} },
-    { key: 'time', label: `${constraints.minutes} мин всего, до ${constraints.maxWalkMinutes} мин пешком в одну сторону${constraints.returnToStart ? ', с возвращением' : ''}`
+    { key: 'time', label: `${constraints.minutes} мин всего, до ${constraints.maxWalkMinutes} мин пешком в одну сторону${constraints.returnToStart ? ', с возвращением' : ', только туда'}`
       + `, запас ${constraints.safetyReserveMinutes} мин`,
     params: { minutes: constraints.minutes, maxWalk: constraints.maxWalkMinutes, returnToStart: Boolean(constraints.returnToStart), reserve: constraints.safetyReserveMinutes } },
   ];

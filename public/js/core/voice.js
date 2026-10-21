@@ -12,42 +12,8 @@ export const lastHeard = { text: '', lang: 'ru' };
 const lettersLang = (text) => (/[әғқңөұүһі]/i.test(text) ? 'kk' : /[а-яё]/i.test(text) ? 'ru' : /[a-z]/i.test(text) ? 'en' : lang());
 
 // ---------- understanding the phrase ----------
-const WORD_NUMBERS = {
-  'десять': 10, 'пятнадцать': 15, 'двадцать': 20, 'двадцать пять': 25, 'тридцать': 30, 'сорок': 40, 'сорок пять': 45, 'пятьдесят': 50, 'шестьдесят': 60, 'девяносто': 90,
-  'ten': 10, 'fifteen': 15, 'twenty': 20, 'thirty': 30, 'forty': 40, 'forty five': 45, 'fifty': 50, 'sixty': 60, 'ninety': 90,
-  'он': 10, 'он бес': 15, 'жиырма': 20, 'отыз': 30, 'қырық': 40, 'қырық бес': 45, 'елу': 50, 'алпыс': 60, 'тоқсан': 90,
-};
-const HOUR_WORDS = { 'один': 1, 'одного': 1, 'два': 2, 'двух': 2, 'три': 3, 'one': 1, 'two': 2, 'three': 3, 'бір': 1, 'екі': 2, 'үш': 3 };
-const numberWords = Object.keys(WORD_NUMBERS).sort((a, b) => b.length - a.length).join('|');
-const hourWords = Object.keys(HOUR_WORDS).join('|');
-
-const RULES = [
-  [/(?:на\s+)?полтора\s+час\S*|(?:an?\s+)?hour\s+and\s+a\s+half|бір\s+жарым\s+сағат\S*|1[.,]5\s*(?:час\S*|h(?:ours?)?|сағат\S*)/i, () => 90],
-  [/(?:на\s+)?полчаса|half\s+an\s+hour|жарты\s+сағат\S*/i, () => 30],
-  [/(?:на\s+|for\s+)?(\d{1,3})\s*(?:-?\s*(?:мин\S*|min\S*|минут\S*))/i, (m) => Number(m[1])],
-  [new RegExp(`(?:на\\s+|for\\s+)?(${numberWords})\\s+(?:мин\\S*|min\\S*)`, 'i'), (m) => WORD_NUMBERS[m[1].toLowerCase()]],
-  [/(?:на\s+|for\s+)?(\d)\s*(?:час\S*|h(?:ours?)?\b|сағат\S*)/i, (m) => Number(m[1]) * 60],
-  [new RegExp(`(?:на\\s+|for\\s+)?(${hourWords})\\s+(?:час\\S*|hours?|сағат\\S*)`, 'i'), (m) => HOUR_WORDS[m[1].toLowerCase()] * 60],
-  [/(?:на\s+|for\s+)?(?:an?\s+)?(?<!\p{L})(?:час|hour|сағат)(?!\p{L})/iu, () => 60],
-];
-
-/** Pulls the time budget out of a spoken or typed request: "на час, кофе и парк" -> { minutes: 60, query: "кофе и парк" }. */
-export function understand(text) {
-  let query = String(text || '').replace(/\s+/g, ' ').trim();
-  let minutes = null;
-  for (const [pattern, value] of RULES) {
-    const match = pattern.exec(query);
-    if (!match) continue;
-    const found = value(match);
-    if (Number.isFinite(found) && found >= 10 && found <= 180) {
-      minutes = found;
-      query = (query.slice(0, match.index) + ' ' + query.slice(match.index + match[0].length));
-    }
-    break;
-  }
-  query = query.trim().replace(/^(?:(?:у меня|i have|менде|а|ну|тогда|давай(?:те)?|and|so|well|ал|енді)(?:\s+|$))+/i, '').replace(/\s+([,.!?])/g, '$1').replace(/^[\s,.;:—-]+|[\s,.;:—-]+$/g, '').replace(/\s+/g, ' ').trim();
-  return { minutes, query };
-}
+// The time in the phrase («3 часа», «только туда») is read by core/time-words.js.
+export { understand } from './time-words.js';
 
 // ---------- listening ----------
 export const canListen = () => Boolean(window.SpeechRecognition || window.webkitSpeechRecognition || (navigator.mediaDevices?.getUserMedia && window.MediaRecorder));
