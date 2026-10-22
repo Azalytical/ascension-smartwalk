@@ -96,7 +96,7 @@ function snapshot() {
     mode: S.mode, online: S.online, gemini: S.gemini, places: S.places, siteError: S.siteError,
     slide: S.slide, seg: S.seg, inBonus: S.inBonus, carry: S.carry, view: S.view, busy: S.busy, beat: S.beat, queue: S.queue, paused: S.paused,
     t0: S.t0, now: Date.now(), captions: S.captions, blackout: S.blackout, screens: S.screens, placement: S.placement, mirrored: S.mirrored,
-    tabs: Object.fromEntries(Object.entries(S.tabs).map(([k, t]) => [k, { state: t.state, at: t.loadedAt, lang: t.lang }])), phone: S.phone, note: S.note,
+    tabs: Object.fromEntries(Object.entries(S.tabs).map(([k, t]) => [k, { state: t.state, at: t.loadedAt, lang: t.lang, error: t.error || undefined }])), phone: S.phone, note: S.note,
     tour: S.tour, messages: S.messages, ui: S.ui, site: SITE_LABEL, offlineVideo: Boolean(OFFLINE_VIDEO),
     overlay: overlay.state === 'off' ? null : { on: S.overlayOn, state: overlay.state },
   };
@@ -312,7 +312,7 @@ await deck.waitForFunction(() => window.deck && window.deck.slides && window.dec
 // A window.open from the deck page (with a user gesture, so no popup blocker) is always a tab of the deck's own window.
 async function newShowTab() {
   const opened = context.waitForEvent('page', { timeout: 10000 });
-  await deckCdp.send('Runtime.evaluate', { expression: "void window.open('about:blank', '_blank')", userGesture: true }).catch(() => {});
+  await deckCdp.send('Runtime.evaluate', { expression: "void window.open('about:blank', '_blank', 'noopener')", userGesture: true }).catch(() => {});
   let page = await opened.catch(() => null);
   if (page) {
     const cdp = await context.newCDPSession(page);
@@ -416,10 +416,34 @@ async function ensureTab(name) {
     const page = await newShowTab();
     t = S.tabs[name] = { name, page, state: 'new', loadedAt: 0, ready: null };
     page.on('crash', () => { t.state = 'failed'; log(`Вкладка «${name}» упала`, 'bad'); });
+    page.on('pageerror', (e) => { t.jsError = String(e?.message || e).split('\n')[0].slice(0, 160); });
     // A new tab comes to the front by itself: what the hall was looking at goes back on top.
     await (S.tabs[S.view]?.page || deck).bringToFront();
   }
   return t;
+}
+// The walk tabs wait for the options themselves. The site's error screen gets its own «Повторить» once; the empty screen and
+// a page that never answers are a failure, with the page's words in the log so the reason is known.
+async function waitResults(page, ms) {
+  const until = Date.now() + ms;
+  let retried = false, seen = '';
+  while (Date.now() < until) {
+    const st = await page.evaluate(() => {
+      const state = document.querySelector('.state-view');
+      const view = document.querySelector('#app section.view, section.view');
+      return { rows: document.querySelectorAll('.result-row').length, bad: !!document.querySelector('.state-view .state-icon.is-bad'),
+        text: state ? state.innerText.replace(/\s+/g, ' ').trim().slice(0, 160) : '', view: view ? view.className.replace(/\bview\b/, '').trim() : '' };
+    }).catch(() => null);
+    if (st?.rows) return '';
+    if (st?.text) {
+      seen = st.text;
+      if (!st.bad || retried) return `на странице: «${seen}»`;
+      retried = true;
+      await page.locator('.state-view .btn-primary').first().click({ timeout: 3000 }).catch(() => {});
+    } else if (st) seen = st.view ? `вид ${st.view}` : seen;
+    await sleep(500);
+  }
+  return `нет вариантов за ${Math.round(ms / 1000)} с${seen ? ` (${seen})` : ''}`;
 }
 async function openTab(name, url) {
   const t = await ensureTab(name);
@@ -427,16 +451,30 @@ async function openTab(name, url) {
   t.url = url;
   push();
   t.ready = (async () => {
-    try {
-      await t.page.goto(SITE + url, { waitUntil: 'domcontentloaded', timeout: 20000 });
-      if (name === 'agent') await t.page.waitForSelector('#examples .chip', { timeout: 15000 });
-      else await t.page.waitForSelector('.result-row, .state-view', { timeout: 25000 });
-      t.lang = await ensureRussian(t.page, name);
-      t.state = (name === 'agent' || await t.page.locator('.result-row').count()) ? 'ready' : 'failed';
-    } catch (e) { t.state = 'failed'; t.error = e.message.split('\n')[0]; }
+    // Two tries: a slow answer of the AI or a page that stuck gets a fresh load.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        t.jsError = '';
+        await t.page.goto(SITE + url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+        if (name === 'agent') await t.page.waitForSelector('#examples .chip', { timeout: 15000 });
+        else {
+          const why = await waitResults(t.page, 30000);
+          if (why) throw new Error(why);
+        }
+        t.lang = await ensureRussian(t.page, name);
+        t.state = (name === 'agent' || await t.page.locator('.result-row').count()) ? 'ready' : 'failed';
+        if (t.state === 'failed') throw new Error('варианты пропали после смены языка');
+        t.error = '';
+        break;
+      } catch (e) {
+        t.state = 'failed';
+        t.error = e.message.split('\n')[0].slice(0, 200) + (t.jsError ? `; ошибка страницы: ${t.jsError}` : '');
+        if (attempt === 1) log(`Вкладка «${name}» не открылась (${t.error}), пробую ещё раз`, 'bad');
+      }
+    }
     t.loadedAt = Date.now();
     push();
-    if (t.state === 'failed') log(`Вкладка «${name}» не загрузилась: живой шаг заменит слайд`, 'bad');
+    if (t.state === 'failed') log(`Вкладка «${name}» не загрузилась (${t.error}): живой шаг заменит слайд`, 'bad');
     return t.state;
   })();
   return t;
@@ -470,8 +508,9 @@ async function loadSiteTabs(force = false) {
     const url = links[name];
     if (!force && t && t.state === 'ready' && Date.now() - t.loadedAt < 3 * 60000) continue;
     if (t && t.state === 'loading') continue;
-    await openTab(name, url);
-    await sleep(400); // the free Gemini key: a small gap between the walk requests
+    const opened = await openTab(name, url);
+    // One walk request at a time (the free Gemini key): the next tab starts once this one answered, or after 8 s.
+    await Promise.race([opened.ready, sleep(8000)]);
   }
 }
 
@@ -482,9 +521,11 @@ const directors = new Map();
 const dOf = (page) => { if (!directors.has(page)) directors.set(page, director(page, ctl, { captions: S.captions })); return directors.get(page); };
 async function veil(page, to, ms) { await page.evaluate(([to, ms]) => window.__AD && window.__AD.fade(to, ms), [to, ms]).catch(() => {}); }
 async function front(name, opt = {}) {
-  const t = S.tabs[name] || (S.online ? await openTab(name, links[name]) : null);
+  let t = S.tabs[name] || (S.online ? await openTab(name, links[name]) : null);
   if (!t) throw new Error('сайт недоступен');
-  if (t.state === 'loading') await Promise.race([t.ready, sleep(opt.wait ?? 12000)]);
+  // A tab that failed earlier gets one more load right now, before the step gives up and shows the slide.
+  if (t.state === 'failed' && S.online) t = await openTab(name, links[name]);
+  if (t.state === 'loading') await Promise.race([t.ready, sleep(opt.wait ?? 15000)]);
   if (t.state !== 'ready') throw new Error(`вкладка «${name}» не загрузилась`);
   const d = dOf(t.page);
   if (S.view !== name) {

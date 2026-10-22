@@ -6,7 +6,7 @@
 // The demo links of the speech (its section «Ссылки для демо»); the speech file wins if it has them.
 export const LINKS = {
   coffee: '/?lat=51.0880152&lon=71.4097489&t=45&w=15&q=' + encodeURIComponent('Хочу выпить кофе и немного отдохнуть. Нужно вернуться к началу') + '&go=1',
-  tourist: '/?from=baiterek&t=120&w=30&q=' + encodeURIComponent('Я турист, у меня 2 часа перед вылетом: что можно посмотреть поблизости?') + '&go=1',
+  tourist: '/?from=baiterek&t=120&w=30&q=' + encodeURIComponent('Я турист, у меня 2 часа перед вылетом: какие достопримечательности поблизости?') + '&go=1',
   agent: '/agent',
 };
 
@@ -143,7 +143,8 @@ export const BEATS = {
   h3: {
     label: 'Вкладка «Рядом»: соты H3, 3D, самый высокий столбик',
     async run(c) {
-      const { d } = await c.front('tourist');
+      // «Рядом» is the same on any tab of the site: without the tourist's tab the coffee tab shows it.
+      const { d } = await c.front(c.isLoaded('tourist') || !c.isLoaded('coffee') ? 'tourist' : 'coffee');
       await d.tap('#tab-explore', { after: 900 });
       if (!(await d.exists('.chip-h3', 5000))) { c.note('Кнопки «Соты H3» на сайте нет: пропусти фразу про соты.'); return; }
       await d.cap('Все 2058 мест на сетке <i>Uber H3</i>', 0, 4200);
@@ -169,7 +170,9 @@ export const BEATS = {
   dataPanel: {
     label: 'Кофе: панель «Какие данные использованы» и «Клетка на карте»',
     async run(c) {
-      const { d } = await c.front('coffee', { results: true });
+      const { d } = await c.front('coffee');
+      // «Рядом» may have been shown on this tab (no tourist tab): the options are one tap away.
+      if (!(await d.exists('.results-view, .place-view')) && await d.exists('#tab-walk')) await d.tap('#tab-walk', { after: 900 });
       await toResults(d);
       if (!(await d.exists('.data-used', 2000))) throw new Error('панели «Какие данные использованы» нет на сайте');
       await d.scrollTo('.data-used', { at: 0.06, dur: 1500 });
