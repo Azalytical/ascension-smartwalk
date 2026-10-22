@@ -15,7 +15,7 @@ import { networkInterfaces, platform, tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { parseSpeech } from './lib/speech.mjs';
 import { director } from './lib/director.mjs';
-import { findBrowser, profileDir, closeOldShow, pickScreens, place } from './lib/browser.mjs';
+import { findBrowser, profileDir, closeOldShow, pickScreens, place, windowOf } from './lib/browser.mjs';
 import { BEATS, CUES, LINKS } from './scenes/pitch.mjs';
 import { TOUR } from './scenes/tour.mjs';
 
@@ -307,6 +307,22 @@ const deckCdp = await context.newCDPSession(deck);
 await deck.goto(`${SHOW}/deck/index.html`);
 await deck.waitForFunction(() => window.deck && window.deck.slides && window.deck.i >= 0, null, { timeout: 15000 }).catch(() => log('Колода загрузилась без управления: листать её можно стрелками', 'bad'));
 
+// Tabs of the site open in the deck's window, on the projector. A tab made over CDP lands in the window used last, and with two
+// screens that is the prompter's window on the laptop: the site then showed up on the laptop instead of the projector.
+// A window.open from the deck page (with a user gesture, so no popup blocker) is always a tab of the deck's own window.
+async function newShowTab() {
+  const opened = context.waitForEvent('page', { timeout: 10000 });
+  await deckCdp.send('Runtime.evaluate', { expression: "void window.open('about:blank', '_blank')", userGesture: true }).catch(() => {});
+  let page = await opened.catch(() => null);
+  if (page) {
+    const cdp = await context.newCDPSession(page);
+    const [a, b] = await Promise.all([windowOf(cdp).catch(() => null), windowOf(deckCdp).catch(() => null)]);
+    await cdp.detach().catch(() => {});
+    if (a && b && a.windowId !== b.windowId) log('Вкладка сайта открылась не в окне показа: перетащите её на проектор', 'bad');
+  }
+  return page || context.newPage();
+}
+
 // The prompter: its own window, on the laptop screen.
 let pult = null, pultCdp = null;
 {
@@ -394,15 +410,19 @@ say(`Суфлёр вручную, если его окна не видно: ${SH
 
 // ---------- tabs of the site ----------
 const order = ['coffee', 'tourist', 'agent'];
-async function openTab(name, url) {
+async function ensureTab(name) {
   let t = S.tabs[name];
   if (!t) {
-    const page = await context.newPage();
+    const page = await newShowTab();
     t = S.tabs[name] = { name, page, state: 'new', loadedAt: 0, ready: null };
     page.on('crash', () => { t.state = 'failed'; log(`Вкладка «${name}» упала`, 'bad'); });
     // A new tab comes to the front by itself: what the hall was looking at goes back on top.
     await (S.tabs[S.view]?.page || deck).bringToFront();
   }
+  return t;
+}
+async function openTab(name, url) {
+  const t = await ensureTab(name);
   t.state = 'loading';
   t.url = url;
   push();
@@ -438,6 +458,13 @@ async function ensureRussian(page, name) {
 }
 async function loadSiteTabs(force = false) {
   if (!S.online) return;
+  // Each new tab goes right after the deck, so they are made last to first: the deck, «кофе», «турист», «агент» = Ctrl+1…4 as in the speech.
+  if (order.some((name) => !S.tabs[name])) {
+    for (const name of [...order].reverse()) await ensureTab(name);
+    // With a projector the deck's window must still fill it after the new tabs.
+    const w = S.screens.count >= 2 && !TEST ? await windowOf(deckCdp).catch(() => null) : null;
+    if (w && w.bounds.windowState !== 'fullscreen') await onScreens().catch(() => {});
+  }
   for (const name of order) {
     const t = S.tabs[name];
     const url = links[name];
@@ -613,7 +640,7 @@ async function startTour(opt = {}) {
   const from = Math.max(0, Math.min(TOUR.length - 1, Number(opt.from) || 0));
   S.mode = 'tour'; S.tour = { step: from, total: TOUR.length, title: TOUR[from]?.title, state: 'run', loop };
   push();
-  const t = S.tabs.tour || (S.tabs.tour = { name: 'tour', page: await context.newPage(), state: 'ready', loadedAt: Date.now() });
+  const t = S.tabs.tour || (S.tabs.tour = { name: 'tour', page: await newShowTab(), state: 'ready', loadedAt: Date.now() });
   await deck.bringToFront();
   const d = dOf(t.page);
   const tctx = { page: t.page, d, site: SITE, front: () => front('tour'), toDeck, note: beatCtx.note, links, log, online: () => S.online };
@@ -675,7 +702,7 @@ async function onKey(o, page) {
 }
 async function offlineVideo() {
   if (!OFFLINE_VIDEO) { log('Записи для показа без интернета нет в папке', 'bad'); return; }
-  const t = S.tabs.video || (S.tabs.video = { name: 'video', page: await context.newPage(), state: 'ready' });
+  const t = S.tabs.video || (S.tabs.video = { name: 'video', page: await newShowTab(), state: 'ready' });
   if (S.view === 'video') { await toDeck(); return; }
   await t.page.goto(`${SHOW}/offline`);
   await t.page.bringToFront();
